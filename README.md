@@ -84,12 +84,8 @@ Ver archivo `SETUP.md` para instrucciones detalladas de instalación.
 
 ## 📝 Estado del Proyecto
 
-**MVP en desarrollo** - Estructura base lista para implementación
+**MVP en desarrollo**
 
 ## 📄 Licencia
 
 MIT
-
----
-
-**Nota**: Los archivos `instrucciones.md` y `roadmap.md` contienen documentación interna detallada y no se suben al repositorio.
