@@ -1,0 +1,31 @@
+{
+  "name": "cio-mvp",
+  "version": "1.0.0",
+  "description": "CIO - Cazador Inteligente de Oportunidades - MVP",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:landing": "npm run dev --workspace=apps/landing",
+    "dev:backend": "npm run start:dev --workspace=apps/backend",
+    "build:landing": "npm run build --workspace=apps/landing",
+    "build:backend": "npm run build --workspace=apps/backend",
+    "start:landing": "npm run start --workspace=apps/landing",
+    "start:backend": "npm run start:prod --workspace=apps/backend",
+    "prisma:generate": "npm run prisma:generate --workspace=apps/backend",
+    "prisma:migrate": "npm run prisma:migrate:dev --workspace=apps/backend",
+    "prisma:studio": "npm run prisma:studio --workspace=apps/backend"
+  },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "job-search",
+    "nestjs",
+    "nextjs"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+

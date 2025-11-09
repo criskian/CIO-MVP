@@ -1,0 +1,101 @@
+// Schema de Prisma para CIO MVP
+// Base de datos: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile       UserProfile?
+  sessions      Session[]
+  alerts        AlertPreference[]
+  searchLogs    JobSearchLog[]
+  sentJobs      SentJob[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  role          String?
+  location      String?
+  jobType       String?  // full_time, part_time, internship, freelance
+  minSalary     Int?
+  remoteAllowed Boolean?
+  createdFromCV Boolean  @default(false)
+  cvUrl         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  state     String   // enum-like: NEW, ASK_TERMS, ASK_ROLE, ASK_LOCATION, ASK_JOB_TYPE, ASK_MIN_SALARY, ASK_ALERT_TIME, READY
+  data      Json?    // para info temporal
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model AlertPreference {
+  id               String    @id @default(cuid())
+  userId           String
+  alertTimeLocal   String    // "07:00"
+  timezone         String    @default("America/Bogota")
+  enabled          Boolean   @default(true)
+  lastNotification DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("alert_preferences")
+}
+
+model JobSearchLog {
+  id          String   @id @default(cuid())
+  userId      String
+  executedAt  DateTime @default(now())
+  query       String
+  resultCount Int
+  success     Boolean  @default(true)
+  errorMsg    String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("job_search_logs")
+}
+
+model SentJob {
+  id        String   @id @default(cuid())
+  userId    String
+  url       String
+  title     String
+  company   String?
+  sentAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, url])
+  @@map("sent_jobs")
+}
+

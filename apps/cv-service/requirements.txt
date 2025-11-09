@@ -1,0 +1,10 @@
+# CV Processing Service - Dependencias Python
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+pdfplumber==0.10.3
+PyPDF2==3.0.1
+python-dotenv==1.0.0
+openai==1.3.0
+requests==2.31.0
+
