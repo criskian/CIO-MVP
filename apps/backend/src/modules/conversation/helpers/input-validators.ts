@@ -112,6 +112,41 @@ export function isHelpIntent(text: string): boolean {
 }
 
 /**
+ * Detecta intención de reiniciar perfil
+ */
+export function isRestartIntent(text: string): boolean {
+  const normalizedText = text.toLowerCase().trim();
+  const restartPatterns = [
+    'reiniciar',
+    'restart',
+    'reset',
+    'volver a empezar',
+    'comenzar de nuevo',
+    'empezar de nuevo',
+  ];
+
+  return restartPatterns.some((pattern) => normalizedText.includes(pattern));
+}
+
+/**
+ * Detecta intención de cancelar servicio
+ */
+export function isCancelServiceIntent(text: string): boolean {
+  const normalizedText = text.toLowerCase().trim();
+  const cancelPatterns = [
+    'cancelar',
+    'cancel',
+    'dejar de usar',
+    'no quiero',
+    'eliminar cuenta',
+    'borrar datos',
+    'darme de baja',
+  ];
+
+  return cancelPatterns.some((pattern) => normalizedText.includes(pattern));
+}
+
+/**
  * Detecta la intención general del usuario
  */
 export function detectIntent(text: string): UserIntent {

@@ -72,7 +72,11 @@ Ejemplo: "9:00", "18:30", "10:00 AM", etc.`,
 
 Cuando esté listo, podrás decirme "buscar" para encontrar ofertas inmediatamente.
 
-Por ahora, estoy en pruebas. ¡Gracias por tu paciencia! 🙏`,
+Por ahora, estoy en pruebas. ¡Gracias por tu paciencia! 🙏
+
+_Comandos útiles:_
+• Escribe *"reiniciar"* para volver a configurar tu perfil
+• Escribe *"cancelar"* si deseas dejar de usar el servicio`,
 
   // Errores de validación
   ERROR_ROLE_INVALID: `Por favor, ingresa un cargo válido (al menos 2 caracteres).
@@ -119,10 +123,39 @@ Si necesitas ayuda, escribe "ayuda".`,
 
 Por ahora estoy en fase de pruebas. Pronto podré buscar ofertas de empleo para ti.
 
-Mantente atento a las actualizaciones. 🚀`,
+Mantente atento a las actualizaciones. 🚀
+
+_Comandos disponibles:_
+• Escribe *"reiniciar"* para volver a configurar tu perfil
+• Escribe *"cancelar"* si deseas dejar de usar el servicio`,
 
   // Mensaje de error general
   ERROR_GENERAL: `Lo siento, ocurrió un error inesperado. 😔
 
 Por favor intenta de nuevo en unos momentos.`,
+
+  // Mensajes de gestión de cuenta
+  CONFIRM_RESTART: `¿Estás seguro que deseas reiniciar tu perfil? 🔄
+
+Esto eliminará toda tu configuración actual y comenzarás desde cero.
+
+Responde *"Sí"* para confirmar o *"No"* para cancelar.`,
+
+  RESTART_CANCELLED: `Perfecto, tu perfil se mantiene como está. 👍`,
+
+  RESTARTED: `Tu perfil ha sido reiniciado. Comencemos de nuevo. 🔄`,
+
+  CONFIRM_CANCEL_SERVICE: `¿Estás seguro que deseas dejar de usar CIO? 😢
+
+Esto eliminará toda tu información y no recibirás más alertas.
+
+Responde *"Sí"* para confirmar o *"No"* para continuar usando el servicio.`,
+
+  SERVICE_CANCELLED: `Entiendo. Tu información ha sido eliminada y ya no recibirás alertas.
+
+Si cambias de opinión en el futuro, puedes escribirme nuevamente.
+
+¡Mucha suerte en tu búsqueda de empleo! 🍀`,
+
+  CANCEL_SERVICE_ABORTED: `¡Me alegra que te quedes! 😊 Tu perfil sigue activo.`,
 };

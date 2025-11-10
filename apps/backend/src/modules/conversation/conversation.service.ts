@@ -13,6 +13,8 @@ import {
   detectIntent,
   isAcceptance,
   isRejection,
+  isRestartIntent,
+  isCancelServiceIntent,
   normalizeRole,
   normalizeLocation,
   normalizeJobType,
@@ -118,6 +120,12 @@ export class ConversationService {
 
       case ConversationState.READY:
         return await this.handleReadyState(userId, text, intent);
+
+      case ConversationState.CONFIRM_RESTART:
+        return await this.handleConfirmRestartState(userId, text);
+
+      case ConversationState.CONFIRM_CANCEL_SERVICE:
+        return await this.handleConfirmCancelServiceState(userId, text);
 
       default:
         this.logger.warn(`Estado desconocido: ${currentState}`);
@@ -290,6 +298,18 @@ export class ConversationService {
     text: string,
     intent: UserIntent,
   ): Promise<BotReply> {
+    // Detectar intención de reiniciar perfil
+    if (isRestartIntent(text)) {
+      await this.updateSessionState(userId, ConversationState.CONFIRM_RESTART);
+      return { text: BotMessages.CONFIRM_RESTART };
+    }
+
+    // Detectar intención de cancelar servicio
+    if (isCancelServiceIntent(text)) {
+      await this.updateSessionState(userId, ConversationState.CONFIRM_CANCEL_SERVICE);
+      return { text: BotMessages.CONFIRM_CANCEL_SERVICE };
+    }
+
     // TODO: Implementar búsqueda de empleos
     // if (intent === UserIntent.SEARCH_NOW) {
     //   return await this.performJobSearch(userId);
@@ -302,6 +322,47 @@ export class ConversationService {
 
     // Por ahora, solo mensaje de "no disponible"
     return { text: BotMessages.NOT_READY_YET };
+  }
+
+  /**
+   * Estado CONFIRM_RESTART: Confirmando reinicio de perfil
+   */
+  private async handleConfirmRestartState(userId: string, text: string): Promise<BotReply> {
+    if (isAcceptance(text)) {
+      // Usuario confirmó reinicio
+      await this.restartUserProfile(userId);
+      await this.updateSessionState(userId, ConversationState.ASK_TERMS);
+      return { text: `${BotMessages.RESTARTED}\n\n${BotMessages.ASK_TERMS}` };
+    }
+
+    if (isRejection(text)) {
+      // Usuario canceló el reinicio
+      await this.updateSessionState(userId, ConversationState.READY);
+      return { text: BotMessages.RESTART_CANCELLED };
+    }
+
+    // No entendió la respuesta
+    return { text: `${BotMessages.CONFIRM_RESTART}\n\n_Responde "Sí" o "No"._` };
+  }
+
+  /**
+   * Estado CONFIRM_CANCEL_SERVICE: Confirmando cancelación del servicio
+   */
+  private async handleConfirmCancelServiceState(userId: string, text: string): Promise<BotReply> {
+    if (isAcceptance(text)) {
+      // Usuario confirmó cancelación
+      await this.deleteUserCompletely(userId);
+      return { text: BotMessages.SERVICE_CANCELLED };
+    }
+
+    if (isRejection(text)) {
+      // Usuario decidió no cancelar
+      await this.updateSessionState(userId, ConversationState.READY);
+      return { text: BotMessages.CANCEL_SERVICE_ABORTED };
+    }
+
+    // No entendió la respuesta
+    return { text: `${BotMessages.CONFIRM_CANCEL_SERVICE}\n\n_Responde "Sí" o "No"._` };
   }
 
   /**
@@ -424,5 +485,43 @@ Continúa con el proceso manual. 👇`,
     });
 
     this.logger.debug(`⏰ Alerta configurada para: ${alertTime}`);
+  }
+
+  /**
+   * Reinicia el perfil del usuario (elimina datos pero mantiene el User)
+   */
+  private async restartUserProfile(userId: string) {
+    // Eliminar UserProfile
+    await this.prisma.userProfile.deleteMany({ where: { userId } });
+
+    // Eliminar AlertPreference
+    await this.prisma.alertPreference.deleteMany({ where: { userId } });
+
+    // Eliminar búsquedas y trabajos enviados
+    await this.prisma.jobSearchLog.deleteMany({ where: { userId } });
+    await this.prisma.sentJob.deleteMany({ where: { userId } });
+
+    // Resetear sesión a NEW
+    await this.prisma.session.updateMany({
+      where: { userId },
+      data: { state: ConversationState.NEW, data: {}, updatedAt: new Date() },
+    });
+
+    this.logger.log(`🔄 Perfil reiniciado para usuario ${userId}`);
+  }
+
+  /**
+   * Elimina completamente al usuario y todos sus datos
+   */
+  private async deleteUserCompletely(userId: string) {
+    // Prisma Cascade Delete eliminará automáticamente:
+    // - UserProfile
+    // - Session
+    // - AlertPreference
+    // - JobSearchLog
+    // - SentJob
+    await this.prisma.user.delete({ where: { id: userId } });
+
+    this.logger.log(`🗑️ Usuario eliminado completamente: ${userId}`);
   }
 }

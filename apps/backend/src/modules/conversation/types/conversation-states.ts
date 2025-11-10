@@ -14,6 +14,8 @@ export enum ConversationState {
   // Estados adicionales para flujos especiales
   WAITING_CV = 'WAITING_CV', // Usuario quiere enviar CV
   PROCESSING_CV = 'PROCESSING_CV', // CV siendo procesado
+  CONFIRM_RESTART = 'CONFIRM_RESTART', // Confirmando reinicio de perfil
+  CONFIRM_CANCEL_SERVICE = 'CONFIRM_CANCEL_SERVICE', // Confirmando cancelación del servicio
 }
 
 /**
