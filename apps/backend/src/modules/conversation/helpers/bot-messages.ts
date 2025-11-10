@@ -70,13 +70,12 @@ Ejemplo: "9:00", "18:30", "10:00 AM", etc.`,
 🔍 Buscarás: *${role}*
 📍 Ubicación: *${location}*
 
-Cuando esté listo, podrás decirme "buscar" para encontrar ofertas inmediatamente.
-
-Por ahora, estoy en pruebas. ¡Gracias por tu paciencia! 🙏
-
-_Comandos útiles:_
+_Comandos disponibles:_
+• Escribe *"buscar"* para encontrar ofertas de empleo ahora
 • Escribe *"reiniciar"* para volver a configurar tu perfil
-• Escribe *"cancelar"* si deseas dejar de usar el servicio`,
+• Escribe *"cancelar"* si deseas dejar de usar el servicio
+
+¿Qué te gustaría hacer?`,
 
   // Errores de validación
   ERROR_ROLE_INVALID: `Por favor, ingresa un cargo válido (al menos 2 caracteres).
@@ -118,16 +117,15 @@ Por ahora estoy en fase de pruebas. Pronto podrás:
 
 Si necesitas ayuda, escribe "ayuda".`,
 
-  // Mensaje cuando el usuario está en estado READY pero aún no hay búsqueda implementada
-  NOT_READY_YET: `¡Gracias por tu interés! 🙏
-
-Por ahora estoy en fase de pruebas. Pronto podré buscar ofertas de empleo para ti.
-
-Mantente atento a las actualizaciones. 🚀
+  // Mensaje cuando el usuario está en estado READY
+  NOT_READY_YET: `¡Tu perfil está listo! 🎉
 
 _Comandos disponibles:_
+• Escribe *"buscar"* para encontrar ofertas de empleo ahora
 • Escribe *"reiniciar"* para volver a configurar tu perfil
-• Escribe *"cancelar"* si deseas dejar de usar el servicio`,
+• Escribe *"cancelar"* si deseas dejar de usar el servicio
+
+¿Qué te gustaría hacer?`,
 
   // Mensaje de error general
   ERROR_GENERAL: `Lo siento, ocurrió un error inesperado. 😔

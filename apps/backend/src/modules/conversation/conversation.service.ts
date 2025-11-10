@@ -7,7 +7,7 @@ import {
   NormalizedIncomingMessage,
   BotReply,
 } from '../whatsapp/interfaces/whatsapp-provider.interface';
-import { ConversationState, UserIntent, JobType } from './types/conversation-states';
+import { ConversationState, UserIntent } from './types/conversation-states';
 import { BotMessages } from './helpers/bot-messages';
 import {
   detectIntent,
@@ -310,10 +310,10 @@ export class ConversationService {
       return { text: BotMessages.CONFIRM_CANCEL_SERVICE };
     }
 
-    // TODO: Implementar búsqueda de empleos
-    // if (intent === UserIntent.SEARCH_NOW) {
-    //   return await this.performJobSearch(userId);
-    // }
+    // Detectar intención de buscar empleos
+    if (intent === UserIntent.SEARCH_NOW) {
+      return await this.performJobSearch(userId);
+    }
 
     // TODO: Implementar cambio de preferencias
     // if (intent === UserIntent.CHANGE_PREFERENCES) {
@@ -322,6 +322,44 @@ export class ConversationService {
 
     // Por ahora, solo mensaje de "no disponible"
     return { text: BotMessages.NOT_READY_YET };
+  }
+
+  /**
+   * Ejecuta búsqueda de empleos y devuelve resultados formateados
+   */
+  private async performJobSearch(userId: string): Promise<BotReply> {
+    try {
+      this.logger.log(`🔍 Usuario ${userId} solicitó búsqueda de empleos`);
+
+      // Ejecutar búsqueda
+      const result = await this.jobSearchService.searchJobsForUser(userId);
+
+      // Si no hay ofertas
+      if (result.jobs.length === 0) {
+        return {
+          text: `No encontré ofertas que coincidan con tu perfil en este momento. 😔
+
+Intenta de nuevo más tarde o escribe "reiniciar" para ajustar tus preferencias.`,
+        };
+      }
+
+      // Formatear ofertas para WhatsApp
+      const formattedJobs = this.jobSearchService.formatJobsForWhatsApp(result.jobs);
+
+      // Marcar ofertas como enviadas
+      await this.jobSearchService.markJobsAsSent(userId, result.jobs);
+
+      return { text: formattedJobs };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error en búsqueda de empleos: ${errorMessage}`);
+
+      return {
+        text: `Lo siento, no pude buscar ofertas en este momento. 😔
+
+Por favor intenta de nuevo en unos minutos.`,
+      };
+    }
   }
 
   /**
@@ -369,7 +407,7 @@ export class ConversationService {
    * Maneja la subida de CV (stub)
    */
   private async handleCVUpload(userId: string, mediaUrl: string): Promise<BotReply> {
-    this.logger.log(`📄 CV recibido de usuario ${userId}`);
+    this.logger.log(`📄 CV recibido de usuario ${userId}: ${mediaUrl}`);
 
     // TODO: Implementar con CvService
     // await this.cvService.processCV(userId, mediaUrl);
@@ -491,13 +529,21 @@ Continúa con el proceso manual. 👇`,
    * Reinicia el perfil del usuario (elimina datos pero mantiene el User)
    */
   private async restartUserProfile(userId: string) {
-    // Eliminar UserProfile
-    await this.prisma.userProfile.deleteMany({ where: { userId } });
+    // Eliminar UserProfile (1:1 con User)
+    try {
+      await this.prisma.userProfile.delete({ where: { userId } });
+    } catch {
+      // No existe, continuar
+    }
 
-    // Eliminar AlertPreference
-    await this.prisma.alertPreference.deleteMany({ where: { userId } });
+    // Eliminar AlertPreference (1:1 con User)
+    try {
+      await this.prisma.alertPreference.delete({ where: { userId } });
+    } catch {
+      // No existe, continuar
+    }
 
-    // Eliminar búsquedas y trabajos enviados
+    // Eliminar búsquedas y trabajos enviados (pueden ser múltiples)
     await this.prisma.jobSearchLog.deleteMany({ where: { userId } });
     await this.prisma.sentJob.deleteMany({ where: { userId } });
 
