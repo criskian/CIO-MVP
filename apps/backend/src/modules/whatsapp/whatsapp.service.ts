@@ -1,49 +1,117 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ConversationService } from '../conversation/conversation.service';
-// TODO: Implementar providers específicos (Cloud API / Twilio)
+import { IWhatsappProvider, BotReply } from './interfaces/whatsapp-provider.interface';
+import { CloudApiProvider } from './providers/cloud-api.provider';
+import { TwilioProvider } from './providers/twilio.provider';
 
+/**
+ * Servicio principal de WhatsApp
+ * Actúa como adapter agnóstico entre el proveedor y el resto de la aplicación
+ * NO contiene lógica de negocio, solo adapta mensajes
+ */
 @Injectable()
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
+  private readonly provider: IWhatsappProvider;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly conversationService: ConversationService,
-  ) {}
+    private readonly cloudApiProvider: CloudApiProvider,
+    private readonly twilioProvider: TwilioProvider,
+  ) {
+    // Seleccionar provider según configuración
+    const providerType = this.configService.get<string>('WHATSAPP_PROVIDER', 'cloud_api');
+
+    if (providerType === 'twilio') {
+      this.provider = this.twilioProvider;
+      this.logger.log('📱 Usando Twilio como proveedor de WhatsApp');
+    } else {
+      this.provider = this.cloudApiProvider;
+      this.logger.log('📱 Usando WhatsApp Cloud API como proveedor');
+    }
+  }
 
   /**
-   * Verifica el webhook (para WhatsApp Cloud API)
+   * Verifica el webhook (solo para Cloud API)
    */
-  verifyWebhook(mode: string, token: string, challenge: string) {
-    const verifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN');
-
-    if (mode === 'subscribe' && token === verifyToken) {
-      this.logger.log('Webhook verificado exitosamente');
-      return challenge;
+  verifyWebhook(mode: string, token: string, challenge: string): string | { error: string } {
+    if (this.provider.verifyWebhook) {
+      const result = this.provider.verifyWebhook(mode, token, challenge);
+      return result || { error: 'Verification failed' };
     }
 
-    this.logger.error('Fallo en verificación de webhook');
-    return { error: 'Verification failed' };
+    // Twilio no requiere verificación GET
+    this.logger.warn('Provider no soporta verificación de webhook');
+    return { error: 'Not supported' };
   }
 
   /**
    * Maneja webhooks entrantes de WhatsApp
    */
-  async handleIncomingWebhook(payload: any) {
-    // TODO: Parsear según el provider (Cloud API o Twilio)
-    this.logger.log('Webhook recibido:', JSON.stringify(payload));
+  async handleIncomingWebhook(payload: any): Promise<{ status: string }> {
+    try {
+      this.logger.log('📨 Webhook recibido');
+      this.logger.debug(`Payload: ${JSON.stringify(payload)}`);
 
-    // Por ahora solo retornamos 200 OK
-    return { status: 'ok' };
+      // Normalizar mensaje usando el provider
+      const normalizedMessage = this.provider.normalizeIncomingMessage(payload);
+
+      if (!normalizedMessage) {
+        this.logger.warn('⚠️ No se pudo normalizar el mensaje');
+        return { status: 'ignored' };
+      }
+
+      this.logger.log(
+        `📬 Mensaje de ${normalizedMessage.phone}: ${normalizedMessage.text || '[media]'}`,
+      );
+
+      // Pasar al ConversationService para procesar
+      const reply = await this.conversationService.handleIncomingMessage(normalizedMessage);
+
+      // Enviar respuesta
+      await this.sendMessage(normalizedMessage.phone, reply.text);
+
+      return { status: 'ok' };
+    } catch (error) {
+      this.logger.error(`❌ Error procesando webhook: ${error.message}`, error.stack);
+
+      // Intentar enviar mensaje de error al usuario
+      try {
+        const normalizedMessage = this.provider.normalizeIncomingMessage(payload);
+        if (normalizedMessage) {
+          await this.sendMessage(
+            normalizedMessage.phone,
+            'Lo siento, hubo un error temporal. Por favor intenta de nuevo en unos momentos.',
+          );
+        }
+      } catch (sendError) {
+        this.logger.error(`Error enviando mensaje de error: ${sendError.message}`);
+      }
+
+      return { status: 'error' };
+    }
   }
 
   /**
-   * Envía un mensaje de texto a WhatsApp
+   * Envía un mensaje de texto a un número
    */
-  async sendMessage(phone: string, text: string) {
-    // TODO: Implementar según provider
-    this.logger.log(`Enviando mensaje a ${phone}: ${text}`);
+  async sendMessage(to: string, text: string): Promise<void> {
+    try {
+      await this.provider.sendMessage(to, text);
+      this.logger.log(`✅ Mensaje enviado a ${to}`);
+    } catch (error) {
+      this.logger.error(`❌ Error enviando mensaje a ${to}: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Envía una respuesta del bot (BotReply)
+   */
+  async sendBotReply(to: string, reply: BotReply): Promise<void> {
+    await this.sendMessage(to, reply.text);
+    // Futuro: manejar botones, listas, templates, etc.
   }
 }
-
