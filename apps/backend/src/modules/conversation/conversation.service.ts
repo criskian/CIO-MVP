@@ -78,7 +78,9 @@ export class ConversationService {
         text: `¡Hola! 👋 Soy CIO, tu Cazador Inteligente de Oportunidades.\n\nEstoy aquí para ayudarte a encontrar las mejores ofertas de empleo en Colombia.\n\n✨ Por ahora estoy en fase de pruebas, pero pronto podré:\n• Buscar empleos personalizados para ti\n• Enviarte alertas diarias\n• Filtrar por ubicación, salario y tipo de trabajo\n\n¡Gracias por probarme! 🚀`,
       };
     } catch (error) {
-      this.logger.error(`❌ Error en handleIncomingMessage: ${error.message}`, error.stack);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`❌ Error en handleIncomingMessage: ${errorMessage}`, errorStack);
 
       return {
         text: 'Lo siento, tuve un problema técnico. Por favor intenta de nuevo en unos momentos.',

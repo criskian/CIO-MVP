@@ -34,12 +34,18 @@ export class TwilioProvider implements IWhatsappProvider {
       const url = `https://api.twilio.com/2010-04-01/Accounts/${this.accountSid}/Messages.json`;
 
       // Twilio requiere formato whatsapp:+número
-      const formattedTo = to.startsWith('whatsapp:') ? to : `whatsapp:+${to}`;
+      // Si el número ya viene con +, no lo duplicamos
+      let formattedTo = to;
+      if (!to.startsWith('whatsapp:')) {
+        formattedTo = to.startsWith('+') ? `whatsapp:${to}` : `whatsapp:+${to}`;
+      }
 
       const params = new URLSearchParams();
       params.append('From', this.fromNumber);
       params.append('To', formattedTo);
       params.append('Body', message);
+
+      this.logger.debug(`Enviando a Twilio: From=${this.fromNumber}, To=${formattedTo}`);
 
       await axios.post(url, params, {
         auth: {
@@ -53,7 +59,15 @@ export class TwilioProvider implements IWhatsappProvider {
 
       this.logger.log(`Mensaje enviado a ${to} via Twilio`);
     } catch (error) {
-      this.logger.error(`Error enviando mensaje: ${error.message}`, error.stack);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      
+      // Log adicional para errores de Twilio (Axios)
+      if (axios.isAxiosError(error) && error.response?.data) {
+        this.logger.error(`Detalles del error de Twilio: ${JSON.stringify(error.response.data)}`);
+      }
+      
+      this.logger.error(`Error enviando mensaje: ${errorMessage}`, errorStack);
       throw error;
     }
   }
@@ -85,7 +99,9 @@ export class TwilioProvider implements IWhatsappProvider {
         raw: payload,
       };
     } catch (error) {
-      this.logger.error(`Error normalizando mensaje de Twilio: ${error.message}`, error.stack);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Error normalizando mensaje de Twilio: ${errorMessage}`, errorStack);
       return null;
     }
   }

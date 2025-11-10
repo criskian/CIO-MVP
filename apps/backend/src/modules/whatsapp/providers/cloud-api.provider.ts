@@ -51,7 +51,9 @@ export class CloudApiProvider implements IWhatsappProvider {
 
       this.logger.log(`Mensaje enviado a ${to}`);
     } catch (error) {
-      this.logger.error(`Error enviando mensaje: ${error.message}`, error.stack);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Error enviando mensaje: ${errorMessage}`, errorStack);
       throw error;
     }
   }
@@ -104,7 +106,9 @@ export class CloudApiProvider implements IWhatsappProvider {
         raw: payload,
       };
     } catch (error) {
-      this.logger.error(`Error normalizando mensaje: ${error.message}`, error.stack);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Error normalizando mensaje: ${errorMessage}`, errorStack);
       return null;
     }
   }

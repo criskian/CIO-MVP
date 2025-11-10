@@ -75,7 +75,9 @@ export class WhatsappService {
 
       return { status: 'ok' };
     } catch (error) {
-      this.logger.error(`❌ Error procesando webhook: ${error.message}`, error.stack);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`❌ Error procesando webhook: ${errorMessage}`, errorStack);
 
       // Intentar enviar mensaje de error al usuario
       try {
@@ -87,7 +89,8 @@ export class WhatsappService {
           );
         }
       } catch (sendError) {
-        this.logger.error(`Error enviando mensaje de error: ${sendError.message}`);
+        const sendErrorMessage = sendError instanceof Error ? sendError.message : 'Unknown error';
+        this.logger.error(`Error enviando mensaje de error: ${sendErrorMessage}`);
       }
 
       return { status: 'error' };
@@ -102,7 +105,9 @@ export class WhatsappService {
       await this.provider.sendMessage(to, text);
       this.logger.log(`✅ Mensaje enviado a ${to}`);
     } catch (error) {
-      this.logger.error(`❌ Error enviando mensaje a ${to}: ${error.message}`, error.stack);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`❌ Error enviando mensaje a ${to}: ${errorMessage}`, errorStack);
       throw error;
     }
   }
