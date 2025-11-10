@@ -1,9 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { ConversationService } from '../conversation/conversation.service';
 import { IWhatsappProvider, BotReply } from './interfaces/whatsapp-provider.interface';
 import { CloudApiProvider } from './providers/cloud-api.provider';
-import { TwilioProvider } from './providers/twilio.provider';
 
 /**
  * Servicio principal de WhatsApp
@@ -16,21 +14,12 @@ export class WhatsappService {
   private readonly provider: IWhatsappProvider;
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly conversationService: ConversationService,
     private readonly cloudApiProvider: CloudApiProvider,
-    private readonly twilioProvider: TwilioProvider,
   ) {
-    // Seleccionar provider según configuración
-    const providerType = this.configService.get<string>('WHATSAPP_PROVIDER', 'cloud_api');
-
-    if (providerType === 'twilio') {
-      this.provider = this.twilioProvider;
-      this.logger.log('📱 Usando Twilio como proveedor de WhatsApp');
-    } else {
-      this.provider = this.cloudApiProvider;
-      this.logger.log('📱 Usando WhatsApp Cloud API como proveedor');
-    }
+    // Usar Cloud API como provider único
+    this.provider = this.cloudApiProvider;
+    this.logger.log('📱 Usando WhatsApp Cloud API como proveedor');
   }
 
   /**

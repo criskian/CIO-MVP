@@ -18,7 +18,7 @@ model User {
 
   profile       UserProfile?
   sessions      Session[]
-  alerts        AlertPreference[]
+  alert         AlertPreference?
   searchLogs    JobSearchLog[]
   sentJobs      SentJob[]
 
@@ -58,7 +58,7 @@ model Session {
 
 model AlertPreference {
   id               String    @id @default(cuid())
-  userId           String
+  userId           String    @unique
   alertTimeLocal   String    // "07:00"
   timezone         String    @default("America/Bogota")
   enabled          Boolean   @default(true)

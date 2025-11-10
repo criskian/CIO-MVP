@@ -31,11 +31,17 @@ export class CloudApiProvider implements IWhatsappProvider {
     try {
       const url = `${this.apiUrl}/${this.phoneNumberId}/messages`;
 
+      // Asegurar que el número tenga el formato correcto (+número)
+      const formattedTo = to.startsWith('+') ? to : `+${to}`;
+
+      this.logger.debug(`📤 Enviando mensaje a ${formattedTo}`);
+      this.logger.debug(`URL: ${url}`);
+
       await axios.post(
         url,
         {
           messaging_product: 'whatsapp',
-          to: to,
+          to: formattedTo,
           type: 'text',
           text: {
             body: message,
@@ -49,10 +55,16 @@ export class CloudApiProvider implements IWhatsappProvider {
         },
       );
 
-      this.logger.log(`Mensaje enviado a ${to}`);
-    } catch (error) {
+      this.logger.log(`✅ Mensaje enviado a ${formattedTo}`);
+    } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
+      
+      // Log detallado del error de Meta
+      if (error?.response?.data) {
+        this.logger.error(`❌ Error de Meta API: ${JSON.stringify(error.response.data, null, 2)}`);
+      }
+      
       this.logger.error(`Error enviando mensaje: ${errorMessage}`, errorStack);
       throw error;
     }
@@ -117,12 +129,14 @@ export class CloudApiProvider implements IWhatsappProvider {
    * Verifica el webhook de Cloud API
    */
   verifyWebhook(mode: string, token: string, challenge: string): string | null {
+    this.logger.debug(`🔍 Verificando webhook - mode: ${mode}, token recibido: ${token}, token esperado: ${this.verifyToken}, challenge: ${challenge}`);
+    
     if (mode === 'subscribe' && token === this.verifyToken) {
       this.logger.log('✅ Webhook verificado correctamente');
       return challenge;
     }
 
-    this.logger.error('❌ Fallo en verificación de webhook');
+    this.logger.error(`❌ Fallo en verificación de webhook - mode: ${mode}, token match: ${token === this.verifyToken}`);
     return null;
   }
 }
