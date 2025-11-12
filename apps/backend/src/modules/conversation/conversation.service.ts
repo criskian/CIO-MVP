@@ -15,6 +15,8 @@ import {
   isRejection,
   isRestartIntent,
   isCancelServiceIntent,
+  isEditIntent,
+  detectEditField,
   normalizeRole,
   normalizeLocation,
   normalizeJobType,
@@ -126,6 +128,24 @@ export class ConversationService {
 
       case ConversationState.CONFIRM_CANCEL_SERVICE:
         return await this.handleConfirmCancelServiceState(userId, text);
+
+      case ConversationState.EDITING_PROFILE:
+        return await this.handleEditingProfileState(userId, text);
+
+      case ConversationState.EDIT_ROLE:
+        return await this.handleEditRoleState(userId, text);
+
+      case ConversationState.EDIT_LOCATION:
+        return await this.handleEditLocationState(userId, text);
+
+      case ConversationState.EDIT_JOB_TYPE:
+        return await this.handleEditJobTypeState(userId, text);
+
+      case ConversationState.EDIT_MIN_SALARY:
+        return await this.handleEditMinSalaryState(userId, text);
+
+      case ConversationState.EDIT_ALERT_TIME:
+        return await this.handleEditAlertTimeState(userId, text);
 
       default:
         this.logger.warn(`Estado desconocido: ${currentState}`);
@@ -310,15 +330,15 @@ export class ConversationService {
       return { text: BotMessages.CONFIRM_CANCEL_SERVICE };
     }
 
+    // Detectar intención de editar perfil
+    if (isEditIntent(text)) {
+      return await this.showProfileForEditing(userId);
+    }
+
     // Detectar intención de buscar empleos
     if (intent === UserIntent.SEARCH_NOW) {
       return await this.performJobSearch(userId);
     }
-
-    // TODO: Implementar cambio de preferencias
-    // if (intent === UserIntent.CHANGE_PREFERENCES) {
-    //   return await this.handlePreferenceChange(userId);
-    // }
 
     // Por ahora, solo mensaje de "no disponible"
     return { text: BotMessages.NOT_READY_YET };
@@ -419,6 +439,195 @@ Por ahora estoy en pruebas y no puedo procesarlo aún, pero pronto podré extrae
 
 Continúa con el proceso manual. 👇`,
     };
+  }
+
+  // ========================================
+  // Métodos de edición de perfil
+  // ========================================
+
+  /**
+   * Muestra el perfil actual del usuario y transiciona a EDITING_PROFILE
+   */
+  private async showProfileForEditing(userId: string): Promise<BotReply> {
+    const profile = await this.prisma.userProfile.findUnique({ where: { userId } });
+    const alertPref = await this.prisma.alertPreference.findUnique({ where: { userId } });
+
+    if (!profile) {
+      return { text: BotMessages.NOT_READY_YET };
+    }
+
+    // Formatear valores para mostrar
+    const formattedProfile = {
+      role: profile.role || 'No configurado',
+      location: profile.remoteAllowed
+        ? `${profile.location || 'No configurado'} (Remoto permitido)`
+        : profile.location || 'No configurado',
+      jobType: this.formatJobType(profile.jobType),
+      minSalary: profile.minSalary
+        ? `$${profile.minSalary.toLocaleString('es-CO')} COP`
+        : 'Sin filtro',
+      alertTime: alertPref?.alertTimeLocal || 'No configurado',
+    };
+
+    // Transicionar a EDITING_PROFILE
+    await this.updateSessionState(userId, ConversationState.EDITING_PROFILE);
+
+    return { text: BotMessages.SHOW_CURRENT_PREFERENCES(formattedProfile) };
+  }
+
+  /**
+   * Estado EDITING_PROFILE: Usuario eligió editar, ahora debe seleccionar qué campo
+   */
+  private async handleEditingProfileState(userId: string, text: string): Promise<BotReply> {
+    // Permitir cancelar
+    if (isRejection(text) || text.toLowerCase().includes('cancelar')) {
+      await this.updateSessionState(userId, ConversationState.READY);
+      return { text: BotMessages.NOT_READY_YET };
+    }
+
+    // Detectar qué campo quiere editar
+    const field = detectEditField(text);
+
+    if (!field) {
+      return { text: BotMessages.EDIT_FIELD_NOT_FOUND };
+    }
+
+    // Transicionar al estado de edición correspondiente
+    switch (field) {
+      case 'rol':
+        await this.updateSessionState(userId, ConversationState.EDIT_ROLE);
+        return { text: BotMessages.ASK_ROLE };
+
+      case 'ubicacion':
+        await this.updateSessionState(userId, ConversationState.EDIT_LOCATION);
+        return { text: BotMessages.ASK_LOCATION };
+
+      case 'tipo':
+        await this.updateSessionState(userId, ConversationState.EDIT_JOB_TYPE);
+        return { text: BotMessages.ASK_JOB_TYPE };
+
+      case 'salario':
+        await this.updateSessionState(userId, ConversationState.EDIT_MIN_SALARY);
+        return { text: BotMessages.ASK_MIN_SALARY };
+
+      case 'horario':
+        await this.updateSessionState(userId, ConversationState.EDIT_ALERT_TIME);
+        return { text: BotMessages.ASK_ALERT_TIME };
+
+      default:
+        return { text: BotMessages.EDIT_FIELD_NOT_FOUND };
+    }
+  }
+
+  /**
+   * Estado EDIT_ROLE: Editando rol
+   */
+  private async handleEditRoleState(userId: string, text: string): Promise<BotReply> {
+    const role = normalizeRole(text);
+
+    if (!role) {
+      return { text: BotMessages.ERROR_ROLE_INVALID };
+    }
+
+    await this.updateUserProfile(userId, { role });
+    await this.updateSessionState(userId, ConversationState.READY);
+
+    return { text: BotMessages.FIELD_UPDATED('rol', role) };
+  }
+
+  /**
+   * Estado EDIT_LOCATION: Editando ubicación
+   */
+  private async handleEditLocationState(userId: string, text: string): Promise<BotReply> {
+    const location = normalizeLocation(text);
+
+    if (!location) {
+      return { text: BotMessages.ERROR_LOCATION_INVALID };
+    }
+
+    const isRemote = text.toLowerCase().includes('remoto') || text.toLowerCase().includes('remote');
+
+    await this.updateUserProfile(userId, {
+      location,
+      remoteAllowed: isRemote,
+    });
+    await this.updateSessionState(userId, ConversationState.READY);
+
+    const displayLocation = isRemote ? `${location} (Remoto)` : location;
+    return { text: BotMessages.FIELD_UPDATED('ubicación', displayLocation) };
+  }
+
+  /**
+   * Estado EDIT_JOB_TYPE: Editando tipo de empleo
+   */
+  private async handleEditJobTypeState(userId: string, text: string): Promise<BotReply> {
+    const jobType = normalizeJobType(text);
+
+    if (!jobType) {
+      return { text: BotMessages.ERROR_JOB_TYPE_INVALID };
+    }
+
+    await this.updateUserProfile(userId, { jobType });
+    await this.updateSessionState(userId, ConversationState.READY);
+
+    return { text: BotMessages.FIELD_UPDATED('tipo de empleo', this.formatJobType(jobType)) };
+  }
+
+  /**
+   * Estado EDIT_MIN_SALARY: Editando salario mínimo
+   */
+  private async handleEditMinSalaryState(userId: string, text: string): Promise<BotReply> {
+    if (text.trim() === '0') {
+      await this.updateUserProfile(userId, { minSalary: 0 });
+      await this.updateSessionState(userId, ConversationState.READY);
+      return { text: BotMessages.FIELD_UPDATED('salario mínimo', 'Sin filtro') };
+    }
+
+    const minSalary = normalizeSalary(text);
+
+    if (!minSalary) {
+      return { text: BotMessages.ERROR_SALARY_INVALID };
+    }
+
+    await this.updateUserProfile(userId, { minSalary });
+    await this.updateSessionState(userId, ConversationState.READY);
+
+    return {
+      text: BotMessages.FIELD_UPDATED(
+        'salario mínimo',
+        `$${minSalary.toLocaleString('es-CO')} COP`,
+      ),
+    };
+  }
+
+  /**
+   * Estado EDIT_ALERT_TIME: Editando horario de alertas
+   */
+  private async handleEditAlertTimeState(userId: string, text: string): Promise<BotReply> {
+    const alertTime = normalizeTime(text);
+
+    if (!alertTime) {
+      return { text: BotMessages.ERROR_TIME_INVALID };
+    }
+
+    await this.upsertAlertPreference(userId, alertTime);
+    await this.updateSessionState(userId, ConversationState.READY);
+
+    return { text: BotMessages.FIELD_UPDATED('horario de alertas', alertTime) };
+  }
+
+  /**
+   * Helper: Formatea el tipo de empleo para mostrar
+   */
+  private formatJobType(jobType: string | null | undefined): string {
+    const typeMap: Record<string, string> = {
+      full_time: 'Tiempo completo',
+      part_time: 'Medio tiempo',
+      internship: 'Pasantía',
+      freelance: 'Freelance',
+    };
+
+    return typeMap[jobType || ''] || 'No configurado';
   }
 
   // ========================================

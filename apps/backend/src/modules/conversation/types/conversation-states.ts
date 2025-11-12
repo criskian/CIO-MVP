@@ -16,6 +16,12 @@ export enum ConversationState {
   PROCESSING_CV = 'PROCESSING_CV', // CV siendo procesado
   CONFIRM_RESTART = 'CONFIRM_RESTART', // Confirmando reinicio de perfil
   CONFIRM_CANCEL_SERVICE = 'CONFIRM_CANCEL_SERVICE', // Confirmando cancelación del servicio
+  EDITING_PROFILE = 'EDITING_PROFILE', // Usuario está editando su perfil
+  EDIT_ROLE = 'EDIT_ROLE', // Editando rol específicamente
+  EDIT_LOCATION = 'EDIT_LOCATION', // Editando ubicación
+  EDIT_JOB_TYPE = 'EDIT_JOB_TYPE', // Editando tipo de empleo
+  EDIT_MIN_SALARY = 'EDIT_MIN_SALARY', // Editando salario mínimo
+  EDIT_ALERT_TIME = 'EDIT_ALERT_TIME', // Editando horario de alertas
 }
 
 /**

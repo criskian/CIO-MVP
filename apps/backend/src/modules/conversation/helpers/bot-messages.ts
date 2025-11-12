@@ -72,7 +72,8 @@ Ejemplo: "9:00", "18:30", "10:00 AM", etc.`,
 
 _Comandos disponibles:_
 • Escribe *"buscar"* para encontrar ofertas de empleo ahora
-• Escribe *"reiniciar"* para volver a configurar tu perfil
+• Escribe *"editar"* para cambiar alguna preferencia
+• Escribe *"reiniciar"* para volver a configurar tu perfil desde cero
 • Escribe *"cancelar"* si deseas dejar de usar el servicio
 
 ¿Qué te gustaría hacer?`,
@@ -122,7 +123,8 @@ Si necesitas ayuda, escribe "ayuda".`,
 
 _Comandos disponibles:_
 • Escribe *"buscar"* para encontrar ofertas de empleo ahora
-• Escribe *"reiniciar"* para volver a configurar tu perfil
+• Escribe *"editar"* para cambiar alguna preferencia
+• Escribe *"reiniciar"* para volver a configurar tu perfil desde cero
 • Escribe *"cancelar"* si deseas dejar de usar el servicio
 
 ¿Qué te gustaría hacer?`,
@@ -156,4 +158,50 @@ Si cambias de opinión en el futuro, puedes escribirme nuevamente.
 ¡Mucha suerte en tu búsqueda de empleo! 🍀`,
 
   CANCEL_SERVICE_ABORTED: `¡Me alegra que te quedes! 😊 Tu perfil sigue activo.`,
+
+  // Mensajes de edición de perfil
+  SHOW_CURRENT_PREFERENCES: (profile: {
+    role: string;
+    location: string;
+    jobType: string;
+    minSalary: string;
+    alertTime: string;
+  }) => `📝 *Tus preferencias actuales:*
+
+🔹 *Rol:* ${profile.role}
+🔹 *Ubicación:* ${profile.location}
+🔹 *Tipo de empleo:* ${profile.jobType}
+🔹 *Salario mínimo:* ${profile.minSalary}
+🔹 *Horario de alertas:* ${profile.alertTime}
+
+---
+
+Para editar una preferencia, escribe el *nombre del campo* que quieres cambiar.
+
+*Ejemplos:*
+• Escribe *"rol"* para cambiar tu cargo deseado
+• Escribe *"ubicación"* para cambiar la ciudad
+• Escribe *"tipo"* para cambiar el tipo de empleo
+• Escribe *"salario"* para cambiar el salario mínimo
+• Escribe *"horario"* para cambiar la hora de alertas
+
+También puedes escribir *"cancelar"* para volver al menú principal.`,
+
+  EDIT_FIELD_NOT_FOUND: `No entendí qué campo quieres editar. 😅
+
+Por favor, escribe uno de estos nombres:
+• *"rol"*
+• *"ubicación"*
+• *"tipo"*
+• *"salario"*
+• *"horario"*
+
+O escribe *"cancelar"* para volver.`,
+
+  FIELD_UPDATED: (fieldName: string, newValue: string) => `✅ Perfecto! Tu *${fieldName}* ha sido actualizado a: *${newValue}*
+
+Tu perfil está listo. Puedes:
+• Escribir *"buscar"* para encontrar ofertas ahora
+• Escribir *"editar"* para cambiar otra preferencia
+• Escribir *"reiniciar"* para volver a configurar todo desde cero`,
 };

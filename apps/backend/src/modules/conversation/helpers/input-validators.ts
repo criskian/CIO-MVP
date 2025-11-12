@@ -147,6 +147,90 @@ export function isCancelServiceIntent(text: string): boolean {
 }
 
 /**
+ * Detecta intención de editar perfil
+ */
+export function isEditIntent(text: string): boolean {
+  const normalizedText = text.toLowerCase().trim();
+  const editPatterns = [
+    'editar',
+    'edit',
+    'cambiar',
+    'modificar',
+    'actualizar',
+    'ajustar',
+    'corregir',
+  ];
+
+  return editPatterns.some((pattern) => normalizedText.includes(pattern));
+}
+
+/**
+ * Detecta qué campo del perfil el usuario quiere editar
+ * Retorna el nombre del campo o null si no se detecta
+ */
+export function detectEditField(
+  text: string,
+): 'rol' | 'ubicacion' | 'tipo' | 'salario' | 'horario' | null {
+  const normalizedText = text.toLowerCase().trim();
+
+  // Detectar campo "rol"
+  const rolePatterns = ['rol', 'cargo', 'puesto', 'trabajo', 'profesión', 'profesion'];
+  if (rolePatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'rol';
+  }
+
+  // Detectar campo "ubicación"
+  const locationPatterns = [
+    'ubicación',
+    'ubicacion',
+    'ciudad',
+    'lugar',
+    'localización',
+    'localizacion',
+    'donde',
+  ];
+  if (locationPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'ubicacion';
+  }
+
+  // Detectar campo "tipo de empleo"
+  const jobTypePatterns = [
+    'tipo',
+    'jornada',
+    'modalidad',
+    'tiempo completo',
+    'medio tiempo',
+    'freelance',
+    'pasantía',
+    'pasantia',
+  ];
+  if (jobTypePatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'tipo';
+  }
+
+  // Detectar campo "salario"
+  const salaryPatterns = ['salario', 'sueldo', 'pago', 'remuneración', 'remuneracion'];
+  if (salaryPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'salario';
+  }
+
+  // Detectar campo "horario de alertas"
+  const alertTimePatterns = [
+    'horario',
+    'hora',
+    'alerta',
+    'notificación',
+    'notificacion',
+    'notificaciones',
+  ];
+  if (alertTimePatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'horario';
+  }
+
+  return null;
+}
+
+/**
  * Detecta la intención general del usuario
  */
 export function detectIntent(text: string): UserIntent {
