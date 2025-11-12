@@ -6,14 +6,14 @@ import { JobPosting, JobSearchQuery, JobSearchResult } from './types/job-posting
 
 /**
  * Servicio de búsqueda de empleos
- * Utiliza Serper API para acceder a resultados de Google
+ * Utiliza SerpApi Google Jobs API para acceder al panel de "Google for Jobs"
  * NO contiene lógica de conversación, solo búsqueda y ranking
  */
 @Injectable()
 export class JobSearchService {
   private readonly logger = new Logger(JobSearchService.name);
-  private readonly serperApiKey: string;
-  private readonly serperSearchUrl = 'https://google.serper.dev/search';
+  private readonly serpApiKey: string;
+  private readonly serpApiUrl = 'https://serpapi.com/search'; // SerpApi endpoint
 
   // Palabras excluidas de búsqueda (para filtrar ofertas no deseadas)
   private readonly excludedKeywords = [
@@ -47,10 +47,12 @@ export class JobSearchService {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
   ) {
-    this.serperApiKey = this.configService.get<string>('SERPER_API_KEY', '');
+    this.serpApiKey = this.configService.get<string>('SERPAPI_API_KEY', '');
 
-    if (!this.serperApiKey) {
-      this.logger.warn('⚠️ Serper API Key no configurada. Job search no funcionará correctamente.');
+    if (!this.serpApiKey) {
+      this.logger.warn(
+        '⚠️ SerpApi API Key no configurada. Job search no funcionará correctamente.',
+      );
     }
   }
 
@@ -105,38 +107,41 @@ export class JobSearchService {
   }
 
   /**
-   * Ejecuta búsqueda en Serper API (accede a Google for Jobs)
+   * Ejecuta búsqueda en SerpApi con Google Jobs API
    */
   private async searchJobs(query: JobSearchQuery): Promise<JobSearchResult> {
     try {
       // Construir query string
       const queryString = this.buildQueryString(query);
 
-      this.logger.debug(`🔎 Query Serper: "${queryString}"`);
+      this.logger.debug(`🔎 Query SerpApi Google Jobs: "${queryString}"`);
 
-      // Llamar a Serper API
-      const response = await axios.post(
-        this.serperSearchUrl,
-        {
+      // Llamar a SerpApi con engine=google_jobs (método GET según documentación)
+      const response = await axios.get(this.serpApiUrl, {
+        params: {
+          engine: 'google_jobs', // Parámetro requerido para usar Google Jobs API
           q: queryString,
-          gl: 'co', // Geolocalización Colombia
-          hl: 'es', // Idioma español
-          num: 10, // Pedir 10 resultados
+          location: query.location || 'Colombia',
+          gl: 'co', // Country code: Colombia
+          hl: 'es', // Language: español
+          api_key: this.serpApiKey,
+          num: 20, // Número de resultados (máx 10 por página en SerpApi)
         },
-        {
-          headers: {
-            'X-API-KEY': this.serperApiKey,
-            'Content-Type': 'application/json',
-          },
-          timeout: 10000, // 10 segundos timeout
-        },
-      );
+        timeout: 15000, // 15 segundos timeout
+      });
 
-      // Normalizar resultados desde Serper
-      const organicResults = response.data.organic || [];
-      const jobs = organicResults.map((item: any) => this.normalizeSerperResult(item));
+      // Debug: Ver respuesta completa de SerpApi
+      this.logger.debug(`📊 Respuesta de SerpApi:`, JSON.stringify(response.data, null, 2));
 
-      this.logger.debug(`📊 Serper devolvió ${jobs.length} resultados`);
+      // Normalizar resultados desde SerpApi
+      // SerpApi devuelve datos estructurados en response.data.jobs_results
+      const jobsData = response.data.jobs_results || [];
+
+      this.logger.debug(`📊 SerpApi Google Jobs devolvió ${jobsData.length} resultados crudos`);
+
+      const jobs = jobsData.map((item: any) => this.normalizeSerpApiJobResult(item));
+
+      this.logger.debug(`📊 Después de normalizar: ${jobs.length} ofertas`);
 
       // Aplicar filtrado y ranking
       const filteredJobs = this.filterJobs(jobs, query);
@@ -153,8 +158,11 @@ export class JobSearchService {
     } catch (error) {
       if (axios.isAxiosError(error)) {
         this.logger.error(
-          `Error llamando Serper API: ${error.response?.status} - ${error.response?.data?.message || error.message}`,
+          `Error llamando SerpApi: ${error.response?.status} - ${error.response?.data?.error || error.message}`,
         );
+        if (error.response?.data) {
+          this.logger.error(`Respuesta completa: ${JSON.stringify(error.response.data, null, 2)}`);
+        }
       }
       throw new Error(
         'No pude buscar ofertas en este momento. Por favor intenta de nuevo más tarde.',
@@ -163,34 +171,29 @@ export class JobSearchService {
   }
 
   /**
-   * Construye el query string para Google CSE
-   * Formato: "rol empleo" para obtener ofertas específicas
+   * Construye el query string para SerpApi Google Jobs
+   * Formato simple para Google Jobs API
    */
   private buildQueryString(query: JobSearchQuery): string {
     const parts: string[] = [];
 
-    // Rol/cargo (obligatorio) - rodeado de comillas para mayor precisión
-    parts.push(`"${query.role}"`);
+    // Rol/cargo (obligatorio) - SIN comillas para ser menos restrictivo
+    parts.push(query.role);
 
-    // SIEMPRE añadir "empleo" para que Google priorice ofertas individuales
-    parts.push('empleo');
+    // Ubicación (ya se pasa como parámetro separado en location)
+    // No la incluimos en el query para evitar redundancia
 
-    // Ubicación
-    if (query.location && !query.remoteAllowed) {
-      parts.push(query.location);
-    }
-
-    // Si es remoto
+    // Si es remoto, agregar al query
     if (query.remoteAllowed) {
-      parts.push('(remoto OR "trabajo remoto" OR "desde casa")');
+      parts.push('remoto');
     }
 
-    // Tipo de jornada
+    // Tipo de jornada (simplificado)
     if (query.jobType) {
       const jobTypeMap: Record<string, string> = {
-        full_time: '"tiempo completo"',
-        part_time: '"medio tiempo"',
-        internship: '(pasantía OR práctica)',
+        full_time: 'tiempo completo',
+        part_time: 'medio tiempo',
+        internship: 'pasantía',
         freelance: 'freelance',
       };
       if (jobTypeMap[query.jobType]) {
@@ -198,15 +201,61 @@ export class JobSearchService {
       }
     }
 
-    // Colombia (para enfocar resultados)
-    parts.push('Colombia');
-
-    // Construir query final
+    // Construir query final (más simple y menos restrictivo)
     return parts.join(' ');
   }
 
   /**
-   * Normaliza un resultado de Serper al formato JobPosting
+   * Normaliza un resultado de SerpApi Google Jobs API
+   * Según documentación: jobs_results contiene datos estructurados completos
+   */
+  private normalizeSerpApiJobResult(item: any): JobPosting {
+    // Extraer URL de aplicación desde apply_options (primer elemento)
+    let url = '';
+    if (item.apply_options && Array.isArray(item.apply_options) && item.apply_options.length > 0) {
+      url = item.apply_options[0].link || '';
+    }
+
+    // Si no hay apply_options, usar share_link o cualquier otro link disponible
+    if (!url) {
+      url = item.share_link || item.link || '';
+    }
+
+    const source = this.extractDomain(url);
+
+    // Extraer información directamente de los campos estructurados de SerpApi
+    const company = item.company_name || undefined;
+    const locationRaw = item.location || undefined;
+
+    // Salario: puede venir en detected_extensions
+    let salaryRaw: string | undefined;
+    if (item.detected_extensions) {
+      // Buscar salario en detected_extensions
+      if (item.detected_extensions.salary) {
+        salaryRaw = item.detected_extensions.salary;
+      } else if (item.detected_extensions.schedule_type) {
+        // A veces el salario viene en schedule_type si está presente
+        const schedule = item.detected_extensions.schedule_type;
+        if (schedule && (schedule.includes('$') || schedule.toLowerCase().includes('cop'))) {
+          salaryRaw = schedule;
+        }
+      }
+    }
+
+    return {
+      title: item.title || 'Sin título',
+      url: url,
+      source,
+      snippet: item.description || '',
+      company,
+      locationRaw,
+      salaryRaw,
+    };
+  }
+
+  /**
+   * Normaliza un resultado de Serper Search (búsqueda web regular)
+   * NOTA: Este método ya no se usa, pero se mantiene por si acaso
    */
   private normalizeSerperResult(item: any): JobPosting {
     // Extraer dominio de la URL

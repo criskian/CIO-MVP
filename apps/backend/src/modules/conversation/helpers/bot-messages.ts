@@ -16,6 +16,14 @@ Estoy aquí para ayudarte a encontrar las mejores ofertas de empleo en Colombia.
 
 ¡Gracias por probarme! 🚀`,
 
+  // Pregunta sobre dispositivo
+  ASK_DEVICE: `Antes de empezar, ¿desde dónde me escribes?
+
+📱 *Celular / Móvil*
+💻 *PC / Portátil / Computador*
+
+Esto me ayuda a mostrarte las opciones de la mejor manera.`,
+
   // Términos y condiciones
   ASK_TERMS: `Antes de comenzar, necesito que aceptes los términos de uso:
 
@@ -198,10 +206,91 @@ Por favor, escribe uno de estos nombres:
 
 O escribe *"cancelar"* para volver.`,
 
-  FIELD_UPDATED: (fieldName: string, newValue: string) => `✅ Perfecto! Tu *${fieldName}* ha sido actualizado a: *${newValue}*
+  FIELD_UPDATED: (
+    fieldName: string,
+    newValue: string,
+  ) => `✅ Perfecto! Tu *${fieldName}* ha sido actualizado a: *${newValue}*
 
 Tu perfil está listo. Puedes:
 • Escribir *"buscar"* para encontrar ofertas ahora
 • Escribir *"editar"* para cambiar otra preferencia
 • Escribir *"reiniciar"* para volver a configurar todo desde cero`,
+
+  // Menú de comandos en estado READY
+  MENU_READY: `¿Qué te gustaría hacer?
+
+📋 *Comandos disponibles:*
+
+🔍 *buscar* - Buscar ofertas de empleo ahora
+✏️ *editar* - Cambiar tus preferencias
+🔄 *reiniciar* - Reconfigurar tu perfil desde cero
+❌ *cancelar* - Dejar de usar el servicio
+
+Escribe el comando que desees.`,
+
+  // Versiones DESKTOP de mensajes (sin botones/listas)
+  ASK_TERMS_DESKTOP: `Antes de comenzar, necesito que aceptes los términos de uso:
+
+📋 *Términos de Uso*
+
+• Recopilaré información sobre tu perfil laboral (cargo deseado, ubicación, preferencias salariales).
+• Si decides compartir tu CV, lo almacenaré de forma segura.
+• Buscaré ofertas de empleo públicas usando Google Empleos.
+• Te enviaré alertas diarias con nuevas oportunidades.
+• No compartiré tu información con terceros.
+
+Para continuar, escribe:
+• *"Acepto"* o *"Sí"* para aceptar
+• *"No acepto"* o *"No"* para rechazar`,
+
+  ASK_JOB_TYPE_DESKTOP: `¿Qué tipo de jornada prefieres?
+
+Escribe el *número* o el *nombre* de tu opción:
+
+*1* - Tiempo completo
+*2* - Medio tiempo
+*3* - Pasantía
+*4* - Freelance`,
+
+  CONFIRM_RESTART_DESKTOP: `⚠️ ¿Estás seguro de que quieres *reiniciar tu perfil*?
+
+Se borrarán todas tus preferencias actuales y empezaremos desde cero.
+
+Escribe:
+• *"Sí"* o *"Confirmar"* para reiniciar
+• *"No"* o *"Cancelar"* para mantener tu perfil`,
+
+  CONFIRM_CANCEL_SERVICE_DESKTOP: `⚠️ ¿Estás seguro de que quieres *cancelar el servicio*?
+
+Se eliminará tu cuenta y toda tu información de forma permanente.
+
+Escribe:
+• *"Sí"* o *"Confirmar"* para eliminar tu cuenta
+• *"No"* o *"Cancelar"* para mantener tu cuenta`,
+
+  EDITING_PROFILE_DESKTOP: (profile: {
+    role: string;
+    location: string;
+    jobType: string;
+    minSalary: string;
+    alertTime: string;
+  }) => `📝 *Tus preferencias actuales:*
+
+🔹 *Rol:* ${profile.role}
+🔹 *Ubicación:* ${profile.location}
+🔹 *Tipo de empleo:* ${profile.jobType}
+🔹 *Salario mínimo:* ${profile.minSalary}
+🔹 *Horario de alertas:* ${profile.alertTime}
+
+---
+
+Escribe el *número* o *nombre* del campo que quieres editar:
+
+*1* - *Rol* - Cambiar tu cargo deseado
+*2* - *Ubicación* - Cambiar la ciudad
+*3* - *Tipo* - Cambiar el tipo de empleo
+*4* - *Salario* - Cambiar el salario mínimo
+*5* - *Horario* - Cambiar la hora de alertas
+
+O escribe *"cancelar"* para volver al menú principal.`,
 };

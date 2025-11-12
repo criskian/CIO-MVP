@@ -5,6 +5,48 @@ import { JobType, UserIntent } from '../types/conversation-states';
  */
 
 /**
+ * Detecta si el usuario está en móvil/celular
+ */
+export function isMobileDevice(text: string): boolean {
+  const normalizedText = text.toLowerCase().trim();
+  const mobilePatterns = [
+    'celular',
+    'movil',
+    'móvil',
+    'telefono',
+    'teléfono',
+    'cell',
+    'phone',
+    'smartphone',
+    'android',
+    'iphone',
+    'móbil',
+  ];
+
+  return mobilePatterns.some((pattern) => normalizedText.includes(pattern));
+}
+
+/**
+ * Detecta si el usuario está en PC/desktop
+ */
+export function isDesktopDevice(text: string): boolean {
+  const normalizedText = text.toLowerCase().trim();
+  const desktopPatterns = [
+    'pc',
+    'computador',
+    'computadora',
+    'portatil',
+    'portátil',
+    'laptop',
+    'desktop',
+    'ordenador',
+    'escritorio',
+  ];
+
+  return desktopPatterns.some((pattern) => normalizedText.includes(pattern));
+}
+
+/**
  * Detecta si el usuario está aceptando (sí, acepto, ok, dale, etc.)
  */
 export function isAcceptance(text: string): boolean {

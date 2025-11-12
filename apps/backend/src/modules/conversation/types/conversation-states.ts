@@ -1,9 +1,10 @@
 /**
  * Estados de la máquina de conversación
- * Flujo: NEW → ASK_TERMS → ASK_ROLE → ASK_LOCATION → ASK_JOB_TYPE → ASK_MIN_SALARY → ASK_ALERT_TIME → READY
+ * Flujo: NEW → ASK_DEVICE → ASK_TERMS → ASK_ROLE → ASK_LOCATION → ASK_JOB_TYPE → ASK_MIN_SALARY → ASK_ALERT_TIME → READY
  */
 export enum ConversationState {
   NEW = 'NEW',
+  ASK_DEVICE = 'ASK_DEVICE', // Preguntar si está en celular o PC
   ASK_TERMS = 'ASK_TERMS',
   ASK_ROLE = 'ASK_ROLE',
   ASK_LOCATION = 'ASK_LOCATION',

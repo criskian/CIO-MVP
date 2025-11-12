@@ -17,6 +17,8 @@ import {
   isCancelServiceIntent,
   isEditIntent,
   detectEditField,
+  isMobileDevice,
+  isDesktopDevice,
   normalizeRole,
   normalizeLocation,
   normalizeJobType,
@@ -102,6 +104,9 @@ export class ConversationService {
       case ConversationState.NEW:
         return await this.handleNewState(userId);
 
+      case ConversationState.ASK_DEVICE:
+        return await this.handleAskDeviceState(userId, text);
+
       case ConversationState.ASK_TERMS:
         return await this.handleAskTermsState(userId, text, intent);
 
@@ -159,16 +164,66 @@ export class ConversationService {
   private async handleNewState(userId: string): Promise<BotReply> {
     this.logger.log(`👤 Nuevo usuario: ${userId}`);
 
-    // Transición: NEW → ASK_TERMS
-    await this.updateSessionState(userId, ConversationState.ASK_TERMS);
+    // Transición: NEW → ASK_DEVICE
+    await this.updateSessionState(userId, ConversationState.ASK_DEVICE);
 
     return {
-      text: `${BotMessages.WELCOME}\n\n${BotMessages.ASK_TERMS}`,
-      buttons: [
-        { id: 'accept_terms', title: 'Sí, acepto' },
-        { id: 'reject_terms', title: 'No acepto' },
-      ],
+      text: `${BotMessages.WELCOME}\n\n${BotMessages.ASK_DEVICE}`,
     };
+  }
+
+  /**
+   * Estado ASK_DEVICE: Detectar si está en móvil o PC
+   */
+  private async handleAskDeviceState(userId: string, text: string): Promise<BotReply> {
+    let deviceType = 'DESKTOP'; // Por defecto, asumimos desktop
+
+    if (isMobileDevice(text)) {
+      deviceType = 'MOBILE';
+      this.logger.log(`📱 Usuario en dispositivo móvil`);
+    } else if (isDesktopDevice(text)) {
+      deviceType = 'DESKTOP';
+      this.logger.log(`💻 Usuario en dispositivo desktop`);
+    } else {
+      // Si no se detecta claramente, pedimos de nuevo
+      return {
+        text: `Por favor, dime si estás en:
+
+📱 *Celular/Móvil/Teléfono*
+💻 *PC/Portátil/Computador*`,
+      };
+    }
+
+    // Guardar deviceType en la sesión activa
+    const session = await this.prisma.session.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (session) {
+      await this.prisma.session.update({
+        where: { id: session.id },
+        data: { deviceType },
+      });
+    }
+
+    // Transición: ASK_DEVICE → ASK_TERMS
+    await this.updateSessionState(userId, ConversationState.ASK_TERMS);
+
+    // Enviar términos según el dispositivo
+    if (deviceType === 'MOBILE') {
+      return {
+        text: BotMessages.ASK_TERMS,
+        buttons: [
+          { id: 'accept_terms', title: 'Sí, acepto' },
+          { id: 'reject_terms', title: 'No acepto' },
+        ],
+      };
+    } else {
+      return {
+        text: BotMessages.ASK_TERMS_DESKTOP,
+      };
+    }
   }
 
   /**
@@ -274,33 +329,41 @@ export class ConversationService {
     const jobType = normalizeJobType(text);
 
     if (!jobType) {
-      return {
-        text: BotMessages.ERROR_JOB_TYPE_INVALID,
-        listTitle: 'Seleccionar tipo',
-        listSections: [
-          {
-            title: 'Tipo de Empleo',
-            rows: [
-              {
-                id: 'full_time',
-                title: 'Tiempo completo',
-                description: 'Jornada laboral completa (8 horas)',
-              },
-              {
-                id: 'part_time',
-                title: 'Medio tiempo',
-                description: 'Jornada parcial (4-6 horas)',
-              },
-              { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
-              {
-                id: 'freelance',
-                title: 'Freelance',
-                description: 'Trabajo por proyectos',
-              },
-            ],
-          },
-        ],
-      };
+      const deviceType = await this.getDeviceType(userId);
+
+      if (deviceType === 'MOBILE') {
+        return {
+          text: BotMessages.ERROR_JOB_TYPE_INVALID,
+          listTitle: 'Seleccionar tipo',
+          listSections: [
+            {
+              title: 'Tipo de Empleo',
+              rows: [
+                {
+                  id: 'full_time',
+                  title: 'Tiempo completo',
+                  description: 'Jornada laboral completa (8 horas)',
+                },
+                {
+                  id: 'part_time',
+                  title: 'Medio tiempo',
+                  description: 'Jornada parcial (4-6 horas)',
+                },
+                { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
+                {
+                  id: 'freelance',
+                  title: 'Freelance',
+                  description: 'Trabajo por proyectos',
+                },
+              ],
+            },
+          ],
+        };
+      } else {
+        return {
+          text: BotMessages.ASK_JOB_TYPE_DESKTOP,
+        };
+      }
     }
 
     // Guardar en UserProfile
@@ -374,28 +437,44 @@ export class ConversationService {
     text: string,
     intent: UserIntent,
   ): Promise<BotReply> {
+    const deviceType = await this.getDeviceType(userId);
+
     // Detectar intención de reiniciar perfil
     if (isRestartIntent(text)) {
       await this.updateSessionState(userId, ConversationState.CONFIRM_RESTART);
-      return {
-        text: BotMessages.CONFIRM_RESTART,
-        buttons: [
-          { id: 'confirm_restart', title: 'Sí, reiniciar' },
-          { id: 'cancel_restart', title: 'No, cancelar' },
-        ],
-      };
+
+      if (deviceType === 'MOBILE') {
+        return {
+          text: BotMessages.CONFIRM_RESTART,
+          buttons: [
+            { id: 'confirm_restart', title: 'Sí, reiniciar' },
+            { id: 'cancel_restart', title: 'No, cancelar' },
+          ],
+        };
+      } else {
+        return {
+          text: BotMessages.CONFIRM_RESTART_DESKTOP,
+        };
+      }
     }
 
     // Detectar intención de cancelar servicio
     if (isCancelServiceIntent(text)) {
       await this.updateSessionState(userId, ConversationState.CONFIRM_CANCEL_SERVICE);
-      return {
-        text: BotMessages.CONFIRM_CANCEL_SERVICE,
-        buttons: [
-          { id: 'confirm_cancel', title: 'Sí, confirmar' },
-          { id: 'abort_cancel', title: 'No, continuar' },
-        ],
-      };
+
+      if (deviceType === 'MOBILE') {
+        return {
+          text: BotMessages.CONFIRM_CANCEL_SERVICE,
+          buttons: [
+            { id: 'confirm_cancel', title: 'Sí, confirmar' },
+            { id: 'abort_cancel', title: 'No, continuar' },
+          ],
+        };
+      } else {
+        return {
+          text: BotMessages.CONFIRM_CANCEL_SERVICE_DESKTOP,
+        };
+      }
     }
 
     // Detectar intención de editar perfil
@@ -408,8 +487,8 @@ export class ConversationService {
       return await this.performJobSearch(userId);
     }
 
-    // Por ahora, solo mensaje de "no disponible"
-    return { text: BotMessages.NOT_READY_YET };
+    // Mostrar menú de comandos disponibles
+    return { text: BotMessages.MENU_READY };
   }
 
   /**
@@ -531,6 +610,7 @@ Continúa con el proceso manual. 👇`,
   private async showProfileForEditing(userId: string): Promise<BotReply> {
     const profile = await this.prisma.userProfile.findUnique({ where: { userId } });
     const alertPref = await this.prisma.alertPreference.findUnique({ where: { userId } });
+    const deviceType = await this.getDeviceType(userId);
 
     if (!profile) {
       return { text: BotMessages.NOT_READY_YET };
@@ -552,7 +632,11 @@ Continúa con el proceso manual. 👇`,
     // Transicionar a EDITING_PROFILE
     await this.updateSessionState(userId, ConversationState.EDITING_PROFILE);
 
-    return { text: BotMessages.SHOW_CURRENT_PREFERENCES(formattedProfile) };
+    if (deviceType === 'DESKTOP') {
+      return { text: BotMessages.EDITING_PROFILE_DESKTOP(formattedProfile) };
+    } else {
+      return { text: BotMessages.SHOW_CURRENT_PREFERENCES(formattedProfile) };
+    }
   }
 
   /**
@@ -666,29 +750,37 @@ Continúa con el proceso manual. 👇`,
     const jobType = normalizeJobType(text);
 
     if (!jobType) {
-      return {
-        text: BotMessages.ERROR_JOB_TYPE_INVALID,
-        listTitle: 'Seleccionar tipo',
-        listSections: [
-          {
-            title: 'Tipo de Empleo',
-            rows: [
-              {
-                id: 'full_time',
-                title: 'Tiempo completo',
-                description: 'Jornada laboral completa (8 horas)',
-              },
-              {
-                id: 'part_time',
-                title: 'Medio tiempo',
-                description: 'Jornada parcial (4-6 horas)',
-              },
-              { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
-              { id: 'freelance', title: 'Freelance', description: 'Trabajo por proyectos' },
-            ],
-          },
-        ],
-      };
+      const deviceType = await this.getDeviceType(userId);
+
+      if (deviceType === 'MOBILE') {
+        return {
+          text: BotMessages.ERROR_JOB_TYPE_INVALID,
+          listTitle: 'Seleccionar tipo',
+          listSections: [
+            {
+              title: 'Tipo de Empleo',
+              rows: [
+                {
+                  id: 'full_time',
+                  title: 'Tiempo completo',
+                  description: 'Jornada laboral completa (8 horas)',
+                },
+                {
+                  id: 'part_time',
+                  title: 'Medio tiempo',
+                  description: 'Jornada parcial (4-6 horas)',
+                },
+                { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
+                { id: 'freelance', title: 'Freelance', description: 'Trabajo por proyectos' },
+              ],
+            },
+          ],
+        };
+      } else {
+        return {
+          text: BotMessages.ASK_JOB_TYPE_DESKTOP,
+        };
+      }
     }
 
     await this.updateUserProfile(userId, { jobType });
@@ -795,6 +887,18 @@ Continúa con el proceso manual. 👇`,
     }
 
     return session;
+  }
+
+  /**
+   * Obtiene el tipo de dispositivo del usuario (MOBILE o DESKTOP)
+   */
+  private async getDeviceType(userId: string): Promise<'MOBILE' | 'DESKTOP'> {
+    const session = await this.prisma.session.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return (session?.deviceType as 'MOBILE' | 'DESKTOP') || 'DESKTOP';
   }
 
   /**
