@@ -6,15 +6,14 @@ import { JobPosting, JobSearchQuery, JobSearchResult } from './types/job-posting
 
 /**
  * Servicio de búsqueda de empleos
- * Utiliza Google Custom Search JSON API para encontrar ofertas
+ * Utiliza Serper API para acceder a resultados de Google
  * NO contiene lógica de conversación, solo búsqueda y ranking
  */
 @Injectable()
 export class JobSearchService {
   private readonly logger = new Logger(JobSearchService.name);
-  private readonly googleApiKey: string;
-  private readonly googleCx: string;
-  private readonly googleSearchUrl = 'https://www.googleapis.com/customsearch/v1';
+  private readonly serperApiKey: string;
+  private readonly serperSearchUrl = 'https://google.serper.dev/search';
 
   // Palabras excluidas de búsqueda (para filtrar ofertas no deseadas)
   private readonly excludedKeywords = [
@@ -26,17 +25,32 @@ export class JobSearchService {
     'ventas de campo',
   ];
 
+  // Patrones de URL que indican páginas de búsqueda o listados múltiples (NO ofertas individuales)
+  private readonly searchUrlPatterns = [
+    '/search',
+    '/buscar',
+    '/busqueda',
+    '/search-jobs',
+    '/empleos/buscar',
+    '/ofertas-empleo/buscar',
+    '/vacantes/buscar',
+    '?q=',
+    '?search=',
+    '?buscar=',
+    '?keyword=',
+    '/jobs/search',
+    '/q-', // Indeed pattern: /q-keyword-empleos
+    'facebook.com/groups', // Facebook groups
+  ];
+
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
   ) {
-    this.googleApiKey = this.configService.get<string>('GOOGLE_CSE_API_KEY', '');
-    this.googleCx = this.configService.get<string>('GOOGLE_CSE_CX', '');
+    this.serperApiKey = this.configService.get<string>('SERPER_API_KEY', '');
 
-    if (!this.googleApiKey || !this.googleCx) {
-      this.logger.warn(
-        '⚠️ Google CSE credentials no configuradas. Job search no funcionará correctamente.',
-      );
+    if (!this.serperApiKey) {
+      this.logger.warn('⚠️ Serper API Key no configurada. Job search no funcionará correctamente.');
     }
   }
 
@@ -91,35 +105,44 @@ export class JobSearchService {
   }
 
   /**
-   * Ejecuta búsqueda en Google Custom Search API
+   * Ejecuta búsqueda en Serper API (accede a Google for Jobs)
    */
   private async searchJobs(query: JobSearchQuery): Promise<JobSearchResult> {
     try {
       // Construir query string
       const queryString = this.buildQueryString(query);
 
-      this.logger.debug(`🔎 Query Google CSE: "${queryString}"`);
+      this.logger.debug(`🔎 Query Serper: "${queryString}"`);
 
-      // Llamar a Google CSE API
-      const response = await axios.get(this.googleSearchUrl, {
-        params: {
-          key: this.googleApiKey,
-          cx: this.googleCx,
+      // Llamar a Serper API
+      const response = await axios.post(
+        this.serperSearchUrl,
+        {
           q: queryString,
-          num: 10, // Pedir 10 resultados
-          lr: 'lang_es', // Idioma español
           gl: 'co', // Geolocalización Colombia
+          hl: 'es', // Idioma español
+          num: 10, // Pedir 10 resultados
         },
-        timeout: 10000, // 10 segundos timeout
-      });
+        {
+          headers: {
+            'X-API-KEY': this.serperApiKey,
+            'Content-Type': 'application/json',
+          },
+          timeout: 10000, // 10 segundos timeout
+        },
+      );
 
-      // Normalizar resultados
-      const items = response.data.items || [];
-      const jobs = items.map((item: any) => this.normalizeGoogleResult(item));
+      // Normalizar resultados desde Serper
+      const organicResults = response.data.organic || [];
+      const jobs = organicResults.map((item: any) => this.normalizeSerperResult(item));
+
+      this.logger.debug(`📊 Serper devolvió ${jobs.length} resultados`);
 
       // Aplicar filtrado y ranking
       const filteredJobs = this.filterJobs(jobs, query);
       const rankedJobs = this.rankJobs(filteredJobs, query);
+
+      this.logger.log(`✅ Después de filtrar: ${rankedJobs.length} ofertas válidas`);
 
       return {
         jobs: rankedJobs,
@@ -130,7 +153,7 @@ export class JobSearchService {
     } catch (error) {
       if (axios.isAxiosError(error)) {
         this.logger.error(
-          `Error llamando Google CSE API: ${error.response?.status} - ${error.response?.data?.error?.message || error.message}`,
+          `Error llamando Serper API: ${error.response?.status} - ${error.response?.data?.message || error.message}`,
         );
       }
       throw new Error(
@@ -141,15 +164,16 @@ export class JobSearchService {
 
   /**
    * Construye el query string para Google CSE
+   * Formato: "rol empleo" para obtener ofertas específicas
    */
   private buildQueryString(query: JobSearchQuery): string {
     const parts: string[] = [];
 
-    // Rol/cargo (obligatorio)
-    parts.push(query.role);
+    // Rol/cargo (obligatorio) - rodeado de comillas para mayor precisión
+    parts.push(`"${query.role}"`);
 
-    // Añadir "empleo", "trabajo", "vacante"
-    parts.push('(empleo OR trabajo OR vacante)');
+    // SIEMPRE añadir "empleo" para que Google priorice ofertas individuales
+    parts.push('empleo');
 
     // Ubicación
     if (query.location && !query.remoteAllowed) {
@@ -182,9 +206,9 @@ export class JobSearchService {
   }
 
   /**
-   * Normaliza un resultado de Google CSE al formato JobPosting
+   * Normaliza un resultado de Serper al formato JobPosting
    */
-  private normalizeGoogleResult(item: any): JobPosting {
+  private normalizeSerperResult(item: any): JobPosting {
     // Extraer dominio de la URL
     const source = this.extractDomain(item.link);
 
@@ -295,7 +319,13 @@ export class JobSearchService {
    */
   private filterJobs(jobs: JobPosting[], query: JobSearchQuery): JobPosting[] {
     return jobs.filter((job) => {
-      // Filtrar por palabras excluidas
+      // 1. FILTRAR URLs DE BÚSQUEDA O LISTADOS MÚLTIPLES
+      if (this.isSearchOrListingUrl(job)) {
+        this.logger.debug(`🚫 URL de búsqueda/listado excluida: ${job.url}`);
+        return false;
+      }
+
+      // 2. Filtrar por palabras excluidas
       const textToCheck = `${job.title} ${job.snippet}`.toLowerCase();
       for (const keyword of this.excludedKeywords) {
         if (textToCheck.includes(keyword)) {
@@ -304,7 +334,13 @@ export class JobSearchService {
         }
       }
 
-      // Filtrar por salario mínimo si está presente
+      // 3. Filtrar títulos que indican listados múltiples
+      if (this.isMultipleJobListing(job)) {
+        this.logger.debug(`🚫 Listado múltiple excluido: ${job.title}`);
+        return false;
+      }
+
+      // 4. Filtrar por salario mínimo si está presente
       if (query.minSalary && job.salaryRaw) {
         const extractedSalary = this.extractSalaryNumber(job.salaryRaw);
         if (extractedSalary && extractedSalary < query.minSalary) {
@@ -317,6 +353,101 @@ export class JobSearchService {
 
       return true;
     });
+  }
+
+  /**
+   * Detecta si una URL es de búsqueda o listado (NO oferta individual)
+   */
+  private isSearchOrListingUrl(job: JobPosting): boolean {
+    const urlLower = job.url.toLowerCase();
+
+    // Verificar patrones de URL de búsqueda
+    for (const pattern of this.searchUrlPatterns) {
+      if (urlLower.includes(pattern.toLowerCase())) {
+        return true;
+      }
+    }
+
+    // URLs que terminan en categorías generales sin ID
+    const genericEndings = ['/empleos', '/trabajos', '/ofertas', '/vacantes', '/jobs'];
+
+    for (const ending of genericEndings) {
+      // Si termina EXACTAMENTE con la categoría (sin nada después), es un listado
+      if (urlLower.endsWith(ending) || urlLower.endsWith(ending + '/')) {
+        return true;
+      }
+    }
+
+    // CASO ESPECIAL: Indeed - Filtrar solo búsquedas obvias
+    if (urlLower.includes('indeed.com')) {
+      // Excluir URLs con patrón de búsqueda: /q-keyword-empleos.html
+      if (urlLower.match(/\/q-.+-empleos\.html?/)) {
+        this.logger.debug(`🚫 Indeed: Búsqueda detectada: ${job.url}`);
+        return true;
+      }
+    }
+
+    // CASO ESPECIAL: elempleo.com - Filtrar rutas de búsqueda específicas
+    if (urlLower.includes('elempleo.com')) {
+      // Excluir: /ofertas-empleo/trabajo-* (son búsquedas)
+      if (urlLower.includes('/ofertas-empleo/trabajo-')) {
+        this.logger.debug(`🚫 ElEmpleo: Ruta de búsqueda: ${job.url}`);
+        return true;
+      }
+    }
+
+    // CASO ESPECIAL: computrabajo.com - Filtrar búsquedas
+    if (urlLower.includes('computrabajo.com')) {
+      // Excluir: /trabajo-de-* (son búsquedas genéricas con hash)
+      // Permitir: /ofertas-de-trabajo/oferta-de-trabajo-de-* (ofertas individuales)
+      if (
+        urlLower.includes('/trabajo-de-') &&
+        !urlLower.includes('/ofertas-de-trabajo/oferta-de-trabajo-de-')
+      ) {
+        this.logger.debug(`🚫 Computrabajo: Búsqueda genérica: ${job.url}`);
+        return true;
+      }
+    }
+
+    // CASO ESPECIAL: linkedin.com - Solo permitir ofertas individuales
+    if (urlLower.includes('linkedin.com')) {
+      // Solo permitir: /jobs/view/* (ofertas individuales con ID)
+      if (!urlLower.includes('/jobs/view/')) {
+        this.logger.debug(`🚫 LinkedIn: No es una oferta individual: ${job.url}`);
+        return true;
+      }
+    }
+
+    // CASO ESPECIAL: Grupos de Facebook
+    if (urlLower.includes('facebook.com/groups')) {
+      this.logger.debug(`🚫 Grupo de Facebook excluido: ${job.url}`);
+      return true;
+    }
+
+    // CASO ESPECIAL: Páginas genéricas de careers SIN oferta específica
+    if (urlLower.match(/\/careers?\/?$/)) {
+      this.logger.debug(`🚫 Página genérica de careers: ${job.url}`);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Detecta si el título/snippet indica un listado múltiple
+   */
+  private isMultipleJobListing(job: JobPosting): boolean {
+    const textToCheck = `${job.title} ${job.snippet}`.toLowerCase();
+
+    const multipleListingPatterns = [
+      /\d+\s*(ofertas?|empleos?|trabajos?|vacantes?)/i, // "174 ofertas", "50 empleos"
+      /ver\s+(todas?|más)\s+(ofertas?|empleos?)/i, // "Ver todas las ofertas"
+      /encuentra\s+\d+/i, // "Encuentra 100 ofertas"
+      /listado\s+de/i, // "Listado de empleos"
+      /bolsa\s+de\s+(empleo|trabajo)/i, // "Bolsa de empleo"
+    ];
+
+    return multipleListingPatterns.some((pattern) => pattern.test(textToCheck));
   }
 
   /**
@@ -364,6 +495,7 @@ export class JobSearchService {
     const titleLower = job.title.toLowerCase();
     const snippetLower = job.snippet.toLowerCase();
     const roleLower = query.role.toLowerCase();
+    const urlLower = job.url.toLowerCase();
 
     // +10 puntos si el rol aparece en el título
     if (titleLower.includes(roleLower)) {
@@ -398,26 +530,54 @@ export class JobSearchService {
     }
 
     // +5 puntos por fuentes confiables
-    const trustedSources = [
-      'linkedin.com',
-      'elempleo.com',
-      'computrabajo.com',
-      'magneto365.com',
-    ];
+    const trustedSources = ['linkedin.com', 'elempleo.com', 'computrabajo.com', 'magneto365.com'];
     if (trustedSources.some((source) => job.source.includes(source))) {
       score += 5;
+    }
+
+    // +10 puntos EXTRA si la URL parece ser de una oferta individual
+    if (this.looksLikeIndividualJob(urlLower)) {
+      score += 10;
+    }
+
+    // -5 puntos si el título es muy genérico o corto (probable listado)
+    if (titleLower.length < 20) {
+      score -= 5;
     }
 
     return score;
   }
 
   /**
+   * Detecta si una URL parece ser de una oferta individual
+   * URLs individuales suelen tener IDs, slugs largos, o títulos específicos
+   */
+  private looksLikeIndividualJob(urlLower: string): boolean {
+    // Patrones que indican oferta individual
+    const individualJobPatterns = [
+      /\/\d{5,}/, // ID numérico largo (/12345, /567890)
+      /\/viewjob\?/, // Indeed: /viewjob?jk=123456
+      /\/company\//, // Indeed: /company/nombre/jobs/123
+      /\/oferta\/\d+/, // ElEmpleo: /oferta/123456
+      /\/job\/\d+/, // Generic: /job/123456
+      /\/jobs\/view\//, // LinkedIn: /jobs/view/...
+      /\/ofertas-de-trabajo\/oferta-de-trabajo-de-/, // Computrabajo: /ofertas-de-trabajo/oferta-de-trabajo-de-...
+      /\/empleo\/[a-z0-9-]{15,}/, // Slug muy largo después de /empleo/
+      /\/vacante\/[a-z0-9-]{15,}/, // Slug muy largo después de /vacante/
+      /\/ver-oferta/, // Vista de oferta específica
+      /\/detalle\/[a-z0-9-]{10,}/, // Página de detalle con slug
+      /-\d{5,}($|\?)/, // Termina con ID numérico largo (-12345)
+      /\/aplicar\/\d+/, // Página de aplicación con ID
+      /\/postularse/, // Página de postulación
+    ];
+
+    return individualJobPatterns.some((pattern) => pattern.test(urlLower));
+  }
+
+  /**
    * Filtra ofertas que ya fueron enviadas al usuario
    */
-  private async filterAlreadySentJobs(
-    userId: string,
-    jobs: JobPosting[],
-  ): Promise<JobPosting[]> {
+  private async filterAlreadySentJobs(userId: string, jobs: JobPosting[]): Promise<JobPosting[]> {
     try {
       // Obtener URLs de ofertas ya enviadas
       const sentJobs = await this.prisma.sentJob.findMany({
