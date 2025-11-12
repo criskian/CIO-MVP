@@ -164,6 +164,10 @@ export class ConversationService {
 
     return {
       text: `${BotMessages.WELCOME}\n\n${BotMessages.ASK_TERMS}`,
+      buttons: [
+        { id: 'accept_terms', title: 'Sí, acepto' },
+        { id: 'reject_terms', title: 'No acepto' },
+      ],
     };
   }
 
@@ -189,7 +193,11 @@ export class ConversationService {
 
     // No entendió la respuesta, repetir pregunta
     return {
-      text: `${BotMessages.ASK_TERMS}\n\n_Responde "Sí" para aceptar o "No" para rechazar._`,
+      text: `${BotMessages.ASK_TERMS}\n\n_Por favor, selecciona una opción:_`,
+      buttons: [
+        { id: 'accept_terms', title: 'Sí, acepto' },
+        { id: 'reject_terms', title: 'No acepto' },
+      ],
     };
   }
 
@@ -234,7 +242,29 @@ export class ConversationService {
     // Transición: ASK_LOCATION → ASK_JOB_TYPE
     await this.updateSessionState(userId, ConversationState.ASK_JOB_TYPE);
 
-    return { text: BotMessages.ASK_JOB_TYPE };
+    return {
+      text: BotMessages.ASK_JOB_TYPE,
+      listTitle: 'Seleccionar tipo',
+      listSections: [
+        {
+          title: 'Tipo de Empleo',
+          rows: [
+            {
+              id: 'full_time',
+              title: 'Tiempo completo',
+              description: 'Jornada laboral completa (8 horas)',
+            },
+            {
+              id: 'part_time',
+              title: 'Medio tiempo',
+              description: 'Jornada parcial (4-6 horas)',
+            },
+            { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
+            { id: 'freelance', title: 'Freelance', description: 'Trabajo por proyectos' },
+          ],
+        },
+      ],
+    };
   }
 
   /**
@@ -244,7 +274,33 @@ export class ConversationService {
     const jobType = normalizeJobType(text);
 
     if (!jobType) {
-      return { text: BotMessages.ERROR_JOB_TYPE_INVALID };
+      return {
+        text: BotMessages.ERROR_JOB_TYPE_INVALID,
+        listTitle: 'Seleccionar tipo',
+        listSections: [
+          {
+            title: 'Tipo de Empleo',
+            rows: [
+              {
+                id: 'full_time',
+                title: 'Tiempo completo',
+                description: 'Jornada laboral completa (8 horas)',
+              },
+              {
+                id: 'part_time',
+                title: 'Medio tiempo',
+                description: 'Jornada parcial (4-6 horas)',
+              },
+              { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
+              {
+                id: 'freelance',
+                title: 'Freelance',
+                description: 'Trabajo por proyectos',
+              },
+            ],
+          },
+        ],
+      };
     }
 
     // Guardar en UserProfile
@@ -321,13 +377,25 @@ export class ConversationService {
     // Detectar intención de reiniciar perfil
     if (isRestartIntent(text)) {
       await this.updateSessionState(userId, ConversationState.CONFIRM_RESTART);
-      return { text: BotMessages.CONFIRM_RESTART };
+      return {
+        text: BotMessages.CONFIRM_RESTART,
+        buttons: [
+          { id: 'confirm_restart', title: 'Sí, reiniciar' },
+          { id: 'cancel_restart', title: 'No, cancelar' },
+        ],
+      };
     }
 
     // Detectar intención de cancelar servicio
     if (isCancelServiceIntent(text)) {
       await this.updateSessionState(userId, ConversationState.CONFIRM_CANCEL_SERVICE);
-      return { text: BotMessages.CONFIRM_CANCEL_SERVICE };
+      return {
+        text: BotMessages.CONFIRM_CANCEL_SERVICE,
+        buttons: [
+          { id: 'confirm_cancel', title: 'Sí, confirmar' },
+          { id: 'abort_cancel', title: 'No, continuar' },
+        ],
+      };
     }
 
     // Detectar intención de editar perfil
@@ -400,7 +468,13 @@ Por favor intenta de nuevo en unos minutos.`,
     }
 
     // No entendió la respuesta
-    return { text: `${BotMessages.CONFIRM_RESTART}\n\n_Responde "Sí" o "No"._` };
+    return {
+      text: `${BotMessages.CONFIRM_RESTART}\n\n_Por favor, selecciona una opción:_`,
+      buttons: [
+        { id: 'confirm_restart', title: 'Sí, reiniciar' },
+        { id: 'cancel_restart', title: 'No, cancelar' },
+      ],
+    };
   }
 
   /**
@@ -420,7 +494,13 @@ Por favor intenta de nuevo en unos minutos.`,
     }
 
     // No entendió la respuesta
-    return { text: `${BotMessages.CONFIRM_CANCEL_SERVICE}\n\n_Responde "Sí" o "No"._` };
+    return {
+      text: `${BotMessages.CONFIRM_CANCEL_SERVICE}\n\n_Por favor, selecciona una opción:_`,
+      buttons: [
+        { id: 'confirm_cancel', title: 'Sí, confirmar' },
+        { id: 'abort_cancel', title: 'No, continuar' },
+      ],
+    };
   }
 
   /**
@@ -504,7 +584,29 @@ Continúa con el proceso manual. 👇`,
 
       case 'tipo':
         await this.updateSessionState(userId, ConversationState.EDIT_JOB_TYPE);
-        return { text: BotMessages.ASK_JOB_TYPE };
+        return {
+          text: BotMessages.ASK_JOB_TYPE,
+          listTitle: 'Seleccionar tipo',
+          listSections: [
+            {
+              title: 'Tipo de Empleo',
+              rows: [
+                {
+                  id: 'full_time',
+                  title: 'Tiempo completo',
+                  description: 'Jornada laboral completa (8 horas)',
+                },
+                {
+                  id: 'part_time',
+                  title: 'Medio tiempo',
+                  description: 'Jornada parcial (4-6 horas)',
+                },
+                { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
+                { id: 'freelance', title: 'Freelance', description: 'Trabajo por proyectos' },
+              ],
+            },
+          ],
+        };
 
       case 'salario':
         await this.updateSessionState(userId, ConversationState.EDIT_MIN_SALARY);
@@ -564,7 +666,29 @@ Continúa con el proceso manual. 👇`,
     const jobType = normalizeJobType(text);
 
     if (!jobType) {
-      return { text: BotMessages.ERROR_JOB_TYPE_INVALID };
+      return {
+        text: BotMessages.ERROR_JOB_TYPE_INVALID,
+        listTitle: 'Seleccionar tipo',
+        listSections: [
+          {
+            title: 'Tipo de Empleo',
+            rows: [
+              {
+                id: 'full_time',
+                title: 'Tiempo completo',
+                description: 'Jornada laboral completa (8 horas)',
+              },
+              {
+                id: 'part_time',
+                title: 'Medio tiempo',
+                description: 'Jornada parcial (4-6 horas)',
+              },
+              { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
+              { id: 'freelance', title: 'Freelance', description: 'Trabajo por proyectos' },
+            ],
+          },
+        ],
+      };
     }
 
     await this.updateUserProfile(userId, { jobType });

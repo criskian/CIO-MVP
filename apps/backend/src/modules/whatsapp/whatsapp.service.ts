@@ -59,8 +59,8 @@ export class WhatsappService {
       // Pasar al ConversationService para procesar
       const reply = await this.conversationService.handleIncomingMessage(normalizedMessage);
 
-      // Enviar respuesta
-      await this.sendMessage(normalizedMessage.phone, reply.text);
+      // Enviar respuesta (con soporte para mensajes interactivos)
+      await this.sendBotReply(normalizedMessage.phone, reply);
 
       return { status: 'ok' };
     } catch (error) {
@@ -72,10 +72,9 @@ export class WhatsappService {
       try {
         const normalizedMessage = this.provider.normalizeIncomingMessage(payload);
         if (normalizedMessage) {
-          await this.sendMessage(
-            normalizedMessage.phone,
-            'Lo siento, hubo un error temporal. Por favor intenta de nuevo en unos momentos.',
-          );
+          await this.sendBotReply(normalizedMessage.phone, {
+            text: 'Lo siento, hubo un error temporal. Por favor intenta de nuevo en unos momentos.',
+          });
         }
       } catch (sendError) {
         const sendErrorMessage = sendError instanceof Error ? sendError.message : 'Unknown error';
@@ -87,11 +86,12 @@ export class WhatsappService {
   }
 
   /**
-   * Envía un mensaje de texto a un número
+   * Envía una respuesta del bot (BotReply)
+   * Soporta mensajes de texto simple, botones y listas
    */
-  async sendMessage(to: string, text: string): Promise<void> {
+  async sendBotReply(to: string, reply: BotReply): Promise<void> {
     try {
-      await this.provider.sendMessage(to, text);
+      await this.provider.sendMessage(to, reply);
       this.logger.log(`✅ Mensaje enviado a ${to}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -99,13 +99,5 @@ export class WhatsappService {
       this.logger.error(`❌ Error enviando mensaje a ${to}: ${errorMessage}`, errorStack);
       throw error;
     }
-  }
-
-  /**
-   * Envía una respuesta del bot (BotReply)
-   */
-  async sendBotReply(to: string, reply: BotReply): Promise<void> {
-    await this.sendMessage(to, reply.text);
-    // Futuro: manejar botones, listas, templates, etc.
   }
 }

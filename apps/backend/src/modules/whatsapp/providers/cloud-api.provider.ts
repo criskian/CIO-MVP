@@ -4,6 +4,7 @@ import axios from 'axios';
 import {
   IWhatsappProvider,
   NormalizedIncomingMessage,
+  BotReply,
 } from '../interfaces/whatsapp-provider.interface';
 
 /**
@@ -25,9 +26,9 @@ export class CloudApiProvider implements IWhatsappProvider {
   }
 
   /**
-   * Envía un mensaje de texto
+   * Envía un mensaje (texto simple o interactivo con botones/listas)
    */
-  async sendMessage(to: string, message: string): Promise<void> {
+  async sendMessage(to: string, reply: BotReply): Promise<void> {
     try {
       const url = `${this.apiUrl}/${this.phoneNumberId}/messages`;
 
@@ -37,34 +38,88 @@ export class CloudApiProvider implements IWhatsappProvider {
       this.logger.debug(`📤 Enviando mensaje a ${formattedTo}`);
       this.logger.debug(`URL: ${url}`);
 
-      await axios.post(
-        url,
-        {
+      let messageBody: any;
+
+      // Si tiene botones de respuesta rápida (máximo 3)
+      if (reply.buttons && reply.buttons.length > 0) {
+        this.logger.debug(`🔘 Enviando mensaje con ${reply.buttons.length} botones`);
+        messageBody = {
+          messaging_product: 'whatsapp',
+          to: formattedTo,
+          type: 'interactive',
+          interactive: {
+            type: 'button',
+            body: {
+              text: reply.text,
+            },
+            action: {
+              buttons: reply.buttons.slice(0, 3).map((btn) => ({
+                type: 'reply',
+                reply: {
+                  id: btn.id,
+                  title: btn.title.substring(0, 20), // Máximo 20 caracteres
+                },
+              })),
+            },
+          },
+        };
+      }
+      // Si tiene lista desplegable
+      else if (reply.listSections && reply.listSections.length > 0) {
+        this.logger.debug(`📋 Enviando mensaje con lista desplegable`);
+        messageBody = {
+          messaging_product: 'whatsapp',
+          to: formattedTo,
+          type: 'interactive',
+          interactive: {
+            type: 'list',
+            body: {
+              text: reply.text,
+            },
+            action: {
+              button: reply.listTitle || 'Ver opciones',
+              sections: reply.listSections.map((section) => ({
+                title: section.title,
+                rows: section.rows.slice(0, 10).map((row) => ({
+                  id: row.id,
+                  title: row.title.substring(0, 24), // Máximo 24 caracteres
+                  description: row.description?.substring(0, 72), // Máximo 72 caracteres
+                })),
+              })),
+            },
+          },
+        };
+      }
+      // Mensaje de texto simple (caso por defecto)
+      else {
+        this.logger.debug(`💬 Enviando mensaje de texto simple`);
+        messageBody = {
           messaging_product: 'whatsapp',
           to: formattedTo,
           type: 'text',
           text: {
-            body: message,
+            body: reply.text,
           },
+        };
+      }
+
+      await axios.post(url, messageBody, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.accessToken}`,
         },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.accessToken}`,
-          },
-        },
-      );
+      });
 
       this.logger.log(`✅ Mensaje enviado a ${formattedTo}`);
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
-      
+
       // Log detallado del error de Meta
       if (error?.response?.data) {
         this.logger.error(`❌ Error de Meta API: ${JSON.stringify(error.response.data, null, 2)}`);
       }
-      
+
       this.logger.error(`Error enviando mensaje: ${errorMessage}`, errorStack);
       throw error;
     }
@@ -72,6 +127,7 @@ export class CloudApiProvider implements IWhatsappProvider {
 
   /**
    * Normaliza el payload de Cloud API al formato interno
+   * Soporta mensajes de texto, interactivos (botones/listas), imágenes y documentos
    */
   normalizeIncomingMessage(payload: any): NormalizedIncomingMessage | null {
     try {
@@ -98,12 +154,37 @@ export class CloudApiProvider implements IWhatsappProvider {
         case 'text':
           text = message.text?.body;
           break;
+
+        case 'interactive':
+          // Usuario respondió a un botón o lista interactiva
+          const interactiveType = message.interactive?.type;
+
+          if (interactiveType === 'button_reply') {
+            // Respuesta de botón
+            text = message.interactive.button_reply.title;
+            this.logger.debug(
+              `🔘 Botón presionado - ID: ${message.interactive.button_reply.id}, Texto: ${text}`,
+            );
+          } else if (interactiveType === 'list_reply') {
+            // Respuesta de lista
+            text = message.interactive.list_reply.title;
+            this.logger.debug(
+              `📋 Opción de lista seleccionada - ID: ${message.interactive.list_reply.id}, Texto: ${text}`,
+            );
+          } else {
+            this.logger.warn(`Tipo de interacción no soportado: ${interactiveType}`);
+            return null;
+          }
+          break;
+
         case 'image':
           mediaUrl = message.image?.id; // En Cloud API se obtiene el ID, luego se descarga
           break;
+
         case 'document':
           mediaUrl = message.document?.id;
           break;
+
         default:
           this.logger.warn(`Tipo de mensaje no soportado: ${messageType}`);
       }
@@ -112,7 +193,7 @@ export class CloudApiProvider implements IWhatsappProvider {
         phone: from,
         text,
         mediaUrl,
-        messageType: messageType as 'text' | 'image' | 'document',
+        messageType: messageType === 'interactive' ? 'text' : (messageType as 'text' | 'image' | 'document'),
         timestamp,
         messageId,
         raw: payload,
