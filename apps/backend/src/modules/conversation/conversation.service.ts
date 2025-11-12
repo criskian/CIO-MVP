@@ -488,7 +488,41 @@ export class ConversationService {
     }
 
     // Mostrar menú de comandos disponibles
-    return { text: BotMessages.MENU_READY };
+    if (deviceType === 'MOBILE') {
+      return {
+        text: '¿Qué te gustaría hacer?',
+        listTitle: 'Ver opciones',
+        listSections: [
+          {
+            title: 'Comandos disponibles',
+            rows: [
+              {
+                id: 'cmd_buscar',
+                title: '🔍 Buscar empleos',
+                description: 'Encontrar ofertas ahora',
+              },
+              {
+                id: 'cmd_editar',
+                title: '✏️ Editar perfil',
+                description: 'Cambiar tus preferencias',
+              },
+              {
+                id: 'cmd_reiniciar',
+                title: '🔄 Reiniciar',
+                description: 'Reconfigurar desde cero',
+              },
+              {
+                id: 'cmd_cancelar',
+                title: '❌ Cancelar servicio',
+                description: 'Dejar de usar el servicio',
+              },
+            ],
+          },
+        ],
+      };
+    } else {
+      return { text: BotMessages.MENU_READY };
+    }
   }
 
   /**
@@ -635,7 +669,56 @@ Continúa con el proceso manual. 👇`,
     if (deviceType === 'DESKTOP') {
       return { text: BotMessages.EDITING_PROFILE_DESKTOP(formattedProfile) };
     } else {
-      return { text: BotMessages.SHOW_CURRENT_PREFERENCES(formattedProfile) };
+      // Móvil: mostrar lista desplegable con opciones de edición
+      return {
+        text: `📝 *Tus preferencias actuales:*
+
+🔹 *Rol:* ${formattedProfile.role}
+🔹 *Ubicación:* ${formattedProfile.location}
+🔹 *Tipo de empleo:* ${formattedProfile.jobType}
+🔹 *Salario mínimo:* ${formattedProfile.minSalary}
+🔹 *Horario de alertas:* ${formattedProfile.alertTime}
+
+Selecciona qué quieres editar:`,
+        listTitle: 'Editar campo',
+        listSections: [
+          {
+            title: 'Preferencias',
+            rows: [
+              {
+                id: 'edit_rol',
+                title: '🔹 Rol',
+                description: `Actual: ${formattedProfile.role}`,
+              },
+              {
+                id: 'edit_ubicacion',
+                title: '📍 Ubicación',
+                description: `Actual: ${formattedProfile.location.substring(0, 50)}`,
+              },
+              {
+                id: 'edit_tipo',
+                title: '💼 Tipo de empleo',
+                description: `Actual: ${formattedProfile.jobType}`,
+              },
+              {
+                id: 'edit_salario',
+                title: '💰 Salario mínimo',
+                description: `Actual: ${formattedProfile.minSalary}`,
+              },
+              {
+                id: 'edit_horario',
+                title: '⏰ Horario alertas',
+                description: `Actual: ${formattedProfile.alertTime}`,
+              },
+              {
+                id: 'cmd_cancelar',
+                title: '❌ Cancelar',
+                description: 'Volver al menú principal',
+              },
+            ],
+          },
+        ],
+      };
     }
   }
 

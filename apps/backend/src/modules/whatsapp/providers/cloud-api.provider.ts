@@ -167,9 +167,24 @@ export class CloudApiProvider implements IWhatsappProvider {
             );
           } else if (interactiveType === 'list_reply') {
             // Respuesta de lista
-            text = message.interactive.list_reply.title;
+            const listReplyId = message.interactive.list_reply.id;
+            const listReplyTitle = message.interactive.list_reply.title;
+
+            // Si el ID es un comando (ej: cmd_buscar), extraer el comando
+            if (listReplyId.startsWith('cmd_')) {
+              text = listReplyId.replace('cmd_', ''); // "cmd_buscar" -> "buscar"
+            }
+            // Si el ID es un campo de edición (ej: edit_rol), extraer el campo
+            else if (listReplyId.startsWith('edit_')) {
+              text = listReplyId.replace('edit_', ''); // "edit_rol" -> "rol"
+            }
+            // Para otros casos (ej: full_time, part_time), usar el ID directamente
+            else {
+              text = listReplyTitle;
+            }
+
             this.logger.debug(
-              `📋 Opción de lista seleccionada - ID: ${message.interactive.list_reply.id}, Texto: ${text}`,
+              `📋 Opción de lista seleccionada - ID: ${listReplyId}, Comando/Campo extraído: ${text}`,
             );
           } else {
             this.logger.warn(`Tipo de interacción no soportado: ${interactiveType}`);
@@ -193,7 +208,8 @@ export class CloudApiProvider implements IWhatsappProvider {
         phone: from,
         text,
         mediaUrl,
-        messageType: messageType === 'interactive' ? 'text' : (messageType as 'text' | 'image' | 'document'),
+        messageType:
+          messageType === 'interactive' ? 'text' : (messageType as 'text' | 'image' | 'document'),
         timestamp,
         messageId,
         raw: payload,
@@ -210,15 +226,18 @@ export class CloudApiProvider implements IWhatsappProvider {
    * Verifica el webhook de Cloud API
    */
   verifyWebhook(mode: string, token: string, challenge: string): string | null {
-    this.logger.debug(`🔍 Verificando webhook - mode: ${mode}, token recibido: ${token}, token esperado: ${this.verifyToken}, challenge: ${challenge}`);
-    
+    this.logger.debug(
+      `🔍 Verificando webhook - mode: ${mode}, token recibido: ${token}, token esperado: ${this.verifyToken}, challenge: ${challenge}`,
+    );
+
     if (mode === 'subscribe' && token === this.verifyToken) {
       this.logger.log('✅ Webhook verificado correctamente');
       return challenge;
     }
 
-    this.logger.error(`❌ Fallo en verificación de webhook - mode: ${mode}, token match: ${token === this.verifyToken}`);
+    this.logger.error(
+      `❌ Fallo en verificación de webhook - mode: ${mode}, token match: ${token === this.verifyToken}`,
+    );
     return null;
   }
 }
-
