@@ -212,11 +212,11 @@ export function isEditIntent(text: string): boolean {
  */
 export function detectEditField(
   text: string,
-): 'rol' | 'ubicacion' | 'tipo' | 'salario' | 'horario' | null {
+): 'rol' | 'ubicacion' | 'modalidad' | 'tipo' | 'salario' | 'horario' | null {
   const normalizedText = text.toLowerCase().trim();
 
   // Detectar campo "rol"
-  const rolePatterns = ['rol', 'cargo', 'puesto', 'trabajo', 'profesión', 'profesion'];
+  const rolePatterns = ['rol', 'cargo', 'puesto', 'profesión', 'profesion'];
   if (rolePatterns.some((pattern) => normalizedText.includes(pattern))) {
     return 'rol';
   }
@@ -235,11 +235,24 @@ export function detectEditField(
     return 'ubicacion';
   }
 
-  // Detectar campo "tipo de empleo"
+  // Detectar campo "modalidad" (remoto/presencial)
+  const workModePatterns = [
+    'modalidad',
+    'remoto',
+    'presencial',
+    'trabajo remoto',
+    'trabajo presencial',
+    'oficina',
+    'casa',
+  ];
+  if (workModePatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'modalidad';
+  }
+
+  // Detectar campo "tipo de empleo/jornada"
   const jobTypePatterns = [
     'tipo',
     'jornada',
-    'modalidad',
     'tiempo completo',
     'medio tiempo',
     'freelance',
@@ -399,6 +412,49 @@ export function normalizeLocation(text: string): string | null {
   if (normalizedText.length >= 2) {
     // Capitalizar primera letra
     return normalizedText.charAt(0).toUpperCase() + normalizedText.slice(1).toLowerCase();
+  }
+
+  return null;
+}
+
+/**
+ * Normaliza la modalidad de trabajo (remoto/presencial)
+ * Retorna: 'remoto' | 'presencial' | null
+ */
+export function normalizeWorkMode(text: string): 'remoto' | 'presencial' | null {
+  const normalizedText = text.toLowerCase().trim();
+
+  // Detectar "remoto"
+  const remotePatterns = [
+    'remoto',
+    'remote',
+    'remota',
+    'desde casa',
+    'casa',
+    'home',
+    'home office',
+    'teletrabajo',
+    '1', // Por si usamos lista numerada
+  ];
+
+  if (remotePatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'remoto';
+  }
+
+  // Detectar "presencial"
+  const presencialPatterns = [
+    'presencial',
+    'oficina',
+    'office',
+    'in-office',
+    'in office',
+    'sitio',
+    'lugar',
+    '2', // Por si usamos lista numerada
+  ];
+
+  if (presencialPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'presencial';
   }
 
   return null;

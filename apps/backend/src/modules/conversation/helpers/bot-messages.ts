@@ -49,7 +49,16 @@ Ejemplo: "Desarrollador Full Stack", "Contador", "Asistente Administrativo", etc
 
   ASK_LOCATION: `Excelente. Ahora dime:
 
-¿En qué ciudad quieres trabajar? (o escribe "Remoto" si prefieres trabajo desde casa)`,
+¿En qué ciudad vives o te encuentras actualmente?
+
+Ejemplo: "Bogotá", "Medellín", "Cali", etc.`,
+
+  ASK_WORK_MODE: `Perfecto. ¿Qué modalidad de trabajo prefieres?
+
+🏠 *Remoto* - Trabajar desde casa
+🏢 *Presencial* - Ir a la oficina
+
+Responde "Remoto" o "Presencial".`,
 
   ASK_JOB_TYPE: `¿Qué tipo de jornada prefieres?
 
@@ -91,9 +100,14 @@ _Comandos disponibles:_
 
 Ejemplo: "Desarrollador", "Contador", "Asistente", etc.`,
 
-  ERROR_LOCATION_INVALID: `Por favor, ingresa una ciudad válida o escribe "Remoto".
+  ERROR_LOCATION_INVALID: `Por favor, ingresa una ciudad válida.
 
-Ejemplo: "Bogotá", "Medellín", "Remoto", etc.`,
+Ejemplo: "Bogotá", "Medellín", "Cali", etc.`,
+
+  ERROR_WORK_MODE_INVALID: `No entendí tu respuesta. Por favor responde:
+
+🏠 *"Remoto"* - Para trabajar desde casa
+🏢 *"Presencial"* - Para ir a la oficina`,
 
   ERROR_JOB_TYPE_INVALID: `No entendí tu respuesta. Por favor responde con:
 
@@ -252,6 +266,12 @@ Escribe el *número* o el *nombre* de tu opción:
 *3* - Pasantía
 *4* - Freelance`,
 
+  ASK_WORK_MODE_DESKTOP: `¿Qué modalidad de trabajo prefieres?
+
+Escribe una de estas opciones:
+• *"Remoto"* - Para trabajar desde casa 🏠
+• *"Presencial"* - Para ir a la oficina 🏢`,
+
   CONFIRM_RESTART_DESKTOP: `⚠️ ¿Estás seguro de que quieres *reiniciar tu perfil*?
 
 Se borrarán todas tus preferencias actuales y empezaremos desde cero.
@@ -271,16 +291,18 @@ Escribe:
   EDITING_PROFILE_DESKTOP: (profile: {
     role: string;
     location: string;
+    workMode: string;
     jobType: string;
     minSalary: string;
     alertTime: string;
   }) => `📝 *Tus preferencias actuales:*
 
 🔹 *Rol:* ${profile.role}
-🔹 *Ubicación:* ${profile.location}
-🔹 *Tipo de empleo:* ${profile.jobType}
-🔹 *Salario mínimo:* ${profile.minSalary}
-🔹 *Horario de alertas:* ${profile.alertTime}
+📍 *Ubicación:* ${profile.location}
+🏠 *Modalidad:* ${profile.workMode}
+💼 *Tipo de empleo:* ${profile.jobType}
+💰 *Salario mínimo:* ${profile.minSalary}
+⏰ *Horario de alertas:* ${profile.alertTime}
 
 ---
 
@@ -288,9 +310,10 @@ Escribe el *número* o *nombre* del campo que quieres editar:
 
 *1* - *Rol* - Cambiar tu cargo deseado
 *2* - *Ubicación* - Cambiar la ciudad
-*3* - *Tipo* - Cambiar el tipo de empleo
-*4* - *Salario* - Cambiar el salario mínimo
-*5* - *Horario* - Cambiar la hora de alertas
+*3* - *Modalidad* - Cambiar entre remoto o presencial
+*4* - *Tipo* - Cambiar el tipo de empleo
+*5* - *Salario* - Cambiar el salario mínimo
+*6* - *Horario* - Cambiar la hora de alertas
 
 O escribe *"cancelar"* para volver al menú principal.`,
 };

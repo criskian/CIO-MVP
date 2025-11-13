@@ -82,22 +82,45 @@ export class JobSearchService {
         remoteAllowed: profile.remoteAllowed || false,
       };
 
-      // 3. Ejecutar búsqueda
-      const result = await this.searchJobs(searchQuery);
+      // 3. Ejecutar búsqueda principal
+      let result = await this.searchJobs(searchQuery);
+      let allJobs = [...result.jobs];
 
-      // 4. Registrar en log
-      await this.logSearch(userId, result);
+      // 4. Si el usuario quiere remoto pero hay pocas ofertas, buscar presenciales en su ciudad
+      if (profile.remoteAllowed && allJobs.length < 3 && profile.location) {
+        this.logger.log(`📍 Pocas ofertas remotas (${allJobs.length}), buscando presenciales en ${profile.location}...`);
+        
+        const presencialQuery: JobSearchQuery = {
+          ...searchQuery,
+          remoteAllowed: false, // Buscar solo presenciales
+        };
 
-      // 5. Filtrar ofertas ya enviadas
-      const filteredJobs = await this.filterAlreadySentJobs(userId, result.jobs);
+        const presencialResult = await this.searchJobs(presencialQuery);
+        
+        // Agregar ofertas presenciales al final (después de las remotas)
+        allJobs = [...allJobs, ...presencialResult.jobs];
+        
+        this.logger.log(`✅ Se agregaron ${presencialResult.jobs.length} ofertas presenciales en ${profile.location}`);
+      }
+
+      // 5. Registrar en log
+      await this.logSearch(userId, {
+        ...result,
+        jobs: allJobs,
+        total: allJobs.length,
+      });
+
+      // 6. Filtrar ofertas ya enviadas
+      const filteredJobs = await this.filterAlreadySentJobs(userId, allJobs);
 
       this.logger.log(
-        `✅ Búsqueda completada: ${filteredJobs.length} ofertas nuevas de ${result.total} totales`,
+        `✅ Búsqueda completada: ${filteredJobs.length} ofertas nuevas de ${allJobs.length} totales`,
       );
 
       return {
         ...result,
         jobs: filteredJobs.slice(0, 5), // Máximo 5 ofertas
+        total: allJobs.length,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -116,12 +139,18 @@ export class JobSearchService {
 
       this.logger.debug(`🔎 Query SerpApi Google Jobs: "${queryString}"`);
 
+      // Determinar ubicación para SerpApi
+      // Si es "Remoto", usar "Colombia" como ubicación base
+      const normalizedLocation = query.location?.toLowerCase() === 'remoto' 
+        ? 'Colombia' 
+        : (query.location || 'Colombia');
+
       // Llamar a SerpApi con engine=google_jobs (método GET según documentación)
       const response = await axios.get(this.serpApiUrl, {
         params: {
           engine: 'google_jobs', // Parámetro requerido para usar Google Jobs API
           q: queryString,
-          location: query.location || 'Colombia',
+          location: normalizedLocation,
           gl: 'co', // Country code: Colombia
           hl: 'es', // Language: español
           api_key: this.serpApiKey,
@@ -693,7 +722,7 @@ export class JobSearchService {
 Intenta de nuevo más tarde o ajusta tus preferencias.`;
     }
 
-    const header = `🎯 *Encontré ${jobs.length} ${jobs.length === 1 ? 'oferta' : 'ofertas'} para ti:*\n\n`;
+    const header = `🎯 *Estas son las ofertas que encontré que más se ajustan a tus preferencias:*\n\n`;
 
     const jobsText = jobs
       .map((job, index) => {

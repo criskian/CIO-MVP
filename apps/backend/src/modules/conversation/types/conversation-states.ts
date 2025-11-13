@@ -1,13 +1,14 @@
 /**
  * Estados de la máquina de conversación
- * Flujo: NEW → ASK_DEVICE → ASK_TERMS → ASK_ROLE → ASK_LOCATION → ASK_JOB_TYPE → ASK_MIN_SALARY → ASK_ALERT_TIME → READY
+ * Flujo: NEW → ASK_DEVICE → ASK_TERMS → ASK_ROLE → ASK_LOCATION → ASK_WORK_MODE → ASK_JOB_TYPE → ASK_MIN_SALARY → ASK_ALERT_TIME → READY
  */
 export enum ConversationState {
   NEW = 'NEW',
   ASK_DEVICE = 'ASK_DEVICE', // Preguntar si está en celular o PC
   ASK_TERMS = 'ASK_TERMS',
   ASK_ROLE = 'ASK_ROLE',
-  ASK_LOCATION = 'ASK_LOCATION',
+  ASK_LOCATION = 'ASK_LOCATION', // Pregunta por la ciudad
+  ASK_WORK_MODE = 'ASK_WORK_MODE', // Pregunta si quiere remoto o presencial
   ASK_JOB_TYPE = 'ASK_JOB_TYPE',
   ASK_MIN_SALARY = 'ASK_MIN_SALARY',
   ASK_ALERT_TIME = 'ASK_ALERT_TIME',
@@ -19,7 +20,8 @@ export enum ConversationState {
   CONFIRM_CANCEL_SERVICE = 'CONFIRM_CANCEL_SERVICE', // Confirmando cancelación del servicio
   EDITING_PROFILE = 'EDITING_PROFILE', // Usuario está editando su perfil
   EDIT_ROLE = 'EDIT_ROLE', // Editando rol específicamente
-  EDIT_LOCATION = 'EDIT_LOCATION', // Editando ubicación
+  EDIT_LOCATION = 'EDIT_LOCATION', // Editando ubicación (ciudad)
+  EDIT_WORK_MODE = 'EDIT_WORK_MODE', // Editando modalidad (remoto/presencial)
   EDIT_JOB_TYPE = 'EDIT_JOB_TYPE', // Editando tipo de empleo
   EDIT_MIN_SALARY = 'EDIT_MIN_SALARY', // Editando salario mínimo
   EDIT_ALERT_TIME = 'EDIT_ALERT_TIME', // Editando horario de alertas
