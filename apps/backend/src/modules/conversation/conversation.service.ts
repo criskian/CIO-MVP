@@ -425,6 +425,44 @@ export class ConversationService {
       profile?.location || 'tu ubicación',
     );
 
+    // Obtener tipo de dispositivo
+    const deviceType = await this.getDeviceType(userId);
+
+    // Si es móvil, mostrar lista desplegable con comandos
+    if (deviceType === 'MOBILE') {
+      return {
+        text: confirmationMessage,
+        listTitle: 'Ver opciones',
+        listSections: [
+          {
+            title: 'Comandos disponibles',
+            rows: [
+              {
+                id: 'cmd_buscar',
+                title: '🔍 Buscar empleos',
+                description: 'Encontrar ofertas ahora',
+              },
+              {
+                id: 'cmd_editar',
+                title: '✏️ Editar perfil',
+                description: 'Cambiar tus preferencias',
+              },
+              {
+                id: 'cmd_reiniciar',
+                title: '🔄 Reiniciar',
+                description: 'Reconfigurar desde cero',
+              },
+              {
+                id: 'cmd_cancelar',
+                title: '❌ Cancelar servicio',
+                description: 'Dejar de usar el servicio',
+              },
+            ],
+          },
+        ],
+      };
+    }
+
     return { text: confirmationMessage };
   }
 
@@ -577,7 +615,7 @@ Por favor intenta de nuevo en unos minutos.`,
     if (isRejection(text)) {
       // Usuario canceló el reinicio
       await this.updateSessionState(userId, ConversationState.READY);
-      return { text: BotMessages.RESTART_CANCELLED };
+      return await this.returnToMainMenu(userId, BotMessages.RESTART_CANCELLED);
     }
 
     // No entendió la respuesta
@@ -603,7 +641,7 @@ Por favor intenta de nuevo en unos minutos.`,
     if (isRejection(text)) {
       // Usuario decidió no cancelar
       await this.updateSessionState(userId, ConversationState.READY);
-      return { text: BotMessages.CANCEL_SERVICE_ABORTED };
+      return await this.returnToMainMenu(userId, BotMessages.CANCEL_SERVICE_ABORTED);
     }
 
     // No entendió la respuesta
@@ -729,7 +767,7 @@ Selecciona qué quieres editar:`,
     // Permitir cancelar
     if (isRejection(text) || text.toLowerCase().includes('cancelar')) {
       await this.updateSessionState(userId, ConversationState.READY);
-      return { text: BotMessages.NOT_READY_YET };
+      return await this.returnToMainMenu(userId, BotMessages.NOT_READY_YET);
     }
 
     // Detectar qué campo quiere editar
@@ -801,7 +839,7 @@ Selecciona qué quieres editar:`,
     await this.updateUserProfile(userId, { role });
     await this.updateSessionState(userId, ConversationState.READY);
 
-    return { text: BotMessages.FIELD_UPDATED('rol', role) };
+    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('rol', role));
   }
 
   /**
@@ -823,7 +861,7 @@ Selecciona qué quieres editar:`,
     await this.updateSessionState(userId, ConversationState.READY);
 
     const displayLocation = isRemote ? `${location} (Remoto)` : location;
-    return { text: BotMessages.FIELD_UPDATED('ubicación', displayLocation) };
+    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('ubicación', displayLocation));
   }
 
   /**
@@ -869,7 +907,7 @@ Selecciona qué quieres editar:`,
     await this.updateUserProfile(userId, { jobType });
     await this.updateSessionState(userId, ConversationState.READY);
 
-    return { text: BotMessages.FIELD_UPDATED('tipo de empleo', this.formatJobType(jobType)) };
+    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('tipo de empleo', this.formatJobType(jobType)));
   }
 
   /**
@@ -879,7 +917,7 @@ Selecciona qué quieres editar:`,
     if (text.trim() === '0') {
       await this.updateUserProfile(userId, { minSalary: 0 });
       await this.updateSessionState(userId, ConversationState.READY);
-      return { text: BotMessages.FIELD_UPDATED('salario mínimo', 'Sin filtro') };
+      return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('salario mínimo', 'Sin filtro'));
     }
 
     const minSalary = normalizeSalary(text);
@@ -891,12 +929,13 @@ Selecciona qué quieres editar:`,
     await this.updateUserProfile(userId, { minSalary });
     await this.updateSessionState(userId, ConversationState.READY);
 
-    return {
-      text: BotMessages.FIELD_UPDATED(
+    return await this.returnToMainMenu(
+      userId,
+      BotMessages.FIELD_UPDATED(
         'salario mínimo',
         `$${minSalary.toLocaleString('es-CO')} COP`,
       ),
-    };
+    );
   }
 
   /**
@@ -912,7 +951,7 @@ Selecciona qué quieres editar:`,
     await this.upsertAlertPreference(userId, alertTime);
     await this.updateSessionState(userId, ConversationState.READY);
 
-    return { text: BotMessages.FIELD_UPDATED('horario de alertas', alertTime) };
+    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('horario de alertas', alertTime));
   }
 
   /**
@@ -982,6 +1021,49 @@ Selecciona qué quieres editar:`,
     });
 
     return (session?.deviceType as 'MOBILE' | 'DESKTOP') || 'DESKTOP';
+  }
+
+  /**
+   * Helper: Regresar al menú principal con opciones interactivas si está en móvil
+   */
+  private async returnToMainMenu(userId: string, message: string): Promise<BotReply> {
+    const deviceType = await this.getDeviceType(userId);
+
+    if (deviceType === 'MOBILE') {
+      return {
+        text: `${message}\n\n¿Qué te gustaría hacer?`,
+        listTitle: 'Ver opciones',
+        listSections: [
+          {
+            title: 'Comandos disponibles',
+            rows: [
+              {
+                id: 'cmd_buscar',
+                title: '🔍 Buscar empleos',
+                description: 'Encontrar ofertas ahora',
+              },
+              {
+                id: 'cmd_editar',
+                title: '✏️ Editar perfil',
+                description: 'Cambiar tus preferencias',
+              },
+              {
+                id: 'cmd_reiniciar',
+                title: '🔄 Reiniciar',
+                description: 'Reconfigurar desde cero',
+              },
+              {
+                id: 'cmd_cancelar',
+                title: '❌ Cancelar servicio',
+                description: 'Dejar de usar el servicio',
+              },
+            ],
+          },
+        ],
+      };
+    }
+
+    return { text: `${message}\n\n${BotMessages.MENU_READY}` };
   }
 
   /**
