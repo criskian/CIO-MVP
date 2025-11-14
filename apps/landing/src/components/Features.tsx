@@ -18,9 +18,9 @@ const features = [
     gradient: 'from-violet-500 to-violet-600',
   },
   {
-    title: '100% Gratis y Seguro',
+    title: '100% Seguro y confiable',
     description:
-      'Sin costos ocultos. Tus datos están protegidos y solo se usan para mejorar tu experiencia.',
+      'Tus datos están protegidos y solo se usan para mejorar tu experiencia.',
     gradient: 'from-purple-600 to-indigo-600',
   },
 ];
