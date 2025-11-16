@@ -1,4 +1,4 @@
-import { JobType, UserIntent } from '../types/conversation-states';
+import { JobType, UserIntent, ExperienceLevel } from '../types/conversation-states';
 
 /**
  * Helpers para validar y normalizar respuestas del usuario
@@ -212,13 +212,27 @@ export function isEditIntent(text: string): boolean {
  */
 export function detectEditField(
   text: string,
-): 'rol' | 'ubicacion' | 'modalidad' | 'tipo' | 'salario' | 'horario' | null {
+): 'rol' | 'experiencia' | 'ubicacion' | 'modalidad' | 'tipo' | 'salario' | 'horario' | null {
   const normalizedText = text.toLowerCase().trim();
 
   // Detectar campo "rol"
   const rolePatterns = ['rol', 'cargo', 'puesto', 'profesión', 'profesion'];
   if (rolePatterns.some((pattern) => normalizedText.includes(pattern))) {
     return 'rol';
+  }
+
+  // Detectar campo "experiencia"
+  const experiencePatterns = [
+    'experiencia',
+    'años',
+    'año',
+    'seniority',
+    'nivel',
+    'junior',
+    'senior',
+  ];
+  if (experiencePatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'experiencia';
   }
 
   // Detectar campo "ubicación"
@@ -471,4 +485,107 @@ export function normalizeRole(text: string): string | null {
   }
 
   return null;
+}
+
+/**
+ * Normaliza el nivel de experiencia del usuario
+ * Retorna: ExperienceLevel enum o null
+ */
+export function normalizeExperienceLevel(text: string): ExperienceLevel | null {
+  const normalizedText = text.toLowerCase().trim();
+
+  // Sin experiencia
+  const nonePatterns = [
+    'sin experiencia',
+    'sin exp',
+    'ninguna',
+    'ninguno',
+    'no tengo',
+    'cero',
+    '0',
+    '1',
+  ];
+  if (nonePatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return ExperienceLevel.NONE;
+  }
+
+  // Junior (1-2 años)
+  const juniorPatterns = ['junior', 'jr', '1 año', '2 años', '1-2', '2'];
+  if (juniorPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return ExperienceLevel.JUNIOR;
+  }
+
+  // Mid/Intermedio (3-5 años)
+  const midPatterns = [
+    'mid',
+    'intermedio',
+    'semi senior',
+    'semi-senior',
+    'middle',
+    '3 años',
+    '4 años',
+    '5 años',
+    '3-5',
+    '3',
+  ];
+  if (midPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return ExperienceLevel.MID;
+  }
+
+  // Senior (5+ años)
+  const seniorPatterns = [
+    'senior',
+    'sr',
+    'experto',
+    'especialista',
+    '5 años',
+    '6 años',
+    '7 años',
+    '8 años',
+    '5+',
+    '4',
+  ];
+  if (seniorPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return ExperienceLevel.SENIOR;
+  }
+
+  // Lead/Expert (7+ años)
+  const leadPatterns = [
+    'lead',
+    'líder',
+    'lider',
+    'principal',
+    'expert',
+    'experto senior',
+    '7+',
+    '10',
+    '10+',
+    '5',
+  ];
+  if (leadPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return ExperienceLevel.LEAD;
+  }
+
+  return null;
+}
+
+/**
+ * Obtiene las palabras clave de búsqueda para cada nivel de experiencia
+ * Estas palabras se usan para filtrar/priorizar resultados en la búsqueda
+ */
+export function getExperienceKeywords(level: ExperienceLevel): string[] {
+  switch (level) {
+    case ExperienceLevel.NONE:
+      return ['junior', 'practicante', 'trainee', 'aprendiz', 'sin experiencia', 'entry level'];
+    case ExperienceLevel.JUNIOR:
+      return ['junior', 'jr'];
+    case ExperienceLevel.MID:
+      return ['semi senior', 'mid', 'intermedio'];
+    case ExperienceLevel.SENIOR:
+      return ['senior', 'sr', 'experto', 'especialista'];
+    case ExperienceLevel.LEAD:
+      return ['lead', 'líder', 'principal', 'expert', 'arquitecto', 'director'];
+    default:
+      return [];
+  }
 }

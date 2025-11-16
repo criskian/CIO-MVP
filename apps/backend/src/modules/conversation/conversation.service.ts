@@ -20,6 +20,8 @@ import {
   isMobileDevice,
   isDesktopDevice,
   normalizeRole,
+  normalizeExperienceLevel,
+  getExperienceKeywords,
   normalizeLocation,
   normalizeWorkMode,
   normalizeJobType,
@@ -114,6 +116,9 @@ export class ConversationService {
       case ConversationState.ASK_ROLE:
         return await this.handleAskRoleState(userId, text);
 
+      case ConversationState.ASK_EXPERIENCE:
+        return await this.handleAskExperienceState(userId, text);
+
       case ConversationState.ASK_LOCATION:
         return await this.handleAskLocationState(userId, text);
 
@@ -143,6 +148,9 @@ export class ConversationService {
 
       case ConversationState.EDIT_ROLE:
         return await this.handleEditRoleState(userId, text);
+
+      case ConversationState.EDIT_EXPERIENCE:
+        return await this.handleEditExperienceState(userId, text);
 
       case ConversationState.EDIT_LOCATION:
         return await this.handleEditLocationState(userId, text);
@@ -276,7 +284,68 @@ export class ConversationService {
     // Guardar en UserProfile
     await this.updateUserProfile(userId, { role });
 
-    // Transición: ASK_ROLE → ASK_LOCATION
+    // Transición: ASK_ROLE → ASK_EXPERIENCE
+    await this.updateSessionState(userId, ConversationState.ASK_EXPERIENCE);
+
+    // Obtener tipo de dispositivo para usar lista en móvil
+    const deviceType = await this.getDeviceType(userId);
+
+    if (deviceType === 'MOBILE') {
+      return {
+        text: BotMessages.ASK_EXPERIENCE,
+        listTitle: 'Seleccionar nivel',
+        listSections: [
+          {
+            title: 'Nivel de Experiencia',
+            rows: [
+              {
+                id: 'exp_none',
+                title: 'Sin experiencia',
+                description: 'Recién graduado o sin experiencia laboral',
+              },
+              {
+                id: 'exp_junior',
+                title: 'Junior (1-2 años)',
+                description: 'Experiencia inicial en el campo',
+              },
+              {
+                id: 'exp_mid',
+                title: 'Intermedio (3-5 años)',
+                description: 'Experiencia sólida',
+              },
+              {
+                id: 'exp_senior',
+                title: 'Senior (5+ años)',
+                description: 'Experto en el área',
+              },
+              {
+                id: 'exp_lead',
+                title: 'Lead/Expert (7+ años)',
+                description: 'Liderazgo y expertise avanzado',
+              },
+            ],
+          },
+        ],
+      };
+    } else {
+      return { text: BotMessages.ASK_EXPERIENCE };
+    }
+  }
+
+  /**
+   * Estado ASK_EXPERIENCE: Esperando nivel de experiencia
+   */
+  private async handleAskExperienceState(userId: string, text: string): Promise<BotReply> {
+    const experienceLevel = normalizeExperienceLevel(text);
+
+    if (!experienceLevel) {
+      return { text: BotMessages.ERROR_EXPERIENCE_INVALID };
+    }
+
+    // Guardar en UserProfile
+    await this.updateUserProfile(userId, { experienceLevel });
+
+    // Transición: ASK_EXPERIENCE → ASK_LOCATION
     await this.updateSessionState(userId, ConversationState.ASK_LOCATION);
 
     return { text: BotMessages.ASK_LOCATION };
@@ -759,6 +828,7 @@ Continúa con el proceso manual. 👇`,
     // Formatear valores para mostrar
     const formattedProfile = {
       role: profile.role || 'No configurado',
+      experience: this.formatExperienceLevel(profile.experienceLevel),
       location: profile.location || 'No configurado',
       workMode: profile.remoteAllowed ? '🏠 Remoto' : '🏢 Presencial',
       jobType: this.formatJobType(profile.jobType),
@@ -779,6 +849,7 @@ Continúa con el proceso manual. 👇`,
         text: `📝 *Tus preferencias actuales:*
 
 🔹 *Rol:* ${formattedProfile.role}
+💡 *Experiencia:* ${formattedProfile.experience}
 📍 *Ubicación:* ${formattedProfile.location}
 🏠 *Modalidad:* ${formattedProfile.workMode}
 💼 *Tipo de empleo:* ${formattedProfile.jobType}
@@ -795,6 +866,11 @@ Selecciona qué quieres editar:`,
                 id: 'edit_rol',
                 title: '🔹 Rol',
                 description: `Actual: ${formattedProfile.role}`,
+              },
+              {
+                id: 'edit_experiencia',
+                title: '💡 Experiencia',
+                description: `Actual: ${formattedProfile.experience}`,
               },
               {
                 id: 'edit_ubicacion',
@@ -855,6 +931,52 @@ Selecciona qué quieres editar:`,
       case 'rol':
         await this.updateSessionState(userId, ConversationState.EDIT_ROLE);
         return { text: BotMessages.ASK_ROLE };
+
+      case 'experiencia': {
+        await this.updateSessionState(userId, ConversationState.EDIT_EXPERIENCE);
+        const deviceType = await this.getDeviceType(userId);
+        
+        if (deviceType === 'MOBILE') {
+          return {
+            text: BotMessages.ASK_EXPERIENCE,
+            listTitle: 'Seleccionar nivel',
+            listSections: [
+              {
+                title: 'Nivel de Experiencia',
+                rows: [
+                  {
+                    id: 'exp_none',
+                    title: 'Sin experiencia',
+                    description: 'Recién graduado',
+                  },
+                  {
+                    id: 'exp_junior',
+                    title: 'Junior (1-2 años)',
+                    description: 'Experiencia inicial',
+                  },
+                  {
+                    id: 'exp_mid',
+                    title: 'Intermedio (3-5 años)',
+                    description: 'Experiencia sólida',
+                  },
+                  {
+                    id: 'exp_senior',
+                    title: 'Senior (5+ años)',
+                    description: 'Experto',
+                  },
+                  {
+                    id: 'exp_lead',
+                    title: 'Lead/Expert (7+ años)',
+                    description: 'Liderazgo avanzado',
+                  },
+                ],
+              },
+            ],
+          };
+        }
+        
+        return { text: BotMessages.ASK_EXPERIENCE };
+      }
 
       case 'ubicacion':
         await this.updateSessionState(userId, ConversationState.EDIT_LOCATION);
@@ -930,6 +1052,26 @@ Selecciona qué quieres editar:`,
     await this.updateSessionState(userId, ConversationState.READY);
 
     return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('rol', role));
+  }
+
+  /**
+   * Estado EDIT_EXPERIENCE: Editando nivel de experiencia
+   */
+  private async handleEditExperienceState(userId: string, text: string): Promise<BotReply> {
+    const experienceLevel = normalizeExperienceLevel(text);
+
+    if (!experienceLevel) {
+      return { text: BotMessages.ERROR_EXPERIENCE_INVALID };
+    }
+
+    await this.updateUserProfile(userId, { experienceLevel });
+    await this.updateSessionState(userId, ConversationState.READY);
+
+    const experienceLabel = this.formatExperienceLevel(experienceLevel);
+    return await this.returnToMainMenu(
+      userId,
+      BotMessages.FIELD_UPDATED('experiencia', experienceLabel),
+    );
   }
 
   /**
@@ -1083,6 +1225,18 @@ Selecciona qué quieres editar:`,
     };
 
     return typeMap[jobType || ''] || 'No configurado';
+  }
+
+  private formatExperienceLevel(experienceLevel: string | null | undefined): string {
+    const experienceMap: Record<string, string> = {
+      none: 'Sin experiencia',
+      junior: 'Junior (1-2 años)',
+      mid: 'Intermedio (3-5 años)',
+      senior: 'Senior (5+ años)',
+      lead: 'Lead/Expert (7+ años)',
+    };
+
+    return experienceMap[experienceLevel || ''] || 'No configurado';
   }
 
   // ========================================

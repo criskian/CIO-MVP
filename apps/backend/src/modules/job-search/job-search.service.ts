@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
 import axios from 'axios';
 import { JobPosting, JobSearchQuery, JobSearchResult } from './types/job-posting';
+import { getExperienceKeywords } from '../conversation/helpers/input-validators';
+import { ExperienceLevel } from '../conversation/types/conversation-states';
 
 /**
  * Servicio de búsqueda de empleos
@@ -74,12 +76,17 @@ export class JobSearchService {
       }
 
       // 2. Construir query de búsqueda
+      const experienceKeywords = profile.experienceLevel
+        ? getExperienceKeywords(profile.experienceLevel as ExperienceLevel)
+        : undefined;
+
       const searchQuery: JobSearchQuery = {
         role: profile.role,
         location: profile.location || undefined,
         jobType: profile.jobType || undefined,
         minSalary: profile.minSalary || undefined,
         remoteAllowed: profile.remoteAllowed || false,
+        experienceKeywords,
       };
 
       // 3. Ejecutar búsqueda principal
@@ -595,6 +602,18 @@ export class JobSearchService {
     // +5 puntos si es remoto y el usuario lo permite
     if (query.remoteAllowed && job.locationRaw?.toLowerCase().includes('remoto')) {
       score += 5;
+    }
+
+    // +7 puntos si el nivel de experiencia coincide (prioriza, pero no filtra)
+    if (query.experienceKeywords && query.experienceKeywords.length > 0) {
+      const hasExperienceMatch = query.experienceKeywords.some(
+        (keyword) =>
+          titleLower.includes(keyword.toLowerCase()) ||
+          snippetLower.includes(keyword.toLowerCase()),
+      );
+      if (hasExperienceMatch) {
+        score += 7;
+      }
     }
 
     // +3 puntos si tiene salario visible

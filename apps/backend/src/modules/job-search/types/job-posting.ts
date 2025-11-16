@@ -26,6 +26,7 @@ export interface JobSearchQuery {
   jobType?: string;
   minSalary?: number;
   remoteAllowed?: boolean;
+  experienceKeywords?: string[]; // Palabras clave para filtrar por experiencia (e.g., ['junior', 'jr'])
 }
 
 /**

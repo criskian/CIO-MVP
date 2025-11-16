@@ -47,6 +47,18 @@ Esto me ayuda a mostrarte las opciones de la mejor manera.`,
 
 Ejemplo: "Desarrollador Full Stack", "Contador", "Asistente Administrativo", etc.`,
 
+  ASK_EXPERIENCE: `Genial. Ahora dime:
+
+¿Cuántos años de experiencia tienes en este campo?
+
+1️⃣ Sin experiencia
+2️⃣ Junior (1-2 años)
+3️⃣ Intermedio (3-5 años)
+4️⃣ Senior (5+ años)
+5️⃣ Lead/Expert (7+ años)
+
+Responde con el número o el nombre.`,
+
   ASK_LOCATION: `Excelente. Ahora dime:
 
 ¿En qué ciudad vives o te encuentras actualmente?
@@ -99,6 +111,14 @@ _Comandos disponibles:_
   ERROR_ROLE_INVALID: `Por favor, ingresa un cargo válido (al menos 2 caracteres).
 
 Ejemplo: "Desarrollador", "Contador", "Asistente", etc.`,
+
+  ERROR_EXPERIENCE_INVALID: `No entendí tu respuesta. Por favor responde con:
+
+1️⃣ Sin experiencia
+2️⃣ Junior (1-2 años)
+3️⃣ Intermedio (3-5 años)
+4️⃣ Senior (5+ años)
+5️⃣ Lead/Expert (7+ años)`,
 
   ERROR_LOCATION_INVALID: `Por favor, ingresa una ciudad válida.
 
@@ -290,6 +310,7 @@ Escribe:
 
   EDITING_PROFILE_DESKTOP: (profile: {
     role: string;
+    experience: string;
     location: string;
     workMode: string;
     jobType: string;
@@ -298,6 +319,7 @@ Escribe:
   }) => `📝 *Tus preferencias actuales:*
 
 🔹 *Rol:* ${profile.role}
+💡 *Experiencia:* ${profile.experience}
 📍 *Ubicación:* ${profile.location}
 🏠 *Modalidad:* ${profile.workMode}
 💼 *Tipo de empleo:* ${profile.jobType}
@@ -309,11 +331,12 @@ Escribe:
 Escribe el *número* o *nombre* del campo que quieres editar:
 
 *1* - *Rol* - Cambiar tu cargo deseado
-*2* - *Ubicación* - Cambiar la ciudad
-*3* - *Modalidad* - Cambiar entre remoto o presencial
-*4* - *Tipo* - Cambiar el tipo de empleo
-*5* - *Salario* - Cambiar el salario mínimo
-*6* - *Horario* - Cambiar la hora de alertas
+*2* - *Experiencia* - Cambiar tu nivel de experiencia
+*3* - *Ubicación* - Cambiar la ciudad
+*4* - *Modalidad* - Cambiar entre remoto o presencial
+*5* - *Tipo* - Cambiar el tipo de empleo
+*6* - *Salario* - Cambiar el salario mínimo
+*7* - *Horario* - Cambiar la hora de alertas
 
 O escribe *"cancelar"* para volver al menú principal.`,
 };
