@@ -1359,6 +1359,7 @@ Selecciona qué quieres editar:`,
     userId: string,
     data: Partial<{
       role: string;
+      experienceLevel: string;
       location: string;
       jobType: string;
       minSalary: number;

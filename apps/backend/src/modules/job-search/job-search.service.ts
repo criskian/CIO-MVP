@@ -185,6 +185,17 @@ export class JobSearchService {
 
       this.logger.log(`✅ Después de filtrar: ${rankedJobs.length} ofertas válidas`);
 
+      // Si no hay resultados y el rol tiene múltiples palabras, intentar búsqueda más amplia
+      if (rankedJobs.length === 0 && query.role.split(' ').length > 1) {
+        this.logger.log(`🔄 No se encontraron resultados con "${query.role}". Intentando búsqueda más amplia...`);
+        
+        // Obtener la primera palabra del rol (ej: "diseñador UI" -> "diseñador")
+        const broadRole = query.role.split(' ')[0];
+        const broadQuery = { ...query, role: broadRole };
+        
+        return await this.searchJobs(broadQuery);
+      }
+
       return {
         jobs: rankedJobs,
         total: rankedJobs.length,
@@ -582,14 +593,37 @@ export class JobSearchService {
     const roleLower = query.role.toLowerCase();
     const urlLower = job.url.toLowerCase();
 
-    // +10 puntos si el rol aparece en el título
+    // +15 puntos si el rol completo aparece en el título (match exacto)
     if (titleLower.includes(roleLower)) {
-      score += 10;
+      score += 15;
+    } else {
+      // +10 puntos si al menos la primera palabra del rol aparece
+      const firstWord = roleLower.split(' ')[0];
+      if (titleLower.includes(firstWord)) {
+        score += 10;
+      }
     }
 
-    // +5 puntos si el rol aparece en el snippet
+    // +7 puntos si el rol completo aparece en el snippet
     if (snippetLower.includes(roleLower)) {
-      score += 5;
+      score += 7;
+    } else {
+      // +3 puntos si al menos la primera palabra del rol aparece
+      const firstWord = roleLower.split(' ')[0];
+      if (snippetLower.includes(firstWord)) {
+        score += 3;
+      }
+    }
+
+    // +5 puntos extra si todas las palabras del rol aparecen (aunque no juntas)
+    const roleWords = roleLower.split(' ').filter(w => w.length > 2);
+    if (roleWords.length > 1) {
+      const allWordsPresent = roleWords.every(
+        word => titleLower.includes(word) || snippetLower.includes(word)
+      );
+      if (allWordsPresent) {
+        score += 5;
+      }
     }
 
     // +8 puntos si la ubicación coincide
