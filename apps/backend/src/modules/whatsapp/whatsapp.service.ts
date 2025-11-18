@@ -13,6 +13,15 @@ export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
   private readonly provider: IWhatsappProvider;
 
+  // Cache para deduplicación de mensajes (messageId -> timestamp)
+  private readonly processedMessages = new Map<string, number>();
+  
+  // Tiempo máximo para aceptar un mensaje (2 minutos)
+  private readonly MAX_MESSAGE_AGE_MS = 2 * 60 * 1000;
+  
+  // Tiempo para mantener IDs en cache (10 minutos)
+  private readonly CACHE_RETENTION_MS = 10 * 60 * 1000;
+
   constructor(
     private readonly conversationService: ConversationService,
     private readonly cloudApiProvider: CloudApiProvider,
@@ -20,6 +29,9 @@ export class WhatsappService {
     // Usar Cloud API como provider único
     this.provider = this.cloudApiProvider;
     this.logger.log('📱 Usando WhatsApp Cloud API como proveedor');
+
+    // Limpiar cache cada 5 minutos
+    setInterval(() => this.cleanupMessageCache(), 5 * 60 * 1000);
   }
 
   /**
@@ -52,14 +64,38 @@ export class WhatsappService {
         return { status: 'ignored' };
       }
 
+      // 1. VALIDAR DEDUPLICACIÓN: Verificar si ya procesamos este mensaje
+      if (normalizedMessage.messageId && this.isMessageAlreadyProcessed(normalizedMessage.messageId)) {
+        this.logger.warn(
+          `🔁 Mensaje duplicado detectado (ID: ${normalizedMessage.messageId}). Ignorando.`,
+        );
+        return { status: 'duplicate' };
+      }
+
+      // 2. VALIDAR ANTIGÜEDAD: Rechazar mensajes muy antiguos (>2 min)
+      if (normalizedMessage.timestamp) {
+        const messageAge = Date.now() - normalizedMessage.timestamp.getTime();
+        if (messageAge > this.MAX_MESSAGE_AGE_MS) {
+          this.logger.warn(
+            `⏰ Mensaje muy antiguo detectado (${Math.round(messageAge / 1000)}s). Ignorando para evitar crear sesiones duplicadas.`,
+          );
+          return { status: 'too_old' };
+        }
+      }
+
       this.logger.log(
         `📬 Mensaje de ${normalizedMessage.phone}: ${normalizedMessage.text || '[media]'}`,
       );
 
-      // Pasar al ConversationService para procesar
+      // 3. MARCAR COMO PROCESADO antes de procesar (para evitar race conditions)
+      if (normalizedMessage.messageId) {
+        this.markMessageAsProcessed(normalizedMessage.messageId);
+      }
+
+      // 4. Pasar al ConversationService para procesar
       const reply = await this.conversationService.handleIncomingMessage(normalizedMessage);
 
-      // Enviar respuesta (con soporte para mensajes interactivos)
+      // 5. Enviar respuesta (con soporte para mensajes interactivos)
       await this.sendBotReply(normalizedMessage.phone, reply);
 
       return { status: 'ok' };
@@ -98,6 +134,40 @@ export class WhatsappService {
       const errorStack = error instanceof Error ? error.stack : undefined;
       this.logger.error(`❌ Error enviando mensaje a ${to}: ${errorMessage}`, errorStack);
       throw error;
+    }
+  }
+
+  /**
+   * Verifica si un mensaje ya fue procesado
+   */
+  private isMessageAlreadyProcessed(messageId: string): boolean {
+    return this.processedMessages.has(messageId);
+  }
+
+  /**
+   * Marca un mensaje como procesado
+   */
+  private markMessageAsProcessed(messageId: string): void {
+    this.processedMessages.set(messageId, Date.now());
+  }
+
+  /**
+   * Limpia mensajes antiguos del cache
+   */
+  private cleanupMessageCache(): void {
+    const now = Date.now();
+    const entriesToDelete: string[] = [];
+
+    for (const [messageId, timestamp] of this.processedMessages.entries()) {
+      if (now - timestamp > this.CACHE_RETENTION_MS) {
+        entriesToDelete.push(messageId);
+      }
+    }
+
+    entriesToDelete.forEach((id) => this.processedMessages.delete(id));
+
+    if (entriesToDelete.length > 0) {
+      this.logger.debug(`🧹 Limpieza de cache: ${entriesToDelete.length} mensajes eliminados`);
     }
   }
 }

@@ -26,17 +26,18 @@ model User {
 }
 
 model UserProfile {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  role          String?
-  location      String?
-  jobType       String?  // full_time, part_time, internship, freelance
-  minSalary     Int?
-  remoteAllowed Boolean?
-  createdFromCV Boolean  @default(false)
-  cvUrl         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  role            String?
+  location        String?
+  jobType         String?  // full_time, part_time, internship, freelance
+  minSalary       Int?
+  remoteAllowed   Boolean?
+  experienceLevel String?  // none, junior, mid, senior, lead
+  createdFromCV   Boolean  @default(false)
+  cvUrl           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -60,6 +61,7 @@ model Session {
 model AlertPreference {
   id               String    @id @default(cuid())
   userId           String    @unique
+  alertFrequency   String    @default("daily") // daily, every_3_days, weekly, monthly
   alertTimeLocal   String    // "07:00"
   timezone         String    @default("America/Bogota")
   enabled          Boolean   @default(true)

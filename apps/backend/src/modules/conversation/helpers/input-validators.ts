@@ -1,4 +1,9 @@
-import { JobType, UserIntent } from '../types/conversation-states';
+import {
+  JobType,
+  UserIntent,
+  ExperienceLevel,
+  AlertFrequency,
+} from '../types/conversation-states';
 
 /**
  * Helpers para validar y normalizar respuestas del usuario
@@ -212,13 +217,36 @@ export function isEditIntent(text: string): boolean {
  */
 export function detectEditField(
   text: string,
-): 'rol' | 'ubicacion' | 'tipo' | 'salario' | 'horario' | null {
+):
+  | 'rol'
+  | 'experiencia'
+  | 'ubicacion'
+  | 'modalidad'
+  | 'tipo'
+  | 'salario'
+  | 'frecuencia'
+  | 'horario'
+  | null {
   const normalizedText = text.toLowerCase().trim();
 
   // Detectar campo "rol"
-  const rolePatterns = ['rol', 'cargo', 'puesto', 'trabajo', 'profesión', 'profesion'];
+  const rolePatterns = ['rol', 'cargo', 'puesto', 'profesión', 'profesion'];
   if (rolePatterns.some((pattern) => normalizedText.includes(pattern))) {
     return 'rol';
+  }
+
+  // Detectar campo "experiencia"
+  const experiencePatterns = [
+    'experiencia',
+    'años',
+    'año',
+    'seniority',
+    'nivel',
+    'junior',
+    'senior',
+  ];
+  if (experiencePatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'experiencia';
   }
 
   // Detectar campo "ubicación"
@@ -235,11 +263,24 @@ export function detectEditField(
     return 'ubicacion';
   }
 
-  // Detectar campo "tipo de empleo"
+  // Detectar campo "modalidad" (remoto/presencial)
+  const workModePatterns = [
+    'modalidad',
+    'remoto',
+    'presencial',
+    'trabajo remoto',
+    'trabajo presencial',
+    'oficina',
+    'casa',
+  ];
+  if (workModePatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'modalidad';
+  }
+
+  // Detectar campo "tipo de empleo/jornada"
   const jobTypePatterns = [
     'tipo',
     'jornada',
-    'modalidad',
     'tiempo completo',
     'medio tiempo',
     'freelance',
@@ -254,6 +295,20 @@ export function detectEditField(
   const salaryPatterns = ['salario', 'sueldo', 'pago', 'remuneración', 'remuneracion'];
   if (salaryPatterns.some((pattern) => normalizedText.includes(pattern))) {
     return 'salario';
+  }
+
+  // Detectar campo "frecuencia de alertas"
+  const frequencyPatterns = [
+    'frecuencia',
+    'cada cuanto',
+    'cada cuánto',
+    'periodicidad',
+    'diario',
+    'semanal',
+    'mensual',
+  ];
+  if (frequencyPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'frecuencia';
   }
 
   // Detectar campo "horario de alertas"
@@ -405,6 +460,49 @@ export function normalizeLocation(text: string): string | null {
 }
 
 /**
+ * Normaliza la modalidad de trabajo (remoto/presencial)
+ * Retorna: 'remoto' | 'presencial' | null
+ */
+export function normalizeWorkMode(text: string): 'remoto' | 'presencial' | null {
+  const normalizedText = text.toLowerCase().trim();
+
+  // Detectar "remoto"
+  const remotePatterns = [
+    'remoto',
+    'remote',
+    'remota',
+    'desde casa',
+    'casa',
+    'home',
+    'home office',
+    'teletrabajo',
+    '1', // Por si usamos lista numerada
+  ];
+
+  if (remotePatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'remoto';
+  }
+
+  // Detectar "presencial"
+  const presencialPatterns = [
+    'presencial',
+    'oficina',
+    'office',
+    'in-office',
+    'in office',
+    'sitio',
+    'lugar',
+    '2', // Por si usamos lista numerada
+  ];
+
+  if (presencialPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'presencial';
+  }
+
+  return null;
+}
+
+/**
  * Valida que un texto sea un rol válido (por ahora, cualquier texto > 2 caracteres)
  */
 export function normalizeRole(text: string): string | null {
@@ -415,4 +513,185 @@ export function normalizeRole(text: string): string | null {
   }
 
   return null;
+}
+
+/**
+ * Normaliza el nivel de experiencia del usuario
+ * Retorna: ExperienceLevel enum o null
+ */
+export function normalizeExperienceLevel(text: string): ExperienceLevel | null {
+  const normalizedText = text.toLowerCase().trim();
+
+  // Sin experiencia
+  const nonePatterns = [
+    'sin experiencia',
+    'sin exp',
+    'ninguna',
+    'ninguno',
+    'no tengo',
+    'cero',
+    '0',
+    '1',
+  ];
+  if (nonePatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return ExperienceLevel.NONE;
+  }
+
+  // Junior (1-2 años)
+  const juniorPatterns = ['junior', 'jr', '1 año', '2 años', '1-2', '2'];
+  if (juniorPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return ExperienceLevel.JUNIOR;
+  }
+
+  // Mid/Intermedio (3-5 años)
+  const midPatterns = [
+    'mid',
+    'intermedio',
+    'semi senior',
+    'semi-senior',
+    'middle',
+    '3 años',
+    '4 años',
+    '5 años',
+    '3-5',
+    '3',
+  ];
+  if (midPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return ExperienceLevel.MID;
+  }
+
+  // Senior (5+ años)
+  const seniorPatterns = [
+    'senior',
+    'sr',
+    'experto',
+    'especialista',
+    '5 años',
+    '6 años',
+    '7 años',
+    '8 años',
+    '5+',
+    '4',
+  ];
+  if (seniorPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return ExperienceLevel.SENIOR;
+  }
+
+  // Lead/Expert (7+ años)
+  const leadPatterns = [
+    'lead',
+    'líder',
+    'lider',
+    'principal',
+    'expert',
+    'experto senior',
+    '7+',
+    '10',
+    '10+',
+    '5',
+  ];
+  if (leadPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return ExperienceLevel.LEAD;
+  }
+
+  return null;
+}
+
+/**
+ * Obtiene las palabras clave de búsqueda para cada nivel de experiencia
+ * Estas palabras se usan para filtrar/priorizar resultados en la búsqueda
+ */
+export function getExperienceKeywords(level: ExperienceLevel): string[] {
+  switch (level) {
+    case ExperienceLevel.NONE:
+      return ['junior', 'practicante', 'trainee', 'aprendiz', 'sin experiencia', 'entry level'];
+    case ExperienceLevel.JUNIOR:
+      return ['junior', 'jr'];
+    case ExperienceLevel.MID:
+      return ['semi senior', 'mid', 'intermedio'];
+    case ExperienceLevel.SENIOR:
+      return ['senior', 'sr', 'experto', 'especialista'];
+    case ExperienceLevel.LEAD:
+      return ['lead', 'líder', 'principal', 'expert', 'arquitecto', 'director'];
+    default:
+      return [];
+  }
+}
+
+/**
+ * Normaliza la frecuencia de alertas del usuario
+ * Retorna: AlertFrequency enum o null
+ */
+export function normalizeAlertFrequency(text: string): AlertFrequency | null {
+  const normalizedText = text.toLowerCase().trim();
+
+  // Diariamente
+  const dailyPatterns = ['diaria', 'diario', 'diariamente', 'todos los dias', 'cada dia', '1'];
+  if (dailyPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return AlertFrequency.DAILY;
+  }
+
+  // Cada 3 días
+  const every3DaysPatterns = ['cada 3', '3 dias', 'tres dias', '2'];
+  if (every3DaysPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return AlertFrequency.EVERY_3_DAYS;
+  }
+
+  // Semanalmente
+  const weeklyPatterns = ['semanal', 'semanalmente', 'cada semana', 'semana', '3'];
+  if (weeklyPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return AlertFrequency.WEEKLY;
+  }
+
+  // Mensualmente
+  const monthlyPatterns = ['mensual', 'mensualmente', 'cada mes', 'mes', '4'];
+  if (monthlyPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return AlertFrequency.MONTHLY;
+  }
+
+  return null;
+}
+
+/**
+ * Convierte AlertFrequency enum a texto legible en español
+ */
+export function alertFrequencyToText(frequency: AlertFrequency): string {
+  switch (frequency) {
+    case AlertFrequency.DAILY:
+      return 'Diariamente ☀️';
+    case AlertFrequency.EVERY_3_DAYS:
+      return 'Cada 3 días 📅';
+    case AlertFrequency.WEEKLY:
+      return 'Semanalmente 📆';
+    case AlertFrequency.MONTHLY:
+      return 'Mensualmente 🗓️';
+    default:
+      return 'Diariamente ☀️';
+  }
+}
+
+/**
+ * Genera lista de horas comunes para selector (6:00 AM a 4:00 PM)
+ * WhatsApp limita las listas a 10 opciones
+ */
+export function generateTimeOptions(): Array<{ id: string; title: string }> {
+  const options: Array<{ id: string; title: string }> = [];
+
+  // Horas más comunes: 6:00 AM a 4:00 PM (10 opciones)
+  for (let hour = 6; hour <= 16; hour++) {
+    const time = `${hour.toString().padStart(2, '0')}:00`;
+    let label = time;
+    
+    // Agregar etiquetas especiales
+    if (hour === 6) label = '🌅 06:00 (Mañana)';
+    else if (hour === 12) label = '☀️ 12:00 (Mediodía)';
+    else if (hour === 16) label = '🌆 16:00 (Tarde)';
+    
+    options.push({
+      id: `time_${time}`,
+      title: label,
+    });
+  }
+
+  return options;
 }

@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
 import axios from 'axios';
 import { JobPosting, JobSearchQuery, JobSearchResult } from './types/job-posting';
+import { getExperienceKeywords } from '../conversation/helpers/input-validators';
+import { ExperienceLevel } from '../conversation/types/conversation-states';
 
 /**
  * Servicio de búsqueda de empleos
@@ -74,30 +76,58 @@ export class JobSearchService {
       }
 
       // 2. Construir query de búsqueda
+      const experienceKeywords = profile.experienceLevel
+        ? getExperienceKeywords(profile.experienceLevel as ExperienceLevel)
+        : undefined;
+
       const searchQuery: JobSearchQuery = {
         role: profile.role,
         location: profile.location || undefined,
         jobType: profile.jobType || undefined,
         minSalary: profile.minSalary || undefined,
         remoteAllowed: profile.remoteAllowed || false,
+        experienceKeywords,
       };
 
-      // 3. Ejecutar búsqueda
-      const result = await this.searchJobs(searchQuery);
+      // 3. Ejecutar búsqueda principal
+      let result = await this.searchJobs(searchQuery);
+      let allJobs = [...result.jobs];
 
-      // 4. Registrar en log
-      await this.logSearch(userId, result);
+      // 4. Si el usuario quiere remoto pero hay pocas ofertas, buscar presenciales en su ciudad
+      if (profile.remoteAllowed && allJobs.length < 3 && profile.location) {
+        this.logger.log(`📍 Pocas ofertas remotas (${allJobs.length}), buscando presenciales en ${profile.location}...`);
+        
+        const presencialQuery: JobSearchQuery = {
+          ...searchQuery,
+          remoteAllowed: false, // Buscar solo presenciales
+        };
 
-      // 5. Filtrar ofertas ya enviadas
-      const filteredJobs = await this.filterAlreadySentJobs(userId, result.jobs);
+        const presencialResult = await this.searchJobs(presencialQuery);
+        
+        // Agregar ofertas presenciales al final (después de las remotas)
+        allJobs = [...allJobs, ...presencialResult.jobs];
+        
+        this.logger.log(`✅ Se agregaron ${presencialResult.jobs.length} ofertas presenciales en ${profile.location}`);
+      }
+
+      // 5. Registrar en log
+      await this.logSearch(userId, {
+        ...result,
+        jobs: allJobs,
+        total: allJobs.length,
+      });
+
+      // 6. Filtrar ofertas ya enviadas
+      const filteredJobs = await this.filterAlreadySentJobs(userId, allJobs);
 
       this.logger.log(
-        `✅ Búsqueda completada: ${filteredJobs.length} ofertas nuevas de ${result.total} totales`,
+        `✅ Búsqueda completada: ${filteredJobs.length} ofertas nuevas de ${allJobs.length} totales`,
       );
 
       return {
         ...result,
         jobs: filteredJobs.slice(0, 5), // Máximo 5 ofertas
+        total: allJobs.length,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -116,12 +146,18 @@ export class JobSearchService {
 
       this.logger.debug(`🔎 Query SerpApi Google Jobs: "${queryString}"`);
 
+      // Determinar ubicación para SerpApi
+      // Si es "Remoto", usar "Colombia" como ubicación base
+      const normalizedLocation = query.location?.toLowerCase() === 'remoto' 
+        ? 'Colombia' 
+        : (query.location || 'Colombia');
+
       // Llamar a SerpApi con engine=google_jobs (método GET según documentación)
       const response = await axios.get(this.serpApiUrl, {
         params: {
           engine: 'google_jobs', // Parámetro requerido para usar Google Jobs API
           q: queryString,
-          location: query.location || 'Colombia',
+          location: normalizedLocation,
           gl: 'co', // Country code: Colombia
           hl: 'es', // Language: español
           api_key: this.serpApiKey,
@@ -148,6 +184,17 @@ export class JobSearchService {
       const rankedJobs = this.rankJobs(filteredJobs, query);
 
       this.logger.log(`✅ Después de filtrar: ${rankedJobs.length} ofertas válidas`);
+
+      // Si no hay resultados y el rol tiene múltiples palabras, intentar búsqueda más amplia
+      if (rankedJobs.length === 0 && query.role.split(' ').length > 1) {
+        this.logger.log(`🔄 No se encontraron resultados con "${query.role}". Intentando búsqueda más amplia...`);
+        
+        // Obtener la primera palabra del rol (ej: "diseñador UI" -> "diseñador")
+        const broadRole = query.role.split(' ')[0];
+        const broadQuery = { ...query, role: broadRole };
+        
+        return await this.searchJobs(broadQuery);
+      }
 
       return {
         jobs: rankedJobs,
@@ -546,14 +593,37 @@ export class JobSearchService {
     const roleLower = query.role.toLowerCase();
     const urlLower = job.url.toLowerCase();
 
-    // +10 puntos si el rol aparece en el título
+    // +15 puntos si el rol completo aparece en el título (match exacto)
     if (titleLower.includes(roleLower)) {
-      score += 10;
+      score += 15;
+    } else {
+      // +10 puntos si al menos la primera palabra del rol aparece
+      const firstWord = roleLower.split(' ')[0];
+      if (titleLower.includes(firstWord)) {
+        score += 10;
+      }
     }
 
-    // +5 puntos si el rol aparece en el snippet
+    // +7 puntos si el rol completo aparece en el snippet
     if (snippetLower.includes(roleLower)) {
-      score += 5;
+      score += 7;
+    } else {
+      // +3 puntos si al menos la primera palabra del rol aparece
+      const firstWord = roleLower.split(' ')[0];
+      if (snippetLower.includes(firstWord)) {
+        score += 3;
+      }
+    }
+
+    // +5 puntos extra si todas las palabras del rol aparecen (aunque no juntas)
+    const roleWords = roleLower.split(' ').filter(w => w.length > 2);
+    if (roleWords.length > 1) {
+      const allWordsPresent = roleWords.every(
+        word => titleLower.includes(word) || snippetLower.includes(word)
+      );
+      if (allWordsPresent) {
+        score += 5;
+      }
     }
 
     // +8 puntos si la ubicación coincide
@@ -566,6 +636,18 @@ export class JobSearchService {
     // +5 puntos si es remoto y el usuario lo permite
     if (query.remoteAllowed && job.locationRaw?.toLowerCase().includes('remoto')) {
       score += 5;
+    }
+
+    // +7 puntos si el nivel de experiencia coincide (prioriza, pero no filtra)
+    if (query.experienceKeywords && query.experienceKeywords.length > 0) {
+      const hasExperienceMatch = query.experienceKeywords.some(
+        (keyword) =>
+          titleLower.includes(keyword.toLowerCase()) ||
+          snippetLower.includes(keyword.toLowerCase()),
+      );
+      if (hasExperienceMatch) {
+        score += 7;
+      }
     }
 
     // +3 puntos si tiene salario visible
@@ -693,7 +775,7 @@ export class JobSearchService {
 Intenta de nuevo más tarde o ajusta tus preferencias.`;
     }
 
-    const header = `🎯 *Encontré ${jobs.length} ${jobs.length === 1 ? 'oferta' : 'ofertas'} para ti:*\n\n`;
+    const header = `🎯 *Estas son las ofertas que encontré que más se ajustan a tus preferencias:*\n\n`;
 
     const jobsText = jobs
       .map((job, index) => {

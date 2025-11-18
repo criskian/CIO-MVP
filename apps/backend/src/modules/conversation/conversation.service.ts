@@ -20,10 +20,16 @@ import {
   isMobileDevice,
   isDesktopDevice,
   normalizeRole,
+  normalizeExperienceLevel,
+  getExperienceKeywords,
   normalizeLocation,
+  normalizeWorkMode,
   normalizeJobType,
   normalizeSalary,
   normalizeTime,
+  normalizeAlertFrequency,
+  alertFrequencyToText,
+  generateTimeOptions,
 } from './helpers/input-validators';
 
 /**
@@ -113,14 +119,23 @@ export class ConversationService {
       case ConversationState.ASK_ROLE:
         return await this.handleAskRoleState(userId, text);
 
+      case ConversationState.ASK_EXPERIENCE:
+        return await this.handleAskExperienceState(userId, text);
+
       case ConversationState.ASK_LOCATION:
         return await this.handleAskLocationState(userId, text);
+
+      case ConversationState.ASK_WORK_MODE:
+        return await this.handleAskWorkModeState(userId, text);
 
       case ConversationState.ASK_JOB_TYPE:
         return await this.handleAskJobTypeState(userId, text);
 
       case ConversationState.ASK_MIN_SALARY:
         return await this.handleAskMinSalaryState(userId, text);
+
+      case ConversationState.ASK_ALERT_FREQUENCY:
+        return await this.handleAskAlertFrequencyState(userId, text);
 
       case ConversationState.ASK_ALERT_TIME:
         return await this.handleAskAlertTimeState(userId, text);
@@ -140,14 +155,23 @@ export class ConversationService {
       case ConversationState.EDIT_ROLE:
         return await this.handleEditRoleState(userId, text);
 
+      case ConversationState.EDIT_EXPERIENCE:
+        return await this.handleEditExperienceState(userId, text);
+
       case ConversationState.EDIT_LOCATION:
         return await this.handleEditLocationState(userId, text);
+
+      case ConversationState.EDIT_WORK_MODE:
+        return await this.handleEditWorkModeState(userId, text);
 
       case ConversationState.EDIT_JOB_TYPE:
         return await this.handleEditJobTypeState(userId, text);
 
       case ConversationState.EDIT_MIN_SALARY:
         return await this.handleEditMinSalaryState(userId, text);
+
+      case ConversationState.EDIT_ALERT_FREQUENCY:
+        return await this.handleEditAlertFrequencyState(userId, text);
 
       case ConversationState.EDIT_ALERT_TIME:
         return await this.handleEditAlertTimeState(userId, text);
@@ -269,7 +293,68 @@ export class ConversationService {
     // Guardar en UserProfile
     await this.updateUserProfile(userId, { role });
 
-    // Transición: ASK_ROLE → ASK_LOCATION
+    // Transición: ASK_ROLE → ASK_EXPERIENCE
+    await this.updateSessionState(userId, ConversationState.ASK_EXPERIENCE);
+
+    // Obtener tipo de dispositivo para usar lista en móvil
+    const deviceType = await this.getDeviceType(userId);
+
+    if (deviceType === 'MOBILE') {
+      return {
+        text: BotMessages.ASK_EXPERIENCE,
+        listTitle: 'Seleccionar nivel',
+        listSections: [
+          {
+            title: 'Nivel de Experiencia',
+            rows: [
+              {
+                id: 'exp_none',
+                title: 'Sin experiencia',
+                description: 'Recién graduado o sin experiencia laboral',
+              },
+              {
+                id: 'exp_junior',
+                title: 'Junior (1-2 años)',
+                description: 'Experiencia inicial en el campo',
+              },
+              {
+                id: 'exp_mid',
+                title: 'Intermedio (3-5 años)',
+                description: 'Experiencia sólida',
+              },
+              {
+                id: 'exp_senior',
+                title: 'Senior (5+ años)',
+                description: 'Experto en el área',
+              },
+              {
+                id: 'exp_lead',
+                title: 'Lead/Expert (7+ años)',
+                description: 'Liderazgo y expertise avanzado',
+              },
+            ],
+          },
+        ],
+      };
+    } else {
+      return { text: BotMessages.ASK_EXPERIENCE };
+    }
+  }
+
+  /**
+   * Estado ASK_EXPERIENCE: Esperando nivel de experiencia
+   */
+  private async handleAskExperienceState(userId: string, text: string): Promise<BotReply> {
+    const experienceLevel = normalizeExperienceLevel(text);
+
+    if (!experienceLevel) {
+      return { text: BotMessages.ERROR_EXPERIENCE_INVALID };
+    }
+
+    // Guardar en UserProfile
+    await this.updateUserProfile(userId, { experienceLevel });
+
+    // Transición: ASK_EXPERIENCE → ASK_LOCATION
     await this.updateSessionState(userId, ConversationState.ASK_LOCATION);
 
     return { text: BotMessages.ASK_LOCATION };
@@ -285,41 +370,90 @@ export class ConversationService {
       return { text: BotMessages.ERROR_LOCATION_INVALID };
     }
 
-    // Detectar si es remoto
-    const isRemote = text.toLowerCase().includes('remoto') || text.toLowerCase().includes('remote');
-
-    // Guardar en UserProfile
+    // Guardar ubicación en UserProfile
     await this.updateUserProfile(userId, {
       location,
-      remoteAllowed: isRemote,
     });
 
-    // Transición: ASK_LOCATION → ASK_JOB_TYPE
+    // Transición: ASK_LOCATION → ASK_WORK_MODE
+    await this.updateSessionState(userId, ConversationState.ASK_WORK_MODE);
+    
+    const deviceType = await this.getDeviceType(userId);
+
+    // Si es móvil, mostrar botones
+    if (deviceType === 'MOBILE') {
+      return {
+        text: BotMessages.ASK_WORK_MODE,
+        buttons: [
+          { id: 'work_remoto', title: '🏠 Remoto' },
+          { id: 'work_presencial', title: '🏢 Presencial' },
+        ],
+      };
+    }
+
+    // Si es desktop, mensaje simple
+    return { text: BotMessages.ASK_WORK_MODE_DESKTOP };
+  }
+
+  /**
+   * Estado ASK_WORK_MODE: Esperando modalidad (remoto/presencial)
+   */
+  private async handleAskWorkModeState(userId: string, text: string): Promise<BotReply> {
+    const workMode = normalizeWorkMode(text);
+
+    if (!workMode) {
+      const deviceType = await this.getDeviceType(userId);
+      
+      if (deviceType === 'MOBILE') {
+        return {
+          text: BotMessages.ERROR_WORK_MODE_INVALID,
+          buttons: [
+            { id: 'work_remoto', title: '🏠 Remoto' },
+            { id: 'work_presencial', title: '🏢 Presencial' },
+          ],
+        };
+      }
+      
+      return { text: BotMessages.ERROR_WORK_MODE_INVALID };
+    }
+
+    // Guardar modalidad en UserProfile
+    await this.updateUserProfile(userId, {
+      remoteAllowed: workMode === 'remoto',
+    });
+
+    // Transición: ASK_WORK_MODE → ASK_JOB_TYPE
     await this.updateSessionState(userId, ConversationState.ASK_JOB_TYPE);
 
-    return {
-      text: BotMessages.ASK_JOB_TYPE,
-      listTitle: 'Seleccionar tipo',
-      listSections: [
-        {
-          title: 'Tipo de Empleo',
-          rows: [
-            {
-              id: 'full_time',
-              title: 'Tiempo completo',
-              description: 'Jornada laboral completa (8 horas)',
-            },
-            {
-              id: 'part_time',
-              title: 'Medio tiempo',
-              description: 'Jornada parcial (4-6 horas)',
-            },
-            { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
-            { id: 'freelance', title: 'Freelance', description: 'Trabajo por proyectos' },
-          ],
-        },
-      ],
-    };
+    const deviceType = await this.getDeviceType(userId);
+
+    if (deviceType === 'MOBILE') {
+      return {
+        text: BotMessages.ASK_JOB_TYPE,
+        listTitle: 'Seleccionar tipo',
+        listSections: [
+          {
+            title: 'Tipo de Empleo',
+            rows: [
+              {
+                id: 'full_time',
+                title: 'Tiempo completo',
+                description: 'Jornada laboral completa (8 horas)',
+              },
+              {
+                id: 'part_time',
+                title: 'Medio tiempo',
+                description: 'Jornada parcial (4-6 horas)',
+              },
+              { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
+              { id: 'freelance', title: 'Freelance', description: 'Trabajo por proyectos' },
+            ],
+          },
+        ],
+      };
+    }
+
+    return { text: BotMessages.ASK_JOB_TYPE_DESKTOP };
   }
 
   /**
@@ -382,8 +516,30 @@ export class ConversationService {
     // Si el usuario escribe "0", aceptamos sin filtro de salario
     if (text.trim() === '0') {
       await this.updateUserProfile(userId, { minSalary: 0 });
-      await this.updateSessionState(userId, ConversationState.ASK_ALERT_TIME);
-      return { text: BotMessages.ASK_ALERT_TIME };
+      await this.updateSessionState(userId, ConversationState.ASK_ALERT_FREQUENCY);
+
+      // Obtener tipo de dispositivo para mostrar lista en móvil
+      const deviceType = await this.getDeviceType(userId);
+
+      if (deviceType === 'MOBILE') {
+        return {
+          text: BotMessages.ASK_ALERT_FREQUENCY,
+          listTitle: 'Seleccionar',
+          listSections: [
+            {
+              title: 'Frecuencia',
+              rows: [
+                { id: 'freq_daily', title: '☀️ Diariamente' },
+                { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
+                { id: 'freq_weekly', title: '📆 Semanalmente' },
+                { id: 'freq_monthly', title: '🗓️ Mensualmente' },
+              ],
+            },
+          ],
+        };
+      }
+
+      return { text: BotMessages.ASK_ALERT_FREQUENCY };
     }
 
     const minSalary = normalizeSalary(text);
@@ -395,8 +551,88 @@ export class ConversationService {
     // Guardar en UserProfile
     await this.updateUserProfile(userId, { minSalary });
 
-    // Transición: ASK_MIN_SALARY → ASK_ALERT_TIME
+    // Transición: ASK_MIN_SALARY → ASK_ALERT_FREQUENCY
+    await this.updateSessionState(userId, ConversationState.ASK_ALERT_FREQUENCY);
+
+    // Obtener tipo de dispositivo para mostrar lista en móvil
+    const deviceType = await this.getDeviceType(userId);
+
+    if (deviceType === 'MOBILE') {
+      return {
+        text: BotMessages.ASK_ALERT_FREQUENCY,
+        listTitle: 'Seleccionar',
+        listSections: [
+          {
+            title: 'Frecuencia',
+            rows: [
+              { id: 'freq_daily', title: '☀️ Diariamente' },
+              { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
+              { id: 'freq_weekly', title: '📆 Semanalmente' },
+              { id: 'freq_monthly', title: '🗓️ Mensualmente' },
+            ],
+          },
+        ],
+      };
+    }
+
+    return { text: BotMessages.ASK_ALERT_FREQUENCY };
+  }
+
+  /**
+   * Estado ASK_ALERT_FREQUENCY: Esperando frecuencia de alertas
+   */
+  private async handleAskAlertFrequencyState(userId: string, text: string): Promise<BotReply> {
+    const frequency = normalizeAlertFrequency(text);
+
+    if (!frequency) {
+      // Obtener tipo de dispositivo para mostrar lista o texto
+      const deviceType = await this.getDeviceType(userId);
+
+      if (deviceType === 'MOBILE') {
+        return {
+          text: BotMessages.ERROR_ALERT_FREQUENCY_INVALID,
+          listTitle: 'Seleccionar',
+          listSections: [
+            {
+              title: 'Frecuencia',
+              rows: [
+                { id: 'freq_daily', title: '☀️ Diariamente' },
+                { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
+                { id: 'freq_weekly', title: '📆 Semanalmente' },
+                { id: 'freq_monthly', title: '🗓️ Mensualmente' },
+              ],
+            },
+          ],
+        };
+      }
+
+      return { text: BotMessages.ERROR_ALERT_FREQUENCY_INVALID };
+    }
+
+    // Guardar temporalmente en session.data (lo guardamos definitivamente cuando guarde la hora)
+    await this.updateSessionData(userId, { alertFrequency: frequency });
+
+    // Transición: ASK_ALERT_FREQUENCY → ASK_ALERT_TIME
     await this.updateSessionState(userId, ConversationState.ASK_ALERT_TIME);
+
+    // Obtener tipo de dispositivo para mostrar lista de horas en móvil
+    const deviceType = await this.getDeviceType(userId);
+
+    if (deviceType === 'MOBILE') {
+      // Mostrar lista desplegable con horas comunes (6:00 AM - 4:00 PM)
+      const timeOptions = generateTimeOptions();
+
+      return {
+        text: BotMessages.ASK_ALERT_TIME_MOBILE,
+        listTitle: 'Seleccionar hora',
+        listSections: [
+          {
+            title: 'Horas comunes',
+            rows: timeOptions,
+          },
+        ],
+      };
+    }
 
     return { text: BotMessages.ASK_ALERT_TIME };
   }
@@ -411,8 +647,16 @@ export class ConversationService {
       return { text: BotMessages.ERROR_TIME_INVALID };
     }
 
+    // Obtener frecuencia guardada en session.data
+    const session = await this.prisma.session.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const alertFrequency = (session?.data as any)?.alertFrequency || 'daily';
+
     // Guardar en AlertPreference
-    await this.upsertAlertPreference(userId, alertTime);
+    await this.upsertAlertPreference(userId, alertTime, alertFrequency);
 
     // Obtener datos del perfil para el mensaje de confirmación
     const profile = await this.prisma.userProfile.findUnique({ where: { userId } });
@@ -588,7 +832,19 @@ Intenta de nuevo más tarde o escribe "reiniciar" para ajustar tus preferencias.
       // Marcar ofertas como enviadas
       await this.jobSearchService.markJobsAsSent(userId, result.jobs);
 
-      return { text: formattedJobs };
+      // Agregar menú de opciones al final
+      const menuText = `
+
+---
+
+¿Qué quieres hacer ahora?
+
+• Escribe *"buscar"* para buscar más ofertas
+• Escribe *"editar"* para cambiar tus preferencias
+• Escribe *"reiniciar"* para reconfigurar tu perfil
+• Escribe *"cancelar"* para dejar de usar el servicio`;
+
+      return { text: formattedJobs + menuText };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Error en búsqueda de empleos: ${errorMessage}`);
@@ -691,13 +947,16 @@ Continúa con el proceso manual. 👇`,
     // Formatear valores para mostrar
     const formattedProfile = {
       role: profile.role || 'No configurado',
-      location: profile.remoteAllowed
-        ? `${profile.location || 'No configurado'} (Remoto permitido)`
-        : profile.location || 'No configurado',
+      experience: this.formatExperienceLevel(profile.experienceLevel),
+      location: profile.location || 'No configurado',
+      workMode: profile.remoteAllowed ? '🏠 Remoto' : '🏢 Presencial',
       jobType: this.formatJobType(profile.jobType),
       minSalary: profile.minSalary
         ? `$${profile.minSalary.toLocaleString('es-CO')} COP`
         : 'Sin filtro',
+      alertFrequency: alertPref?.alertFrequency
+        ? alertFrequencyToText(alertPref.alertFrequency as any)
+        : 'No configurado',
       alertTime: alertPref?.alertTimeLocal || 'No configurado',
     };
 
@@ -712,10 +971,13 @@ Continúa con el proceso manual. 👇`,
         text: `📝 *Tus preferencias actuales:*
 
 🔹 *Rol:* ${formattedProfile.role}
-🔹 *Ubicación:* ${formattedProfile.location}
-🔹 *Tipo de empleo:* ${formattedProfile.jobType}
-🔹 *Salario mínimo:* ${formattedProfile.minSalary}
-🔹 *Horario de alertas:* ${formattedProfile.alertTime}
+💡 *Experiencia:* ${formattedProfile.experience}
+📍 *Ubicación:* ${formattedProfile.location}
+🏠 *Modalidad:* ${formattedProfile.workMode}
+💼 *Tipo de empleo:* ${formattedProfile.jobType}
+💰 *Salario mínimo:* ${formattedProfile.minSalary}
+🔔 *Frecuencia:* ${formattedProfile.alertFrequency}
+⏰ *Horario de alertas:* ${formattedProfile.alertTime}
 
 Selecciona qué quieres editar:`,
         listTitle: 'Editar campo',
@@ -729,9 +991,19 @@ Selecciona qué quieres editar:`,
                 description: `Actual: ${formattedProfile.role}`,
               },
               {
+                id: 'edit_experiencia',
+                title: '💡 Experiencia',
+                description: `Actual: ${formattedProfile.experience}`,
+              },
+              {
                 id: 'edit_ubicacion',
                 title: '📍 Ubicación',
-                description: `Actual: ${formattedProfile.location.substring(0, 50)}`,
+                description: `Actual: ${formattedProfile.location}`,
+              },
+              {
+                id: 'edit_modalidad',
+                title: '🏠 Modalidad',
+                description: `Actual: ${formattedProfile.workMode}`,
               },
               {
                 id: 'edit_tipo',
@@ -742,6 +1014,11 @@ Selecciona qué quieres editar:`,
                 id: 'edit_salario',
                 title: '💰 Salario mínimo',
                 description: `Actual: ${formattedProfile.minSalary}`,
+              },
+              {
+                id: 'edit_frecuencia',
+                title: '🔔 Frecuencia',
+                description: `Actual: ${formattedProfile.alertFrequency}`,
               },
               {
                 id: 'edit_horario',
@@ -783,9 +1060,72 @@ Selecciona qué quieres editar:`,
         await this.updateSessionState(userId, ConversationState.EDIT_ROLE);
         return { text: BotMessages.ASK_ROLE };
 
+      case 'experiencia': {
+        await this.updateSessionState(userId, ConversationState.EDIT_EXPERIENCE);
+        const deviceType = await this.getDeviceType(userId);
+        
+        if (deviceType === 'MOBILE') {
+          return {
+            text: BotMessages.ASK_EXPERIENCE,
+            listTitle: 'Seleccionar nivel',
+            listSections: [
+              {
+                title: 'Nivel de Experiencia',
+                rows: [
+                  {
+                    id: 'exp_none',
+                    title: 'Sin experiencia',
+                    description: 'Recién graduado',
+                  },
+                  {
+                    id: 'exp_junior',
+                    title: 'Junior (1-2 años)',
+                    description: 'Experiencia inicial',
+                  },
+                  {
+                    id: 'exp_mid',
+                    title: 'Intermedio (3-5 años)',
+                    description: 'Experiencia sólida',
+                  },
+                  {
+                    id: 'exp_senior',
+                    title: 'Senior (5+ años)',
+                    description: 'Experto',
+                  },
+                  {
+                    id: 'exp_lead',
+                    title: 'Lead/Expert (7+ años)',
+                    description: 'Liderazgo avanzado',
+                  },
+                ],
+              },
+            ],
+          };
+        }
+        
+        return { text: BotMessages.ASK_EXPERIENCE };
+      }
+
       case 'ubicacion':
         await this.updateSessionState(userId, ConversationState.EDIT_LOCATION);
         return { text: BotMessages.ASK_LOCATION };
+
+      case 'modalidad': {
+        await this.updateSessionState(userId, ConversationState.EDIT_WORK_MODE);
+        const deviceType = await this.getDeviceType(userId);
+        
+        if (deviceType === 'MOBILE') {
+          return {
+            text: BotMessages.ASK_WORK_MODE,
+            buttons: [
+              { id: 'work_remoto', title: '🏠 Remoto' },
+              { id: 'work_presencial', title: '🏢 Presencial' },
+            ],
+          };
+        }
+        
+        return { text: BotMessages.ASK_WORK_MODE_DESKTOP };
+      }
 
       case 'tipo':
         await this.updateSessionState(userId, ConversationState.EDIT_JOB_TYPE);
@@ -817,9 +1157,51 @@ Selecciona qué quieres editar:`,
         await this.updateSessionState(userId, ConversationState.EDIT_MIN_SALARY);
         return { text: BotMessages.ASK_MIN_SALARY };
 
-      case 'horario':
+      case 'frecuencia': {
+        await this.updateSessionState(userId, ConversationState.EDIT_ALERT_FREQUENCY);
+        const deviceType = await this.getDeviceType(userId);
+
+        if (deviceType === 'MOBILE') {
+          return {
+            text: BotMessages.ASK_ALERT_FREQUENCY,
+            listTitle: 'Seleccionar',
+            listSections: [
+              {
+                title: 'Frecuencia',
+                rows: [
+                  { id: 'freq_daily', title: '☀️ Diariamente' },
+                  { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
+                  { id: 'freq_weekly', title: '📆 Semanalmente' },
+                  { id: 'freq_monthly', title: '🗓️ Mensualmente' },
+                ],
+              },
+            ],
+          };
+        }
+
+        return { text: BotMessages.ASK_ALERT_FREQUENCY };
+      }
+
+      case 'horario': {
         await this.updateSessionState(userId, ConversationState.EDIT_ALERT_TIME);
+        const deviceType = await this.getDeviceType(userId);
+
+        if (deviceType === 'MOBILE') {
+          const timeOptions = generateTimeOptions();
+          return {
+            text: BotMessages.ASK_ALERT_TIME_MOBILE,
+            listTitle: 'Seleccionar hora',
+            listSections: [
+              {
+                title: 'Horas comunes',
+                rows: timeOptions,
+              },
+            ],
+          };
+        }
+
         return { text: BotMessages.ASK_ALERT_TIME };
+      }
 
       default:
         return { text: BotMessages.EDIT_FIELD_NOT_FOUND };
@@ -843,6 +1225,26 @@ Selecciona qué quieres editar:`,
   }
 
   /**
+   * Estado EDIT_EXPERIENCE: Editando nivel de experiencia
+   */
+  private async handleEditExperienceState(userId: string, text: string): Promise<BotReply> {
+    const experienceLevel = normalizeExperienceLevel(text);
+
+    if (!experienceLevel) {
+      return { text: BotMessages.ERROR_EXPERIENCE_INVALID };
+    }
+
+    await this.updateUserProfile(userId, { experienceLevel });
+    await this.updateSessionState(userId, ConversationState.READY);
+
+    const experienceLabel = this.formatExperienceLevel(experienceLevel);
+    return await this.returnToMainMenu(
+      userId,
+      BotMessages.FIELD_UPDATED('experiencia', experienceLabel),
+    );
+  }
+
+  /**
    * Estado EDIT_LOCATION: Editando ubicación
    */
   private async handleEditLocationState(userId: string, text: string): Promise<BotReply> {
@@ -852,16 +1254,43 @@ Selecciona qué quieres editar:`,
       return { text: BotMessages.ERROR_LOCATION_INVALID };
     }
 
-    const isRemote = text.toLowerCase().includes('remoto') || text.toLowerCase().includes('remote');
-
     await this.updateUserProfile(userId, {
       location,
-      remoteAllowed: isRemote,
     });
     await this.updateSessionState(userId, ConversationState.READY);
 
-    const displayLocation = isRemote ? `${location} (Remoto)` : location;
-    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('ubicación', displayLocation));
+    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('ubicación', location));
+  }
+
+  /**
+   * Estado EDIT_WORK_MODE: Editando modalidad de trabajo
+   */
+  private async handleEditWorkModeState(userId: string, text: string): Promise<BotReply> {
+    const workMode = normalizeWorkMode(text);
+
+    if (!workMode) {
+      const deviceType = await this.getDeviceType(userId);
+      
+      if (deviceType === 'MOBILE') {
+        return {
+          text: BotMessages.ERROR_WORK_MODE_INVALID,
+          buttons: [
+            { id: 'work_remoto', title: '🏠 Remoto' },
+            { id: 'work_presencial', title: '🏢 Presencial' },
+          ],
+        };
+      }
+      
+      return { text: BotMessages.ERROR_WORK_MODE_INVALID };
+    }
+
+    await this.updateUserProfile(userId, {
+      remoteAllowed: workMode === 'remoto',
+    });
+    await this.updateSessionState(userId, ConversationState.READY);
+
+    const displayMode = workMode === 'remoto' ? '🏠 Remoto' : '🏢 Presencial';
+    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('modalidad de trabajo', displayMode));
   }
 
   /**
@@ -939,6 +1368,33 @@ Selecciona qué quieres editar:`,
   }
 
   /**
+   * Estado EDIT_ALERT_FREQUENCY: Editando frecuencia de alertas
+   */
+  private async handleEditAlertFrequencyState(userId: string, text: string): Promise<BotReply> {
+    const frequency = normalizeAlertFrequency(text);
+
+    if (!frequency) {
+      return { text: BotMessages.ERROR_ALERT_FREQUENCY_INVALID };
+    }
+
+    // Obtener alertTime actual para mantenerla
+    const alertPref = await this.prisma.alertPreference.findUnique({
+      where: { userId },
+    });
+
+    const alertTime = alertPref?.alertTimeLocal || '09:00';
+
+    await this.upsertAlertPreference(userId, alertTime, frequency);
+    await this.updateSessionState(userId, ConversationState.READY);
+
+    const displayFrequency = alertFrequencyToText(frequency);
+    return await this.returnToMainMenu(
+      userId,
+      BotMessages.FIELD_UPDATED('frecuencia de alertas', displayFrequency),
+    );
+  }
+
+  /**
    * Estado EDIT_ALERT_TIME: Editando horario de alertas
    */
   private async handleEditAlertTimeState(userId: string, text: string): Promise<BotReply> {
@@ -948,10 +1404,20 @@ Selecciona qué quieres editar:`,
       return { text: BotMessages.ERROR_TIME_INVALID };
     }
 
-    await this.upsertAlertPreference(userId, alertTime);
+    // Obtener frecuencia actual para mantenerla
+    const alertPref = await this.prisma.alertPreference.findUnique({
+      where: { userId },
+    });
+
+    const frequency = alertPref?.alertFrequency || 'daily';
+
+    await this.upsertAlertPreference(userId, alertTime, frequency);
     await this.updateSessionState(userId, ConversationState.READY);
 
-    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('horario de alertas', alertTime));
+    return await this.returnToMainMenu(
+      userId,
+      BotMessages.FIELD_UPDATED('horario de alertas', alertTime),
+    );
   }
 
   /**
@@ -966,6 +1432,18 @@ Selecciona qué quieres editar:`,
     };
 
     return typeMap[jobType || ''] || 'No configurado';
+  }
+
+  private formatExperienceLevel(experienceLevel: string | null | undefined): string {
+    const experienceMap: Record<string, string> = {
+      none: 'Sin experiencia',
+      junior: 'Junior (1-2 años)',
+      mid: 'Intermedio (3-5 años)',
+      senior: 'Senior (5+ años)',
+      lead: 'Lead/Expert (7+ años)',
+    };
+
+    return experienceMap[experienceLevel || ''] || 'No configurado';
   }
 
   // ========================================
@@ -1082,12 +1560,36 @@ Selecciona qué quieres editar:`,
   }
 
   /**
+   * Actualiza datos temporales en la sesión (campo JSON data)
+   */
+  private async updateSessionData(userId: string, newData: Record<string, any>) {
+    const session = await this.prisma.session.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const currentData = (session?.data as Record<string, any>) || {};
+    const mergedData = { ...currentData, ...newData };
+
+    await this.prisma.session.updateMany({
+      where: { userId },
+      data: {
+        data: mergedData,
+        updatedAt: new Date(),
+      },
+    });
+
+    this.logger.debug(`💾 Datos de sesión actualizados: ${JSON.stringify(newData)}`);
+  }
+
+  /**
    * Actualiza o crea el perfil del usuario
    */
   private async updateUserProfile(
     userId: string,
     data: Partial<{
       role: string;
+      experienceLevel: string;
       location: string;
       jobType: string;
       minSalary: number;
@@ -1109,22 +1611,28 @@ Selecciona qué quieres editar:`,
   /**
    * Crea o actualiza la preferencia de alertas
    */
-  private async upsertAlertPreference(userId: string, alertTime: string) {
+  private async upsertAlertPreference(
+    userId: string,
+    alertTime: string,
+    alertFrequency: string = 'daily',
+  ) {
     await this.prisma.alertPreference.upsert({
       where: { userId },
       update: {
+        alertFrequency,
         alertTimeLocal: alertTime,
         enabled: true,
       },
       create: {
         userId,
+        alertFrequency,
         alertTimeLocal: alertTime,
         timezone: 'America/Bogota',
         enabled: true,
       },
     });
 
-    this.logger.debug(`⏰ Alerta configurada para: ${alertTime}`);
+    this.logger.debug(`⏰ Alerta configurada para: ${alertTime} con frecuencia ${alertFrequency}`);
   }
 
   /**
