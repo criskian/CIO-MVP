@@ -87,11 +87,28 @@ Ejemplo: "2000000", "2.5 millones", etc.
 
 _(Puedes escribir "0" si prefieres ver todas las ofertas sin filtro de salario)_`,
 
-  ASK_ALERT_TIME: `¡Ya casi terminamos! ⏰
+  ASK_ALERT_FREQUENCY: `¡Ya casi terminamos! 🔔
 
-¿A qué hora quieres recibir alertas diarias con nuevas ofertas?
+¿Con qué frecuencia te gustaría recibir recordatorios de búsqueda de empleo?
+
+1️⃣ Diariamente ☀️
+2️⃣ Cada 3 días 📅
+3️⃣ Semanalmente 📆
+4️⃣ Mensualmente 🗓️
+
+Responde con el número o el nombre de la opción.`,
+
+  ASK_ALERT_TIME: `Perfecto. ⏰
+
+¿A qué hora quieres recibir las alertas?
 
 Ejemplo: "9:00", "18:30", "10:00 AM", etc.`,
+
+  ASK_ALERT_TIME_MOBILE: `Perfecto. ⏰
+
+Selecciona la hora en que quieres recibir las alertas:
+
+_Si prefieres otra hora, escríbela (ej: "20:00", "7:30 AM")_`,
 
   // Confirmación y estado READY
   ONBOARDING_COMPLETE: (role: string, location: string) => `¡Listo! 🎉 Tu perfil está configurado.
@@ -139,6 +156,13 @@ Ejemplo: "Bogotá", "Medellín", "Cali", etc.`,
   ERROR_SALARY_INVALID: `Por favor ingresa un salario válido en pesos colombianos (entre 500,000 y 50,000,000) o escribe "0" para no filtrar por salario.
 
 Ejemplo: "2000000", "2.5 millones", "0"`,
+
+  ERROR_ALERT_FREQUENCY_INVALID: `No entendí tu respuesta. Por favor responde con:
+
+1️⃣ Diariamente ☀️
+2️⃣ Cada 3 días 📅
+3️⃣ Semanalmente 📆
+4️⃣ Mensualmente 🗓️`,
 
   ERROR_TIME_INVALID: `Por favor ingresa una hora válida.
 
@@ -207,6 +231,7 @@ Si cambias de opinión en el futuro, puedes escribirme nuevamente.
     location: string;
     jobType: string;
     minSalary: string;
+    alertFrequency: string;
     alertTime: string;
   }) => `📝 *Tus preferencias actuales:*
 
@@ -214,6 +239,7 @@ Si cambias de opinión en el futuro, puedes escribirme nuevamente.
 🔹 *Ubicación:* ${profile.location}
 🔹 *Tipo de empleo:* ${profile.jobType}
 🔹 *Salario mínimo:* ${profile.minSalary}
+🔹 *Frecuencia de alertas:* ${profile.alertFrequency}
 🔹 *Horario de alertas:* ${profile.alertTime}
 
 ---
@@ -225,6 +251,7 @@ Para editar una preferencia, escribe el *nombre del campo* que quieres cambiar.
 • Escribe *"ubicación"* para cambiar la ciudad
 • Escribe *"tipo"* para cambiar el tipo de empleo
 • Escribe *"salario"* para cambiar el salario mínimo
+• Escribe *"frecuencia"* para cambiar la frecuencia de alertas
 • Escribe *"horario"* para cambiar la hora de alertas
 
 También puedes escribir *"cancelar"* para volver al menú principal.`,
@@ -236,6 +263,7 @@ Por favor, escribe uno de estos nombres:
 • *"ubicación"*
 • *"tipo"*
 • *"salario"*
+• *"frecuencia"*
 • *"horario"*
 
 O escribe *"cancelar"* para volver.`,
@@ -315,6 +343,7 @@ Escribe:
     workMode: string;
     jobType: string;
     minSalary: string;
+    alertFrequency: string;
     alertTime: string;
   }) => `📝 *Tus preferencias actuales:*
 
@@ -324,6 +353,7 @@ Escribe:
 🏠 *Modalidad:* ${profile.workMode}
 💼 *Tipo de empleo:* ${profile.jobType}
 💰 *Salario mínimo:* ${profile.minSalary}
+🔔 *Frecuencia:* ${profile.alertFrequency}
 ⏰ *Horario de alertas:* ${profile.alertTime}
 
 ---
@@ -336,7 +366,8 @@ Escribe el *número* o *nombre* del campo que quieres editar:
 *4* - *Modalidad* - Cambiar entre remoto o presencial
 *5* - *Tipo* - Cambiar el tipo de empleo
 *6* - *Salario* - Cambiar el salario mínimo
-*7* - *Horario* - Cambiar la hora de alertas
+*7* - *Frecuencia* - Cambiar la frecuencia de alertas
+*8* - *Horario* - Cambiar la hora de alertas
 
 O escribe *"cancelar"* para volver al menú principal.`,
 };

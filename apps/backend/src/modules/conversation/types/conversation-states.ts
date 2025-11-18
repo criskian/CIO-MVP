@@ -1,6 +1,6 @@
 /**
  * Estados de la máquina de conversación
- * Flujo: NEW → ASK_DEVICE → ASK_TERMS → ASK_ROLE → ASK_EXPERIENCE → ASK_LOCATION → ASK_WORK_MODE → ASK_JOB_TYPE → ASK_MIN_SALARY → ASK_ALERT_TIME → READY
+ * Flujo: NEW → ASK_DEVICE → ASK_TERMS → ASK_ROLE → ASK_EXPERIENCE → ASK_LOCATION → ASK_WORK_MODE → ASK_JOB_TYPE → ASK_MIN_SALARY → ASK_ALERT_FREQUENCY → ASK_ALERT_TIME → READY
  */
 export enum ConversationState {
   NEW = 'NEW',
@@ -12,7 +12,8 @@ export enum ConversationState {
   ASK_WORK_MODE = 'ASK_WORK_MODE', // Pregunta si quiere remoto o presencial
   ASK_JOB_TYPE = 'ASK_JOB_TYPE',
   ASK_MIN_SALARY = 'ASK_MIN_SALARY',
-  ASK_ALERT_TIME = 'ASK_ALERT_TIME',
+  ASK_ALERT_FREQUENCY = 'ASK_ALERT_FREQUENCY', // Pregunta con qué frecuencia desea alertas
+  ASK_ALERT_TIME = 'ASK_ALERT_TIME', // Pregunta a qué hora desea alertas
   READY = 'READY',
   // Estados adicionales para flujos especiales
   WAITING_CV = 'WAITING_CV', // Usuario quiere enviar CV
@@ -26,6 +27,7 @@ export enum ConversationState {
   EDIT_WORK_MODE = 'EDIT_WORK_MODE', // Editando modalidad (remoto/presencial)
   EDIT_JOB_TYPE = 'EDIT_JOB_TYPE', // Editando tipo de empleo
   EDIT_MIN_SALARY = 'EDIT_MIN_SALARY', // Editando salario mínimo
+  EDIT_ALERT_FREQUENCY = 'EDIT_ALERT_FREQUENCY', // Editando frecuencia de alertas
   EDIT_ALERT_TIME = 'EDIT_ALERT_TIME', // Editando horario de alertas
 }
 
@@ -48,6 +50,16 @@ export enum ExperienceLevel {
   MID = 'mid', // 3-5 años
   SENIOR = 'senior', // 5+ años
   LEAD = 'lead', // 7+ años (Lead/Expert)
+}
+
+/**
+ * Frecuencia de alertas
+ */
+export enum AlertFrequency {
+  DAILY = 'daily',
+  EVERY_3_DAYS = 'every_3_days',
+  WEEKLY = 'weekly',
+  MONTHLY = 'monthly',
 }
 
 /**

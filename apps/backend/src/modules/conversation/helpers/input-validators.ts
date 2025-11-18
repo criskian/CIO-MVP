@@ -1,4 +1,9 @@
-import { JobType, UserIntent, ExperienceLevel } from '../types/conversation-states';
+import {
+  JobType,
+  UserIntent,
+  ExperienceLevel,
+  AlertFrequency,
+} from '../types/conversation-states';
 
 /**
  * Helpers para validar y normalizar respuestas del usuario
@@ -212,7 +217,16 @@ export function isEditIntent(text: string): boolean {
  */
 export function detectEditField(
   text: string,
-): 'rol' | 'experiencia' | 'ubicacion' | 'modalidad' | 'tipo' | 'salario' | 'horario' | null {
+):
+  | 'rol'
+  | 'experiencia'
+  | 'ubicacion'
+  | 'modalidad'
+  | 'tipo'
+  | 'salario'
+  | 'frecuencia'
+  | 'horario'
+  | null {
   const normalizedText = text.toLowerCase().trim();
 
   // Detectar campo "rol"
@@ -281,6 +295,20 @@ export function detectEditField(
   const salaryPatterns = ['salario', 'sueldo', 'pago', 'remuneración', 'remuneracion'];
   if (salaryPatterns.some((pattern) => normalizedText.includes(pattern))) {
     return 'salario';
+  }
+
+  // Detectar campo "frecuencia de alertas"
+  const frequencyPatterns = [
+    'frecuencia',
+    'cada cuanto',
+    'cada cuánto',
+    'periodicidad',
+    'diario',
+    'semanal',
+    'mensual',
+  ];
+  if (frequencyPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'frecuencia';
   }
 
   // Detectar campo "horario de alertas"
@@ -588,4 +616,82 @@ export function getExperienceKeywords(level: ExperienceLevel): string[] {
     default:
       return [];
   }
+}
+
+/**
+ * Normaliza la frecuencia de alertas del usuario
+ * Retorna: AlertFrequency enum o null
+ */
+export function normalizeAlertFrequency(text: string): AlertFrequency | null {
+  const normalizedText = text.toLowerCase().trim();
+
+  // Diariamente
+  const dailyPatterns = ['diaria', 'diario', 'diariamente', 'todos los dias', 'cada dia', '1'];
+  if (dailyPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return AlertFrequency.DAILY;
+  }
+
+  // Cada 3 días
+  const every3DaysPatterns = ['cada 3', '3 dias', 'tres dias', '2'];
+  if (every3DaysPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return AlertFrequency.EVERY_3_DAYS;
+  }
+
+  // Semanalmente
+  const weeklyPatterns = ['semanal', 'semanalmente', 'cada semana', 'semana', '3'];
+  if (weeklyPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return AlertFrequency.WEEKLY;
+  }
+
+  // Mensualmente
+  const monthlyPatterns = ['mensual', 'mensualmente', 'cada mes', 'mes', '4'];
+  if (monthlyPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return AlertFrequency.MONTHLY;
+  }
+
+  return null;
+}
+
+/**
+ * Convierte AlertFrequency enum a texto legible en español
+ */
+export function alertFrequencyToText(frequency: AlertFrequency): string {
+  switch (frequency) {
+    case AlertFrequency.DAILY:
+      return 'Diariamente ☀️';
+    case AlertFrequency.EVERY_3_DAYS:
+      return 'Cada 3 días 📅';
+    case AlertFrequency.WEEKLY:
+      return 'Semanalmente 📆';
+    case AlertFrequency.MONTHLY:
+      return 'Mensualmente 🗓️';
+    default:
+      return 'Diariamente ☀️';
+  }
+}
+
+/**
+ * Genera lista de horas comunes para selector (6:00 AM a 4:00 PM)
+ * WhatsApp limita las listas a 10 opciones
+ */
+export function generateTimeOptions(): Array<{ id: string; title: string }> {
+  const options: Array<{ id: string; title: string }> = [];
+
+  // Horas más comunes: 6:00 AM a 4:00 PM (10 opciones)
+  for (let hour = 6; hour <= 16; hour++) {
+    const time = `${hour.toString().padStart(2, '0')}:00`;
+    let label = time;
+    
+    // Agregar etiquetas especiales
+    if (hour === 6) label = '🌅 06:00 (Mañana)';
+    else if (hour === 12) label = '☀️ 12:00 (Mediodía)';
+    else if (hour === 16) label = '🌆 16:00 (Tarde)';
+    
+    options.push({
+      id: `time_${time}`,
+      title: label,
+    });
+  }
+
+  return options;
 }

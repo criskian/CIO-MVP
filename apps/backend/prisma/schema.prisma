@@ -61,6 +61,7 @@ model Session {
 model AlertPreference {
   id               String    @id @default(cuid())
   userId           String    @unique
+  alertFrequency   String    @default("daily") // daily, every_3_days, weekly, monthly
   alertTimeLocal   String    // "07:00"
   timezone         String    @default("America/Bogota")
   enabled          Boolean   @default(true)
@@ -99,5 +100,17 @@ model SentJob {
 
   @@index([userId, url])
   @@map("sent_jobs")
+}
+
+model ProcessedMessage {
+  id          String   @id @default(cuid())
+  messageId   String   @unique  // ID del mensaje de WhatsApp
+  phone       String
+  processedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([phone])
+  @@index([processedAt])
+  @@map("processed_messages")
 }
 

@@ -161,9 +161,36 @@ export class CloudApiProvider implements IWhatsappProvider {
 
           if (interactiveType === 'button_reply') {
             // Respuesta de botón
-            text = message.interactive.button_reply.title;
+            const buttonId = message.interactive.button_reply.id;
+            const buttonTitle = message.interactive.button_reply.title;
+
+            // Si el ID es de frecuencia (ej: freq_daily), extraer el valor
+            if (buttonId.startsWith('freq_')) {
+              const freqValue = buttonId.replace('freq_', ''); // "freq_daily" -> "daily"
+              // Mapear al texto esperado por el validador
+              const freqMap: Record<string, string> = {
+                daily: 'diariamente',
+                every_3_days: 'cada 3 días',
+                weekly: 'semanalmente',
+                monthly: 'mensualmente',
+              };
+              text = freqMap[freqValue] || buttonTitle;
+            }
+            // Si el ID es de modalidad de trabajo (ej: work_remoto)
+            else if (buttonId.startsWith('work_')) {
+              text = buttonId.replace('work_', ''); // "work_remoto" -> "remoto"
+            }
+            // Si el ID es de experiencia (ej: exp_junior)
+            else if (buttonId.startsWith('exp_')) {
+              text = buttonId.replace('exp_', ''); // "exp_junior" -> "junior"
+            }
+            // Para otros casos, usar el título del botón
+            else {
+              text = buttonTitle;
+            }
+
             this.logger.debug(
-              `🔘 Botón presionado - ID: ${message.interactive.button_reply.id}, Texto: ${text}`,
+              `🔘 Botón presionado - ID: ${buttonId}, Texto extraído: ${text}`,
             );
           } else if (interactiveType === 'list_reply') {
             // Respuesta de lista
@@ -177,6 +204,10 @@ export class CloudApiProvider implements IWhatsappProvider {
             // Si el ID es un campo de edición (ej: edit_rol), extraer el campo
             else if (listReplyId.startsWith('edit_')) {
               text = listReplyId.replace('edit_', ''); // "edit_rol" -> "rol"
+            }
+            // Si el ID es de hora (ej: time_09:00), extraer la hora
+            else if (listReplyId.startsWith('time_')) {
+              text = listReplyId.replace('time_', ''); // "time_09:00" -> "09:00"
             }
             // Para otros casos (ej: full_time, part_time), usar el ID directamente
             else {

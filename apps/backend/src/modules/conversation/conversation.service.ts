@@ -27,6 +27,9 @@ import {
   normalizeJobType,
   normalizeSalary,
   normalizeTime,
+  normalizeAlertFrequency,
+  alertFrequencyToText,
+  generateTimeOptions,
 } from './helpers/input-validators';
 
 /**
@@ -131,6 +134,9 @@ export class ConversationService {
       case ConversationState.ASK_MIN_SALARY:
         return await this.handleAskMinSalaryState(userId, text);
 
+      case ConversationState.ASK_ALERT_FREQUENCY:
+        return await this.handleAskAlertFrequencyState(userId, text);
+
       case ConversationState.ASK_ALERT_TIME:
         return await this.handleAskAlertTimeState(userId, text);
 
@@ -163,6 +169,9 @@ export class ConversationService {
 
       case ConversationState.EDIT_MIN_SALARY:
         return await this.handleEditMinSalaryState(userId, text);
+
+      case ConversationState.EDIT_ALERT_FREQUENCY:
+        return await this.handleEditAlertFrequencyState(userId, text);
 
       case ConversationState.EDIT_ALERT_TIME:
         return await this.handleEditAlertTimeState(userId, text);
@@ -507,8 +516,30 @@ export class ConversationService {
     // Si el usuario escribe "0", aceptamos sin filtro de salario
     if (text.trim() === '0') {
       await this.updateUserProfile(userId, { minSalary: 0 });
-      await this.updateSessionState(userId, ConversationState.ASK_ALERT_TIME);
-      return { text: BotMessages.ASK_ALERT_TIME };
+      await this.updateSessionState(userId, ConversationState.ASK_ALERT_FREQUENCY);
+
+      // Obtener tipo de dispositivo para mostrar lista en móvil
+      const deviceType = await this.getDeviceType(userId);
+
+      if (deviceType === 'MOBILE') {
+        return {
+          text: BotMessages.ASK_ALERT_FREQUENCY,
+          listTitle: 'Seleccionar',
+          listSections: [
+            {
+              title: 'Frecuencia',
+              rows: [
+                { id: 'freq_daily', title: '☀️ Diariamente' },
+                { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
+                { id: 'freq_weekly', title: '📆 Semanalmente' },
+                { id: 'freq_monthly', title: '🗓️ Mensualmente' },
+              ],
+            },
+          ],
+        };
+      }
+
+      return { text: BotMessages.ASK_ALERT_FREQUENCY };
     }
 
     const minSalary = normalizeSalary(text);
@@ -520,8 +551,88 @@ export class ConversationService {
     // Guardar en UserProfile
     await this.updateUserProfile(userId, { minSalary });
 
-    // Transición: ASK_MIN_SALARY → ASK_ALERT_TIME
+    // Transición: ASK_MIN_SALARY → ASK_ALERT_FREQUENCY
+    await this.updateSessionState(userId, ConversationState.ASK_ALERT_FREQUENCY);
+
+    // Obtener tipo de dispositivo para mostrar lista en móvil
+    const deviceType = await this.getDeviceType(userId);
+
+    if (deviceType === 'MOBILE') {
+      return {
+        text: BotMessages.ASK_ALERT_FREQUENCY,
+        listTitle: 'Seleccionar',
+        listSections: [
+          {
+            title: 'Frecuencia',
+            rows: [
+              { id: 'freq_daily', title: '☀️ Diariamente' },
+              { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
+              { id: 'freq_weekly', title: '📆 Semanalmente' },
+              { id: 'freq_monthly', title: '🗓️ Mensualmente' },
+            ],
+          },
+        ],
+      };
+    }
+
+    return { text: BotMessages.ASK_ALERT_FREQUENCY };
+  }
+
+  /**
+   * Estado ASK_ALERT_FREQUENCY: Esperando frecuencia de alertas
+   */
+  private async handleAskAlertFrequencyState(userId: string, text: string): Promise<BotReply> {
+    const frequency = normalizeAlertFrequency(text);
+
+    if (!frequency) {
+      // Obtener tipo de dispositivo para mostrar lista o texto
+      const deviceType = await this.getDeviceType(userId);
+
+      if (deviceType === 'MOBILE') {
+        return {
+          text: BotMessages.ERROR_ALERT_FREQUENCY_INVALID,
+          listTitle: 'Seleccionar',
+          listSections: [
+            {
+              title: 'Frecuencia',
+              rows: [
+                { id: 'freq_daily', title: '☀️ Diariamente' },
+                { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
+                { id: 'freq_weekly', title: '📆 Semanalmente' },
+                { id: 'freq_monthly', title: '🗓️ Mensualmente' },
+              ],
+            },
+          ],
+        };
+      }
+
+      return { text: BotMessages.ERROR_ALERT_FREQUENCY_INVALID };
+    }
+
+    // Guardar temporalmente en session.data (lo guardamos definitivamente cuando guarde la hora)
+    await this.updateSessionData(userId, { alertFrequency: frequency });
+
+    // Transición: ASK_ALERT_FREQUENCY → ASK_ALERT_TIME
     await this.updateSessionState(userId, ConversationState.ASK_ALERT_TIME);
+
+    // Obtener tipo de dispositivo para mostrar lista de horas en móvil
+    const deviceType = await this.getDeviceType(userId);
+
+    if (deviceType === 'MOBILE') {
+      // Mostrar lista desplegable con horas comunes (6:00 AM - 4:00 PM)
+      const timeOptions = generateTimeOptions();
+
+      return {
+        text: BotMessages.ASK_ALERT_TIME_MOBILE,
+        listTitle: 'Seleccionar hora',
+        listSections: [
+          {
+            title: 'Horas comunes',
+            rows: timeOptions,
+          },
+        ],
+      };
+    }
 
     return { text: BotMessages.ASK_ALERT_TIME };
   }
@@ -536,8 +647,16 @@ export class ConversationService {
       return { text: BotMessages.ERROR_TIME_INVALID };
     }
 
+    // Obtener frecuencia guardada en session.data
+    const session = await this.prisma.session.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const alertFrequency = (session?.data as any)?.alertFrequency || 'daily';
+
     // Guardar en AlertPreference
-    await this.upsertAlertPreference(userId, alertTime);
+    await this.upsertAlertPreference(userId, alertTime, alertFrequency);
 
     // Obtener datos del perfil para el mensaje de confirmación
     const profile = await this.prisma.userProfile.findUnique({ where: { userId } });
@@ -835,6 +954,9 @@ Continúa con el proceso manual. 👇`,
       minSalary: profile.minSalary
         ? `$${profile.minSalary.toLocaleString('es-CO')} COP`
         : 'Sin filtro',
+      alertFrequency: alertPref?.alertFrequency
+        ? alertFrequencyToText(alertPref.alertFrequency as any)
+        : 'No configurado',
       alertTime: alertPref?.alertTimeLocal || 'No configurado',
     };
 
@@ -854,6 +976,7 @@ Continúa con el proceso manual. 👇`,
 🏠 *Modalidad:* ${formattedProfile.workMode}
 💼 *Tipo de empleo:* ${formattedProfile.jobType}
 💰 *Salario mínimo:* ${formattedProfile.minSalary}
+🔔 *Frecuencia:* ${formattedProfile.alertFrequency}
 ⏰ *Horario de alertas:* ${formattedProfile.alertTime}
 
 Selecciona qué quieres editar:`,
@@ -891,6 +1014,11 @@ Selecciona qué quieres editar:`,
                 id: 'edit_salario',
                 title: '💰 Salario mínimo',
                 description: `Actual: ${formattedProfile.minSalary}`,
+              },
+              {
+                id: 'edit_frecuencia',
+                title: '🔔 Frecuencia',
+                description: `Actual: ${formattedProfile.alertFrequency}`,
               },
               {
                 id: 'edit_horario',
@@ -1029,9 +1157,51 @@ Selecciona qué quieres editar:`,
         await this.updateSessionState(userId, ConversationState.EDIT_MIN_SALARY);
         return { text: BotMessages.ASK_MIN_SALARY };
 
-      case 'horario':
+      case 'frecuencia': {
+        await this.updateSessionState(userId, ConversationState.EDIT_ALERT_FREQUENCY);
+        const deviceType = await this.getDeviceType(userId);
+
+        if (deviceType === 'MOBILE') {
+          return {
+            text: BotMessages.ASK_ALERT_FREQUENCY,
+            listTitle: 'Seleccionar',
+            listSections: [
+              {
+                title: 'Frecuencia',
+                rows: [
+                  { id: 'freq_daily', title: '☀️ Diariamente' },
+                  { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
+                  { id: 'freq_weekly', title: '📆 Semanalmente' },
+                  { id: 'freq_monthly', title: '🗓️ Mensualmente' },
+                ],
+              },
+            ],
+          };
+        }
+
+        return { text: BotMessages.ASK_ALERT_FREQUENCY };
+      }
+
+      case 'horario': {
         await this.updateSessionState(userId, ConversationState.EDIT_ALERT_TIME);
+        const deviceType = await this.getDeviceType(userId);
+
+        if (deviceType === 'MOBILE') {
+          const timeOptions = generateTimeOptions();
+          return {
+            text: BotMessages.ASK_ALERT_TIME_MOBILE,
+            listTitle: 'Seleccionar hora',
+            listSections: [
+              {
+                title: 'Horas comunes',
+                rows: timeOptions,
+              },
+            ],
+          };
+        }
+
         return { text: BotMessages.ASK_ALERT_TIME };
+      }
 
       default:
         return { text: BotMessages.EDIT_FIELD_NOT_FOUND };
@@ -1198,6 +1368,33 @@ Selecciona qué quieres editar:`,
   }
 
   /**
+   * Estado EDIT_ALERT_FREQUENCY: Editando frecuencia de alertas
+   */
+  private async handleEditAlertFrequencyState(userId: string, text: string): Promise<BotReply> {
+    const frequency = normalizeAlertFrequency(text);
+
+    if (!frequency) {
+      return { text: BotMessages.ERROR_ALERT_FREQUENCY_INVALID };
+    }
+
+    // Obtener alertTime actual para mantenerla
+    const alertPref = await this.prisma.alertPreference.findUnique({
+      where: { userId },
+    });
+
+    const alertTime = alertPref?.alertTimeLocal || '09:00';
+
+    await this.upsertAlertPreference(userId, alertTime, frequency);
+    await this.updateSessionState(userId, ConversationState.READY);
+
+    const displayFrequency = alertFrequencyToText(frequency);
+    return await this.returnToMainMenu(
+      userId,
+      BotMessages.FIELD_UPDATED('frecuencia de alertas', displayFrequency),
+    );
+  }
+
+  /**
    * Estado EDIT_ALERT_TIME: Editando horario de alertas
    */
   private async handleEditAlertTimeState(userId: string, text: string): Promise<BotReply> {
@@ -1207,10 +1404,20 @@ Selecciona qué quieres editar:`,
       return { text: BotMessages.ERROR_TIME_INVALID };
     }
 
-    await this.upsertAlertPreference(userId, alertTime);
+    // Obtener frecuencia actual para mantenerla
+    const alertPref = await this.prisma.alertPreference.findUnique({
+      where: { userId },
+    });
+
+    const frequency = alertPref?.alertFrequency || 'daily';
+
+    await this.upsertAlertPreference(userId, alertTime, frequency);
     await this.updateSessionState(userId, ConversationState.READY);
 
-    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('horario de alertas', alertTime));
+    return await this.returnToMainMenu(
+      userId,
+      BotMessages.FIELD_UPDATED('horario de alertas', alertTime),
+    );
   }
 
   /**
@@ -1353,6 +1560,29 @@ Selecciona qué quieres editar:`,
   }
 
   /**
+   * Actualiza datos temporales en la sesión (campo JSON data)
+   */
+  private async updateSessionData(userId: string, newData: Record<string, any>) {
+    const session = await this.prisma.session.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const currentData = (session?.data as Record<string, any>) || {};
+    const mergedData = { ...currentData, ...newData };
+
+    await this.prisma.session.updateMany({
+      where: { userId },
+      data: {
+        data: mergedData,
+        updatedAt: new Date(),
+      },
+    });
+
+    this.logger.debug(`💾 Datos de sesión actualizados: ${JSON.stringify(newData)}`);
+  }
+
+  /**
    * Actualiza o crea el perfil del usuario
    */
   private async updateUserProfile(
@@ -1381,22 +1611,28 @@ Selecciona qué quieres editar:`,
   /**
    * Crea o actualiza la preferencia de alertas
    */
-  private async upsertAlertPreference(userId: string, alertTime: string) {
+  private async upsertAlertPreference(
+    userId: string,
+    alertTime: string,
+    alertFrequency: string = 'daily',
+  ) {
     await this.prisma.alertPreference.upsert({
       where: { userId },
       update: {
+        alertFrequency,
         alertTimeLocal: alertTime,
         enabled: true,
       },
       create: {
         userId,
+        alertFrequency,
         alertTimeLocal: alertTime,
         timezone: 'America/Bogota',
         enabled: true,
       },
     });
 
-    this.logger.debug(`⏰ Alerta configurada para: ${alertTime}`);
+    this.logger.debug(`⏰ Alerta configurada para: ${alertTime} con frecuencia ${alertFrequency}`);
   }
 
   /**
