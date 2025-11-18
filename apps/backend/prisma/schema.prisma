@@ -102,15 +102,3 @@ model SentJob {
   @@map("sent_jobs")
 }
 
-model ProcessedMessage {
-  id          String   @id @default(cuid())
-  messageId   String   @unique  // ID del mensaje de WhatsApp
-  phone       String
-  processedAt DateTime @default(now())
-  createdAt   DateTime @default(now())
-
-  @@index([phone])
-  @@index([processedAt])
-  @@map("processed_messages")
-}
-
