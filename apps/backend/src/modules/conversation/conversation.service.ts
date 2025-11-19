@@ -379,15 +379,29 @@ export class ConversationService {
 
     const deviceType = await this.getDeviceType(userId);
 
-    // Si es móvil, mostrar botones (4 opciones)
+    // Si es móvil, mostrar lista desplegable (4 opciones)
     if (deviceType === 'MOBILE') {
       return {
         text: BotMessages.ASK_WORK_MODE,
-        buttons: [
-          { id: 'work_remoto', title: '🏠 Remoto' },
-          { id: 'work_presencial', title: '🏢 Presencial' },
-          { id: 'work_hibrido', title: '🔄 Híbrido' },
-          { id: 'work_sin_preferencia', title: '✨ Sin preferencia' },
+        listTitle: 'Elige modalidad',
+        listSections: [
+          {
+            title: 'Modalidad de Trabajo',
+            rows: [
+              { id: 'work_remoto', title: '🏠 Remoto', description: 'Trabajar desde casa' },
+              { id: 'work_presencial', title: '🏢 Presencial', description: 'Ir a la oficina' },
+              {
+                id: 'work_hibrido',
+                title: '🔄 Híbrido',
+                description: 'Mixto (remoto + presencial)',
+              },
+              {
+                id: 'work_sin_preferencia',
+                title: '✨ Sin preferencia',
+                description: 'Cualquier modalidad',
+              },
+            ],
+          },
         ],
       };
     }
@@ -408,11 +422,25 @@ export class ConversationService {
       if (deviceType === 'MOBILE') {
         return {
           text: BotMessages.ERROR_WORK_MODE_INVALID,
-          buttons: [
-            { id: 'work_remoto', title: '🏠 Remoto' },
-            { id: 'work_presencial', title: '🏢 Presencial' },
-            { id: 'work_hibrido', title: '🔄 Híbrido' },
-            { id: 'work_sin_preferencia', title: '✨ Sin preferencia' },
+          listTitle: 'Elige modalidad',
+          listSections: [
+            {
+              title: 'Modalidad de Trabajo',
+              rows: [
+                { id: 'work_remoto', title: '🏠 Remoto', description: 'Trabajar desde casa' },
+                { id: 'work_presencial', title: '🏢 Presencial', description: 'Ir a la oficina' },
+                {
+                  id: 'work_hibrido',
+                  title: '🔄 Híbrido',
+                  description: 'Mixto (remoto + presencial)',
+                },
+                {
+                  id: 'work_sin_preferencia',
+                  title: '✨ Sin preferencia',
+                  description: 'Cualquier modalidad',
+                },
+              ],
+            },
           ],
         };
       }
@@ -1120,11 +1148,25 @@ Selecciona qué quieres editar:`,
         if (deviceType === 'MOBILE') {
           return {
             text: BotMessages.ASK_WORK_MODE,
-            buttons: [
-              { id: 'work_remoto', title: '🏠 Remoto' },
-              { id: 'work_presencial', title: '🏢 Presencial' },
-              { id: 'work_hibrido', title: '🔄 Híbrido' },
-              { id: 'work_sin_preferencia', title: '✨ Sin preferencia' },
+            listTitle: 'Elige modalidad',
+            listSections: [
+              {
+                title: 'Modalidad de Trabajo',
+                rows: [
+                  { id: 'work_remoto', title: '🏠 Remoto', description: 'Trabajar desde casa' },
+                  { id: 'work_presencial', title: '🏢 Presencial', description: 'Ir a la oficina' },
+                  {
+                    id: 'work_hibrido',
+                    title: '🔄 Híbrido',
+                    description: 'Mixto (remoto + presencial)',
+                  },
+                  {
+                    id: 'work_sin_preferencia',
+                    title: '✨ Sin preferencia',
+                    description: 'Cualquier modalidad',
+                  },
+                ],
+              },
             ],
           };
         }
@@ -1279,11 +1321,25 @@ Selecciona qué quieres editar:`,
       if (deviceType === 'MOBILE') {
         return {
           text: BotMessages.ERROR_WORK_MODE_INVALID,
-          buttons: [
-            { id: 'work_remoto', title: '🏠 Remoto' },
-            { id: 'work_presencial', title: '🏢 Presencial' },
-            { id: 'work_hibrido', title: '🔄 Híbrido' },
-            { id: 'work_sin_preferencia', title: '✨ Sin preferencia' },
+          listTitle: 'Elige modalidad',
+          listSections: [
+            {
+              title: 'Modalidad de Trabajo',
+              rows: [
+                { id: 'work_remoto', title: '🏠 Remoto', description: 'Trabajar desde casa' },
+                { id: 'work_presencial', title: '🏢 Presencial', description: 'Ir a la oficina' },
+                {
+                  id: 'work_hibrido',
+                  title: '🔄 Híbrido',
+                  description: 'Mixto (remoto + presencial)',
+                },
+                {
+                  id: 'work_sin_preferencia',
+                  title: '✨ Sin preferencia',
+                  description: 'Cualquier modalidad',
+                },
+              ],
+            },
           ],
         };
       }

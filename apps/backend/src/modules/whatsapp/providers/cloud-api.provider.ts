@@ -108,6 +108,7 @@ export class CloudApiProvider implements IWhatsappProvider {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.accessToken}`,
         },
+        timeout: 10000, // 10 segundos timeout
       });
 
       this.logger.log(`✅ Mensaje enviado a ${formattedTo}`);
