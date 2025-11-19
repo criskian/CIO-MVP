@@ -84,7 +84,7 @@ export default function Hero({ whatsappLink }: HeroProps) {
                 }}
               >
                 <Image
-                  src="/assets/images/indeedLogo.png"
+                  src="/assets/images/indeeedlogo.png"
                   alt="Indeed"
                   width={86}
                   height={86}
@@ -134,7 +134,7 @@ export default function Hero({ whatsappLink }: HeroProps) {
                 }}
               >
                 <Image
-                  src="/assets/images/Linkedin_icon.svg.webp"
+                  src="/assets/images/linkedin.png"
                   alt="LinkedIn"
                   width={108}
                   height={108}
