@@ -42,14 +42,14 @@ export default function Hero({ whatsappLink }: HeroProps) {
       <div className="flex-1 flex items-start justify-center px-4 pt-44 pb-12">
         <div className="max-w-4xl mx-auto text-center relative z-10">
           {/* Tarjetas con logos laterales */}
-          <div className="pointer-events-none hidden lg:block">
+          <div className="hidden lg:block">
             {/* Columna izquierda */}
             <div
               className="absolute flex flex-col gap-14"
               style={{ top: '-140px', left: '-310px' }}
             >
               <div
-                className="flex items-center justify-center"
+                className="group flex items-center justify-center cursor-pointer transition-all duration-300 hover:-translate-y-2 hover:scale-110"
                 style={{
                   width: '120px',
                   height: '120px',
@@ -66,11 +66,12 @@ export default function Hero({ whatsappLink }: HeroProps) {
                   width={108}
                   height={108}
                   style={{ objectFit: 'cover', borderRadius: '18px' }}
+                  className="transition-transform duration-300 group-hover:scale-105"
                 />
               </div>
 
               <div
-                className="flex items-center justify-center mx-auto"
+                className="group flex items-center justify-center mx-auto cursor-pointer transition-all duration-300 hover:-translate-y-2 hover:scale-110"
                 style={{
                   width: '86px',
                   height: '86px',
@@ -88,11 +89,12 @@ export default function Hero({ whatsappLink }: HeroProps) {
                   width={86}
                   height={86}
                   style={{ objectFit: 'cover', borderRadius: '18px' }}
+                  className="transition-transform duration-300 group-hover:scale-105"
                 />
               </div>
 
               <div
-                className="flex items-center justify-center"
+                className="group flex items-center justify-center cursor-pointer transition-all duration-300 hover:-translate-y-2 hover:scale-110"
                 style={{
                   width: '120px',
                   height: '120px',
@@ -109,6 +111,7 @@ export default function Hero({ whatsappLink }: HeroProps) {
                   width={108}
                   height={108}
                   style={{ objectFit: 'contain' }}
+                  className="transition-transform duration-300 group-hover:scale-105"
                 />
               </div>
             </div>
@@ -119,7 +122,7 @@ export default function Hero({ whatsappLink }: HeroProps) {
               style={{ top: '-120px', right: '-310px' }}
             >
               <div
-                className="flex items-center justify-center"
+                className="group flex items-center justify-center cursor-pointer transition-all duration-300 hover:-translate-y-2 hover:scale-110"
                 style={{
                   width: '120px',
                   height: '120px',
@@ -136,11 +139,12 @@ export default function Hero({ whatsappLink }: HeroProps) {
                   width={108}
                   height={108}
                   style={{ objectFit: 'contain' }}
+                  className="transition-transform duration-300 group-hover:scale-105"
                 />
               </div>
 
               <div
-                className="flex items-center justify-center mr-6"
+                className="group flex items-center justify-center mr-6 cursor-pointer transition-all duration-300 hover:-translate-y-2 hover:scale-110"
                 style={{
                   width: '86px',
                   height: '86px',
@@ -158,11 +162,12 @@ export default function Hero({ whatsappLink }: HeroProps) {
                   width={72}
                   height={72}
                   style={{ objectFit: 'contain' }}
+                  className="transition-transform duration-300 group-hover:scale-105"
                 />
               </div>
 
               <div
-                className="flex items-center justify-center"
+                className="group flex items-center justify-center cursor-pointer transition-all duration-300 hover:-translate-y-2 hover:scale-110"
                 style={{
                   width: '120px',
                   height: '120px',
@@ -179,6 +184,7 @@ export default function Hero({ whatsappLink }: HeroProps) {
                   width={108}
                   height={108}
                   style={{ objectFit: 'contain' }}
+                  className="transition-transform duration-300 group-hover:scale-105"
                 />
               </div>
             </div>

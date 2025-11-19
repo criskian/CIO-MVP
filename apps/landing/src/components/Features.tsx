@@ -1,26 +1,26 @@
 const features = [
   {
-    title: 'Asistente Inteligente',
+    title: 'Búsqueda inteligente',
     description:
-      'CIO entiende tus preferencias y busca empleos que realmente se ajusten a tu perfil profesional.',
+      'CIO analiza miles de vacantes en línea y te entrega únicamente aquellas que coinciden con tu perfil profesional real.',
     gradientClass: 'from-[#9054C6] to-[#7A3FC3]',
   },
   {
-    title: 'Alertas Diarias',
+    title: 'Plataformas verificadas',
     description:
-      'Recibe ofertas nuevas todos los días a la hora que prefieras, directamente en tu WhatsApp.',
+      'CIO rastrea información en fuentes laborales confiables y actualizadas.',
     gradientClass: 'from-[#9054C6] to-[#B68DE0]',
   },
   {
-    title: 'Búsqueda Personalizada',
+    title: 'Ahorro de tiempo',
     description:
-      'Define tu cargo ideal, ubicación, salario y tipo de jornada. CIO hace el resto por ti.',
+      'CIO hace el trabajo por usted: busca, filtra y entrega oportunidades listas para aplicar.',
     gradientClass: 'from-[#9054C6] to-[#A173D8]',
   },
   {
-    title: '100% Seguro y confiable',
+    title: 'Acceso inmediato',
     description:
-      'Tus datos están protegidos y solo se usan para mejorar tu experiencia.',
+      'Una experiencia simple, accesible y diseñada especialmente para quienes prefieren procesos claros.',
     gradientClass: 'from-[#9054C6] to-[#6F2EA6]',
   },
 ];
