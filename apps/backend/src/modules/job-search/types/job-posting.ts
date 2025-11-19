@@ -13,7 +13,9 @@ export interface JobPosting {
   company?: string;
   locationRaw?: string;
   salaryRaw?: string;
-  publishedAt?: Date;
+  jobTypeRaw?: string; // Tipo de empleo como texto (ej: "Full-time", "Part-time")
+  postedAtRaw?: string; // Fecha como texto (ej: "hace 20 días", "2 days ago")
+  publishedAt?: Date; // Fecha parseada (si es posible)
   score?: number; // score de relevancia (usado para ranking)
 }
 
@@ -38,4 +40,3 @@ export interface JobSearchResult {
   query: string;
   executedAt: Date;
 }
-

@@ -21,7 +21,6 @@ import {
   isDesktopDevice,
   normalizeRole,
   normalizeExperienceLevel,
-  getExperienceKeywords,
   normalizeLocation,
   normalizeWorkMode,
   normalizeJobType,
@@ -377,7 +376,7 @@ export class ConversationService {
 
     // Transición: ASK_LOCATION → ASK_WORK_MODE
     await this.updateSessionState(userId, ConversationState.ASK_WORK_MODE);
-    
+
     const deviceType = await this.getDeviceType(userId);
 
     // Si es móvil, mostrar botones
@@ -403,7 +402,7 @@ export class ConversationService {
 
     if (!workMode) {
       const deviceType = await this.getDeviceType(userId);
-      
+
       if (deviceType === 'MOBILE') {
         return {
           text: BotMessages.ERROR_WORK_MODE_INVALID,
@@ -413,7 +412,7 @@ export class ConversationService {
           ],
         };
       }
-      
+
       return { text: BotMessages.ERROR_WORK_MODE_INVALID };
     }
 
@@ -1063,7 +1062,7 @@ Selecciona qué quieres editar:`,
       case 'experiencia': {
         await this.updateSessionState(userId, ConversationState.EDIT_EXPERIENCE);
         const deviceType = await this.getDeviceType(userId);
-        
+
         if (deviceType === 'MOBILE') {
           return {
             text: BotMessages.ASK_EXPERIENCE,
@@ -1102,7 +1101,7 @@ Selecciona qué quieres editar:`,
             ],
           };
         }
-        
+
         return { text: BotMessages.ASK_EXPERIENCE };
       }
 
@@ -1113,7 +1112,7 @@ Selecciona qué quieres editar:`,
       case 'modalidad': {
         await this.updateSessionState(userId, ConversationState.EDIT_WORK_MODE);
         const deviceType = await this.getDeviceType(userId);
-        
+
         if (deviceType === 'MOBILE') {
           return {
             text: BotMessages.ASK_WORK_MODE,
@@ -1123,7 +1122,7 @@ Selecciona qué quieres editar:`,
             ],
           };
         }
-        
+
         return { text: BotMessages.ASK_WORK_MODE_DESKTOP };
       }
 
@@ -1270,7 +1269,7 @@ Selecciona qué quieres editar:`,
 
     if (!workMode) {
       const deviceType = await this.getDeviceType(userId);
-      
+
       if (deviceType === 'MOBILE') {
         return {
           text: BotMessages.ERROR_WORK_MODE_INVALID,
@@ -1280,7 +1279,7 @@ Selecciona qué quieres editar:`,
           ],
         };
       }
-      
+
       return { text: BotMessages.ERROR_WORK_MODE_INVALID };
     }
 
@@ -1290,7 +1289,10 @@ Selecciona qué quieres editar:`,
     await this.updateSessionState(userId, ConversationState.READY);
 
     const displayMode = workMode === 'remoto' ? '🏠 Remoto' : '🏢 Presencial';
-    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('modalidad de trabajo', displayMode));
+    return await this.returnToMainMenu(
+      userId,
+      BotMessages.FIELD_UPDATED('modalidad de trabajo', displayMode),
+    );
   }
 
   /**
@@ -1336,7 +1338,10 @@ Selecciona qué quieres editar:`,
     await this.updateUserProfile(userId, { jobType });
     await this.updateSessionState(userId, ConversationState.READY);
 
-    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('tipo de empleo', this.formatJobType(jobType)));
+    return await this.returnToMainMenu(
+      userId,
+      BotMessages.FIELD_UPDATED('tipo de empleo', this.formatJobType(jobType)),
+    );
   }
 
   /**
@@ -1346,7 +1351,10 @@ Selecciona qué quieres editar:`,
     if (text.trim() === '0') {
       await this.updateUserProfile(userId, { minSalary: 0 });
       await this.updateSessionState(userId, ConversationState.READY);
-      return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('salario mínimo', 'Sin filtro'));
+      return await this.returnToMainMenu(
+        userId,
+        BotMessages.FIELD_UPDATED('salario mínimo', 'Sin filtro'),
+      );
     }
 
     const minSalary = normalizeSalary(text);
@@ -1360,10 +1368,7 @@ Selecciona qué quieres editar:`,
 
     return await this.returnToMainMenu(
       userId,
-      BotMessages.FIELD_UPDATED(
-        'salario mínimo',
-        `$${minSalary.toLocaleString('es-CO')} COP`,
-      ),
+      BotMessages.FIELD_UPDATED('salario mínimo', `$${minSalary.toLocaleString('es-CO')} COP`),
     );
   }
 

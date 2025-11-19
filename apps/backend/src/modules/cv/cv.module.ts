@@ -6,4 +6,3 @@ import { CvService } from './cv.service';
   exports: [CvService],
 })
 export class CvModule {}
-

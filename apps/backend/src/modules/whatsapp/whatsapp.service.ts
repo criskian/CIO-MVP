@@ -15,10 +15,10 @@ export class WhatsappService {
 
   // Cache para deduplicación de mensajes (messageId -> timestamp)
   private readonly processedMessages = new Map<string, number>();
-  
+
   // Tiempo máximo para aceptar un mensaje (2 minutos)
   private readonly MAX_MESSAGE_AGE_MS = 2 * 60 * 1000;
-  
+
   // Tiempo para mantener IDs en cache (10 minutos)
   private readonly CACHE_RETENTION_MS = 10 * 60 * 1000;
 
@@ -65,7 +65,10 @@ export class WhatsappService {
       }
 
       // 1. VALIDAR DEDUPLICACIÓN: Verificar si ya procesamos este mensaje
-      if (normalizedMessage.messageId && this.isMessageAlreadyProcessed(normalizedMessage.messageId)) {
+      if (
+        normalizedMessage.messageId &&
+        this.isMessageAlreadyProcessed(normalizedMessage.messageId)
+      ) {
         this.logger.warn(
           `🔁 Mensaje duplicado detectado (ID: ${normalizedMessage.messageId}). Ignorando.`,
         );

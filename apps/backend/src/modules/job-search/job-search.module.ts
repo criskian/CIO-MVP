@@ -8,4 +8,3 @@ import { DatabaseModule } from '../database/database.module';
   exports: [JobSearchService],
 })
 export class JobSearchModule {}
-

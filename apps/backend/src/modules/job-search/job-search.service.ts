@@ -90,24 +90,28 @@ export class JobSearchService {
       };
 
       // 3. Ejecutar búsqueda principal
-      let result = await this.searchJobs(searchQuery);
+      const result = await this.searchJobs(searchQuery);
       let allJobs = [...result.jobs];
 
       // 4. Si el usuario quiere remoto pero hay pocas ofertas, buscar presenciales en su ciudad
       if (profile.remoteAllowed && allJobs.length < 3 && profile.location) {
-        this.logger.log(`📍 Pocas ofertas remotas (${allJobs.length}), buscando presenciales en ${profile.location}...`);
-        
+        this.logger.log(
+          `📍 Pocas ofertas remotas (${allJobs.length}), buscando presenciales en ${profile.location}...`,
+        );
+
         const presencialQuery: JobSearchQuery = {
           ...searchQuery,
           remoteAllowed: false, // Buscar solo presenciales
         };
 
         const presencialResult = await this.searchJobs(presencialQuery);
-        
+
         // Agregar ofertas presenciales al final (después de las remotas)
         allJobs = [...allJobs, ...presencialResult.jobs];
-        
-        this.logger.log(`✅ Se agregaron ${presencialResult.jobs.length} ofertas presenciales en ${profile.location}`);
+
+        this.logger.log(
+          `✅ Se agregaron ${presencialResult.jobs.length} ofertas presenciales en ${profile.location}`,
+        );
       }
 
       // 5. Registrar en log
@@ -148,9 +152,8 @@ export class JobSearchService {
 
       // Determinar ubicación para SerpApi
       // Si es "Remoto", usar "Colombia" como ubicación base
-      const normalizedLocation = query.location?.toLowerCase() === 'remoto' 
-        ? 'Colombia' 
-        : (query.location || 'Colombia');
+      const normalizedLocation =
+        query.location?.toLowerCase() === 'remoto' ? 'Colombia' : query.location || 'Colombia';
 
       // Llamar a SerpApi con engine=google_jobs (método GET según documentación)
       const response = await axios.get(this.serpApiUrl, {
@@ -187,12 +190,14 @@ export class JobSearchService {
 
       // Si no hay resultados y el rol tiene múltiples palabras, intentar búsqueda más amplia
       if (rankedJobs.length === 0 && query.role.split(' ').length > 1) {
-        this.logger.log(`🔄 No se encontraron resultados con "${query.role}". Intentando búsqueda más amplia...`);
-        
+        this.logger.log(
+          `🔄 No se encontraron resultados con "${query.role}". Intentando búsqueda más amplia...`,
+        );
+
         // Obtener la primera palabra del rol (ej: "diseñador UI" -> "diseñador")
         const broadRole = query.role.split(' ')[0];
         const broadQuery = { ...query, role: broadRole };
-        
+
         return await this.searchJobs(broadQuery);
       }
 
@@ -274,20 +279,37 @@ export class JobSearchService {
     const company = item.company_name || undefined;
     const locationRaw = item.location || undefined;
 
-    // Salario: puede venir en detected_extensions
+    // Salario y tipo de empleo: pueden venir en detected_extensions
     let salaryRaw: string | undefined;
+    let jobTypeRaw: string | undefined;
+
     if (item.detected_extensions) {
       // Buscar salario en detected_extensions
       if (item.detected_extensions.salary) {
         salaryRaw = item.detected_extensions.salary;
-      } else if (item.detected_extensions.schedule_type) {
-        // A veces el salario viene en schedule_type si está presente
+      }
+
+      // Buscar tipo de empleo en schedule_type
+      if (item.detected_extensions.schedule_type) {
         const schedule = item.detected_extensions.schedule_type;
-        if (schedule && (schedule.includes('$') || schedule.toLowerCase().includes('cop'))) {
+        // Si schedule_type contiene salario, no es el tipo de empleo
+        if (schedule && !(schedule.includes('$') || schedule.toLowerCase().includes('cop'))) {
+          jobTypeRaw = schedule;
+        } else if (schedule && (schedule.includes('$') || schedule.toLowerCase().includes('cop'))) {
+          // A veces el salario viene en schedule_type
           salaryRaw = schedule;
         }
       }
     }
+
+    // Fecha de publicación: puede venir en detected_extensions.posted_at
+    let postedAtRaw: string | undefined;
+    if (item.detected_extensions?.posted_at) {
+      postedAtRaw = item.detected_extensions.posted_at;
+    }
+
+    // Intentar parsear la fecha a Date
+    const publishedAt = postedAtRaw ? this.parsePostedAtDate(postedAtRaw) : undefined;
 
     return {
       title: item.title || 'Sin título',
@@ -297,6 +319,9 @@ export class JobSearchService {
       company,
       locationRaw,
       salaryRaw,
+      jobTypeRaw,
+      postedAtRaw,
+      publishedAt,
     };
   }
 
@@ -616,10 +641,10 @@ export class JobSearchService {
     }
 
     // +5 puntos extra si todas las palabras del rol aparecen (aunque no juntas)
-    const roleWords = roleLower.split(' ').filter(w => w.length > 2);
+    const roleWords = roleLower.split(' ').filter((w) => w.length > 2);
     if (roleWords.length > 1) {
       const allWordsPresent = roleWords.every(
-        word => titleLower.includes(word) || snippetLower.includes(word)
+        (word) => titleLower.includes(word) || snippetLower.includes(word),
       );
       if (allWordsPresent) {
         score += 5;
@@ -630,6 +655,14 @@ export class JobSearchService {
     if (query.location && job.locationRaw) {
       if (job.locationRaw.toLowerCase().includes(query.location.toLowerCase())) {
         score += 8;
+      }
+    }
+
+    // +5 puntos si el tipo de empleo coincide
+    if (query.jobType && job.jobTypeRaw) {
+      const normalizedJobType = this.normalizeJobType(job.jobTypeRaw);
+      if (normalizedJobType === query.jobType) {
+        score += 5;
       }
     }
 
@@ -669,6 +702,19 @@ export class JobSearchService {
     // +10 puntos EXTRA si la URL parece ser de una oferta individual
     if (this.looksLikeIndividualJob(urlLower)) {
       score += 10;
+    }
+
+    // Puntos por antigüedad de la oferta (favorece ofertas recientes sin opacar concordancia)
+    const ageDays = this.getJobAgeDays(job);
+    if (ageDays !== null) {
+      if (ageDays <= 7) {
+        score += 6; // Muy reciente (última semana)
+      } else if (ageDays <= 15) {
+        score += 4; // Reciente (últimas 2 semanas)
+      } else if (ageDays <= 30) {
+        score += 2; // Relativamente reciente (último mes)
+      }
+      // Si es mayor a 30 días, no suma puntos pero tampoco resta
     }
 
     // -5 puntos si el título es muy genérico o corto (probable listado)
@@ -766,6 +812,152 @@ export class JobSearchService {
   }
 
   /**
+   * Normaliza el tipo de empleo de SerpAPI a nuestro formato interno
+   * Ejemplos: "Full-time" -> "full_time", "Part-time" -> "part_time"
+   */
+  private normalizeJobType(jobTypeText: string): string | undefined {
+    const lowerText = jobTypeText.toLowerCase().trim();
+
+    // Mapeo de términos comunes
+    if (lowerText.includes('full') && lowerText.includes('time')) {
+      return 'full_time';
+    }
+    if (lowerText.includes('part') && lowerText.includes('time')) {
+      return 'part_time';
+    }
+    if (lowerText.includes('medio tiempo')) {
+      return 'part_time';
+    }
+    if (lowerText.includes('tiempo completo')) {
+      return 'full_time';
+    }
+    if (
+      lowerText.includes('internship') ||
+      lowerText.includes('pasantía') ||
+      lowerText.includes('practicante')
+    ) {
+      return 'internship';
+    }
+    if (
+      lowerText.includes('freelance') ||
+      lowerText.includes('contractor') ||
+      lowerText.includes('contrato')
+    ) {
+      return 'freelance';
+    }
+    if (lowerText.includes('temporal') || lowerText.includes('temporary')) {
+      return 'freelance';
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Intenta parsear el texto de fecha de publicación a Date
+   * Ejemplos: "hace 20 días", "2 days ago", "Today", "hace 1 hora"
+   */
+  private parsePostedAtDate(postedAtText: string): Date | undefined {
+    try {
+      const now = new Date();
+      const lowerText = postedAtText.toLowerCase();
+
+      // Patrones en español
+      if (lowerText.includes('hace') && lowerText.includes('día')) {
+        const match = lowerText.match(/hace\s+(\d+)\s+día/);
+        if (match) {
+          const daysAgo = parseInt(match[1]);
+          const date = new Date(now);
+          date.setDate(date.getDate() - daysAgo);
+          return date;
+        }
+      }
+
+      if (lowerText.includes('hace') && lowerText.includes('hora')) {
+        const match = lowerText.match(/hace\s+(\d+)\s+hora/);
+        if (match) {
+          const hoursAgo = parseInt(match[1]);
+          const date = new Date(now);
+          date.setHours(date.getHours() - hoursAgo);
+          return date;
+        }
+      }
+
+      if (lowerText.includes('hace') && lowerText.includes('mes')) {
+        const match = lowerText.match(/hace\s+(\d+)\s+mes/);
+        if (match) {
+          const monthsAgo = parseInt(match[1]);
+          const date = new Date(now);
+          date.setMonth(date.getMonth() - monthsAgo);
+          return date;
+        }
+      }
+
+      // Patrones en inglés
+      if (lowerText.includes('day') && lowerText.includes('ago')) {
+        const match = lowerText.match(/(\d+)\s+day/);
+        if (match) {
+          const daysAgo = parseInt(match[1]);
+          const date = new Date(now);
+          date.setDate(date.getDate() - daysAgo);
+          return date;
+        }
+      }
+
+      if (lowerText.includes('hour') && lowerText.includes('ago')) {
+        const match = lowerText.match(/(\d+)\s+hour/);
+        if (match) {
+          const hoursAgo = parseInt(match[1]);
+          const date = new Date(now);
+          date.setHours(date.getHours() - hoursAgo);
+          return date;
+        }
+      }
+
+      if (lowerText.includes('month') && lowerText.includes('ago')) {
+        const match = lowerText.match(/(\d+)\s+month/);
+        if (match) {
+          const monthsAgo = parseInt(match[1]);
+          const date = new Date(now);
+          date.setMonth(date.getMonth() - monthsAgo);
+          return date;
+        }
+      }
+
+      // Casos especiales
+      if (lowerText.includes('today') || lowerText.includes('hoy')) {
+        return now;
+      }
+
+      if (lowerText.includes('yesterday') || lowerText.includes('ayer')) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - 1);
+        return date;
+      }
+
+      return undefined;
+    } catch (error) {
+      this.logger.debug(`No se pudo parsear fecha: ${postedAtText}`);
+      return undefined;
+    }
+  }
+
+  /**
+   * Calcula cuántos días de antigüedad tiene una oferta
+   * Retorna null si no se puede determinar
+   */
+  private getJobAgeDays(job: JobPosting): number | null {
+    if (!job.publishedAt) {
+      return null;
+    }
+
+    const now = new Date();
+    const diffMs = now.getTime() - job.publishedAt.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    return diffDays >= 0 ? diffDays : null;
+  }
+
+  /**
    * Formatea ofertas para enviar por WhatsApp
    */
   formatJobsForWhatsApp(jobs: JobPosting[]): string {
@@ -791,6 +983,11 @@ Intenta de nuevo más tarde o ajusta tus preferencias.`;
 
         if (job.salaryRaw) {
           text += `💰 ${job.salaryRaw}\n`;
+        }
+
+        // Mostrar fecha de publicación si está disponible
+        if (job.postedAtRaw) {
+          text += `📅 Publicada ${job.postedAtRaw}\n`;
         }
 
         text += `🔗 ${job.url}\n`;

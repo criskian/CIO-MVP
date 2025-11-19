@@ -24,4 +24,3 @@ import { CvModule } from './modules/cv/cv.module';
   ],
 })
 export class AppModule {}
-

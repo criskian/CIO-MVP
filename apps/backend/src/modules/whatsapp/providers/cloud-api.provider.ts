@@ -189,9 +189,7 @@ export class CloudApiProvider implements IWhatsappProvider {
               text = buttonTitle;
             }
 
-            this.logger.debug(
-              `🔘 Botón presionado - ID: ${buttonId}, Texto extraído: ${text}`,
-            );
+            this.logger.debug(`🔘 Botón presionado - ID: ${buttonId}, Texto extraído: ${text}`);
           } else if (interactiveType === 'list_reply') {
             // Respuesta de lista
             const listReplyId = message.interactive.list_reply.id;

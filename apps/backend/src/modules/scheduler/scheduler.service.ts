@@ -60,9 +60,7 @@ export class SchedulerService implements OnModuleInit {
       }
 
       // 2. Filtrar usuarios que deben recibir alerta AHORA
-      const usersToNotify = alertPreferences.filter((pref) =>
-        this.shouldSendAlertNow(pref),
-      );
+      const usersToNotify = alertPreferences.filter((pref) => this.shouldSendAlertNow(pref));
 
       this.logger.log(`📮 ${usersToNotify.length} usuarios deben recibir alerta ahora`);
 
@@ -81,16 +79,12 @@ export class SchedulerService implements OnModuleInit {
         } catch (error) {
           failCount++;
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          this.logger.error(
-            `❌ Error notificando a usuario ${alertPref.userId}: ${errorMessage}`,
-          );
+          this.logger.error(`❌ Error notificando a usuario ${alertPref.userId}: ${errorMessage}`);
           // Continuar con el siguiente usuario
         }
       }
 
-      this.logger.log(
-        `✅ Alertas enviadas: ${successCount} exitosas, ${failCount} fallidas`,
-      );
+      this.logger.log(`✅ Alertas enviadas: ${successCount} exitosas, ${failCount} fallidas`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`❌ Error en checkAndSendAlerts: ${errorMessage}`);
@@ -123,9 +117,7 @@ export class SchedulerService implements OnModuleInit {
 
       // Si no hay última notificación, es la primera vez → enviar
       if (!alertPref.lastNotification) {
-        this.logger.debug(
-          `✅ Usuario ${alertPref.userId}: Primera notificación → enviar`,
-        );
+        this.logger.debug(`✅ Usuario ${alertPref.userId}: Primera notificación → enviar`);
         return true;
       }
 
@@ -172,9 +164,7 @@ export class SchedulerService implements OnModuleInit {
       return shouldSend;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(
-        `Error evaluando si enviar alerta a ${alertPref.userId}: ${errorMessage}`,
-      );
+      this.logger.error(`Error evaluando si enviar alerta a ${alertPref.userId}: ${errorMessage}`);
       return false;
     }
   }
@@ -210,9 +200,7 @@ export class SchedulerService implements OnModuleInit {
 Te volveré a notificar cuando encuentre algo interesante. ✨`;
       } else {
         // Hay ofertas → formatear y enviar
-        const formattedJobs = this.jobSearchService.formatJobsForWhatsApp(
-          searchResult.jobs,
-        );
+        const formattedJobs = this.jobSearchService.formatJobsForWhatsApp(searchResult.jobs);
 
         messageText = `🎯 *¡Nuevas ofertas de empleo para ti!*\n\n${formattedJobs}\n\n_Te seguiré enviando alertas según tu configuración._ ⏰`;
 
@@ -232,14 +220,10 @@ Te volveré a notificar cuando encuentre algo interesante. ✨`;
         },
       });
 
-      this.logger.log(
-        `✅ Usuario ${userId} notificado con ${searchResult.jobs.length} ofertas`,
-      );
+      this.logger.log(`✅ Usuario ${userId} notificado con ${searchResult.jobs.length} ofertas`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(
-        `❌ Error en runJobSearchAndNotifyUser para ${userId}: ${errorMessage}`,
-      );
+      this.logger.error(`❌ Error en runJobSearchAndNotifyUser para ${userId}: ${errorMessage}`);
 
       // Intentar enviar mensaje de error al usuario
       try {
@@ -261,4 +245,3 @@ Te volveré a notificar cuando encuentre algo interesante. ✨`;
     }
   }
 }
-

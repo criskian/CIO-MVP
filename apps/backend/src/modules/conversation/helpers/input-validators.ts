@@ -1,9 +1,4 @@
-import {
-  JobType,
-  UserIntent,
-  ExperienceLevel,
-  AlertFrequency,
-} from '../types/conversation-states';
+import { JobType, UserIntent, ExperienceLevel, AlertFrequency } from '../types/conversation-states';
 
 /**
  * Helpers para validar y normalizar respuestas del usuario
@@ -681,12 +676,12 @@ export function generateTimeOptions(): Array<{ id: string; title: string }> {
   for (let hour = 6; hour <= 16; hour++) {
     const time = `${hour.toString().padStart(2, '0')}:00`;
     let label = time;
-    
+
     // Agregar etiquetas especiales
     if (hour === 6) label = '🌅 06:00 (Mañana)';
     else if (hour === 12) label = '☀️ 12:00 (Mediodía)';
     else if (hour === 16) label = '🌆 16:00 (Tarde)';
-    
+
     options.push({
       id: `time_${time}`,
       title: label,

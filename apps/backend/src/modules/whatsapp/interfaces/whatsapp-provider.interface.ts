@@ -66,4 +66,3 @@ export interface IWhatsappProvider {
    */
   verifyWebhook?(mode: string, token: string, challenge: string): string | null;
 }
-
