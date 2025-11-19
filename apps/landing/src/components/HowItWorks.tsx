@@ -1,3 +1,7 @@
+interface HowItWorksProps {
+  whatsappLink: string;
+}
+
 const steps = [
   {
     number: '1',
@@ -25,7 +29,7 @@ const steps = [
   },
 ];
 
-export default function HowItWorks() {
+export default function HowItWorks({ whatsappLink }: HowItWorksProps) {
   return (
     <section className="py-20 md:py-28 px-4 bg-gradient-to-b from-gray-50 to-white">
       <div className="max-w-6xl mx-auto">
@@ -77,7 +81,12 @@ export default function HowItWorks() {
         <div className="mt-16 text-center">
           <p className="text-gray-600 text-lg">
             ¿Todo listo?{' '}
-            <a href="#hero" className="text-[#9054C6] hover:text-[#7A3FC3] font-semibold underline decoration-2 underline-offset-4 transition-colors">
+            <a 
+              href={whatsappLink} 
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#9054C6] hover:text-[#7A3FC3] font-semibold underline decoration-2 underline-offset-4 transition-colors"
+            >
               Comienza ahora mismo
             </a>
           </p>

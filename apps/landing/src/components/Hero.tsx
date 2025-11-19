@@ -17,6 +17,10 @@ export default function Hero({ whatsappLink }: HeroProps) {
           className="mx-auto"
           priority
         />
+        {/* Texto "cazador inteligente de oportunidades" */}
+        <p className="text-center mt-3 text-[#9054C6] font-medium text-base md:text-lg">
+          Cazador inteligente de oportunidades
+        </p>
       </div>
 
       {/* Rectángulo con gradiente multicolor que se desvanece hacia arriba */}

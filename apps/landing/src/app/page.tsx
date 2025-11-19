@@ -19,7 +19,7 @@ export default function Home() {
       <Features />
 
       {/* How It Works Section */}
-      <HowItWorks />
+      <HowItWorks whatsappLink={whatsappLink} />
 
       {/* Footer */}
       <Footer />
