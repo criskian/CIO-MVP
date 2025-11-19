@@ -27,6 +27,26 @@ export class JobSearchService {
     'ventas de campo',
   ];
 
+  // Portales de empleo NO confiables (se excluyen completamente)
+  private readonly excludedSources = [
+    'bebee.com',
+    'jobrapido.com',
+    'jooble.com',
+    'jobleads.com',
+    'trabajozy.com',
+    'cazvid.com',
+  ];
+
+  // Portales de empleo confiables (se priorizan en el scoring)
+  private readonly trustedSources = [
+    'magneto365.com',
+    'magneto.com.co',
+    'elempleo.com',
+    'indeed.com',
+    'computrabajo.com',
+    'linkedin.com',
+  ];
+
   // Patrones de URL que indican páginas de búsqueda o listados múltiples (NO ofertas individuales)
   private readonly searchUrlPatterns = [
     '/search',
@@ -188,8 +208,13 @@ export class JobSearchService {
 
       this.logger.log(`✅ Después de filtrar: ${rankedJobs.length} ofertas válidas`);
 
+      // Eliminar duplicados (misma empresa + mismo rol en diferentes portales)
+      const uniqueJobs = this.removeDuplicateJobs(rankedJobs);
+
+      this.logger.log(`✅ Después de eliminar duplicados: ${uniqueJobs.length} ofertas únicas`);
+
       // Si no hay resultados y el rol tiene múltiples palabras, intentar búsqueda más amplia
-      if (rankedJobs.length === 0 && query.role.split(' ').length > 1) {
+      if (uniqueJobs.length === 0 && query.role.split(' ').length > 1) {
         this.logger.log(
           `🔄 No se encontraron resultados con "${query.role}". Intentando búsqueda más amplia...`,
         );
@@ -202,8 +227,8 @@ export class JobSearchService {
       }
 
       return {
-        jobs: rankedJobs,
-        total: rankedJobs.length,
+        jobs: uniqueJobs,
+        total: uniqueJobs.length,
         query: queryString,
         executedAt: new Date(),
       };
@@ -446,7 +471,15 @@ export class JobSearchService {
         return false;
       }
 
-      // 2. Filtrar por palabras excluidas
+      // 2. FILTRAR PORTALES NO CONFIABLES
+      for (const excludedSource of this.excludedSources) {
+        if (job.source.includes(excludedSource)) {
+          this.logger.debug(`🚫 Portal no confiable excluido: ${job.title} (${job.source})`);
+          return false;
+        }
+      }
+
+      // 3. Filtrar por palabras excluidas
       const textToCheck = `${job.title} ${job.snippet}`.toLowerCase();
       for (const keyword of this.excludedKeywords) {
         if (textToCheck.includes(keyword)) {
@@ -455,13 +488,13 @@ export class JobSearchService {
         }
       }
 
-      // 3. Filtrar títulos que indican listados múltiples
+      // 4. Filtrar títulos que indican listados múltiples
       if (this.isMultipleJobListing(job)) {
         this.logger.debug(`🚫 Listado múltiple excluido: ${job.title}`);
         return false;
       }
 
-      // 4. Filtrar por salario mínimo si está presente
+      // 5. Filtrar por salario mínimo si está presente
       if (query.minSalary && job.salaryRaw) {
         const extractedSalary = this.extractSalaryNumber(job.salaryRaw);
         if (extractedSalary && extractedSalary < query.minSalary) {
@@ -693,9 +726,8 @@ export class JobSearchService {
       score += 2;
     }
 
-    // +5 puntos por fuentes confiables
-    const trustedSources = ['linkedin.com', 'elempleo.com', 'computrabajo.com', 'magneto365.com'];
-    if (trustedSources.some((source) => job.source.includes(source))) {
+    // +5 puntos por fuentes confiables (priorizadas)
+    if (this.trustedSources.some((source) => job.source.includes(source))) {
       score += 5;
     }
 
@@ -809,6 +841,89 @@ export class JobSearchService {
     } catch (error) {
       this.logger.warn('No se pudieron marcar ofertas como enviadas');
     }
+  }
+
+  /**
+   * Normaliza texto para comparación (elimina acentos, minúsculas, espacios extra)
+   */
+  private normalizeTextForComparison(text: string): string {
+    if (!text) return '';
+
+    return text
+      .toLowerCase()
+      .normalize('NFD') // Descomponer caracteres con acento
+      .replace(/[\u0300-\u036f]/g, '') // Eliminar marcas diacríticas
+      .replace(/[^\w\s]/g, '') // Eliminar caracteres especiales
+      .replace(/\s+/g, ' ') // Normalizar espacios
+      .trim();
+  }
+
+  /**
+   * Calcula similitud entre dos strings (Jaccard similarity basado en palabras)
+   * Retorna un valor entre 0 (totalmente diferente) y 1 (idéntico)
+   */
+  private calculateTextSimilarity(text1: string, text2: string): number {
+    const words1 = new Set(this.normalizeTextForComparison(text1).split(' '));
+    const words2 = new Set(this.normalizeTextForComparison(text2).split(' '));
+
+    // Calcular intersección y unión
+    const intersection = new Set([...words1].filter((word) => words2.has(word)));
+    const union = new Set([...words1, ...words2]);
+
+    // Jaccard similarity = |intersección| / |unión|
+    return union.size === 0 ? 0 : intersection.size / union.size;
+  }
+
+  /**
+   * Elimina ofertas duplicadas basándose en empresa + título
+   * Considera duplicadas las ofertas con empresa y título muy similares
+   */
+  private removeDuplicateJobs(jobs: JobPosting[]): JobPosting[] {
+    const uniqueJobs: JobPosting[] = [];
+    const seenJobs = new Map<string, JobPosting>();
+
+    for (const job of jobs) {
+      let isDuplicate = false;
+
+      // Si no tiene empresa, no podemos comparar por empresa
+      // Solo verificamos por URL exacta
+      if (!job.company) {
+        if (!seenJobs.has(job.url)) {
+          uniqueJobs.push(job);
+          seenJobs.set(job.url, job);
+        }
+        continue;
+      }
+
+      // Comparar con ofertas ya vistas
+      for (const seenJob of seenJobs.values()) {
+        // Si no tiene empresa la oferta vista, skip
+        if (!seenJob.company) continue;
+
+        // Calcular similitud de empresa y título
+        const companySimilarity = this.calculateTextSimilarity(job.company, seenJob.company);
+        const titleSimilarity = this.calculateTextSimilarity(job.title, seenJob.title);
+
+        // Si empresa es muy similar (>=80%) Y título es muy similar (>=70%), es duplicado
+        if (companySimilarity >= 0.8 && titleSimilarity >= 0.7) {
+          isDuplicate = true;
+          this.logger.debug(
+            `🔄 Duplicado detectado: "${job.title}" en ${job.company} (${job.source}) - Similar a "${seenJob.title}" en ${seenJob.company} (${seenJob.source})`,
+          );
+          break;
+        }
+      }
+
+      // Si no es duplicado, agregarlo
+      if (!isDuplicate) {
+        uniqueJobs.push(job);
+        // Usar empresa + título normalizado como key
+        const key = `${this.normalizeTextForComparison(job.company)}_${this.normalizeTextForComparison(job.title)}`;
+        seenJobs.set(key, job);
+      }
+    }
+
+    return uniqueJobs;
   }
 
   /**
