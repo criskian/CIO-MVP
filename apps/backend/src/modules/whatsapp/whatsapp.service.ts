@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConversationService } from '../conversation/conversation.service';
 import { IWhatsappProvider, BotReply } from './interfaces/whatsapp-provider.interface';
 import { CloudApiProvider } from './providers/cloud-api.provider';
+import { BotMessages } from '../conversation/helpers/bot-messages';
 
 /**
  * Servicio principal de WhatsApp
@@ -99,26 +100,40 @@ export class WhatsappService {
       const reply = await this.conversationService.handleIncomingMessage(normalizedMessage);
 
       // 5. Enviar respuesta (con soporte para mensajes interactivos)
-      await this.sendBotReply(normalizedMessage.phone, reply);
+      try {
+        await this.sendBotReply(normalizedMessage.phone, reply);
+      } catch (sendError) {
+        // Si falla el envío del mensaje principal, intentar reenviar el mismo mensaje
+        // con un texto de error adicional
+        const errorMessage = sendError instanceof Error ? sendError.message : 'Unknown error';
+        this.logger.error(`❌ Error enviando respuesta: ${errorMessage}`);
+        this.logger.log(`🔄 Reintentando envío del mensaje...`);
+
+        // Reintentar con el mismo mensaje pero como texto simple si es interactivo
+        try {
+          if (reply.buttons || reply.listSections) {
+            // Si era un mensaje interactivo, enviar como texto simple en el retry
+            await this.sendBotReply(normalizedMessage.phone, {
+              text: reply.text + '\n\n' + BotMessages.ERROR_RETRY,
+            });
+          } else {
+            // Si era texto simple, agregar mensaje de error
+            await this.sendBotReply(normalizedMessage.phone, {
+              text: reply.text + '\n\n' + BotMessages.ERROR_RETRY,
+            });
+          }
+        } catch (retryError) {
+          const retryErrorMessage = retryError instanceof Error ? retryError.message : 'Unknown error';
+          this.logger.error(`Error en retry: ${retryErrorMessage}`);
+          throw sendError; // Lanzar el error original si el retry también falla
+        }
+      }
 
       return { status: 'ok' };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
       this.logger.error(`❌ Error procesando webhook: ${errorMessage}`, errorStack);
-
-      // Intentar enviar mensaje de error al usuario
-      try {
-        const normalizedMessage = this.provider.normalizeIncomingMessage(payload);
-        if (normalizedMessage) {
-          await this.sendBotReply(normalizedMessage.phone, {
-            text: 'Lo siento, hubo un error temporal. Por favor intenta de nuevo en unos momentos.',
-          });
-        }
-      } catch (sendError) {
-        const sendErrorMessage = sendError instanceof Error ? sendError.message : 'Unknown error';
-        this.logger.error(`Error enviando mensaje de error: ${sendErrorMessage}`);
-      }
 
       return { status: 'error' };
     }

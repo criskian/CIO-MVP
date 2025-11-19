@@ -103,12 +103,16 @@ export class CloudApiProvider implements IWhatsappProvider {
         };
       }
 
+      // Timeout más largo para mensajes interactivos (listas y botones)
+      const isInteractive = reply.buttons || reply.listSections;
+      const timeout = isInteractive ? 30000 : 10000; // 30s para interactivos, 10s para texto
+
       await axios.post(url, messageBody, {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.accessToken}`,
         },
-        timeout: 10000, // 10 segundos timeout
+        timeout,
       });
 
       this.logger.log(`✅ Mensaje enviado a ${formattedTo}`);

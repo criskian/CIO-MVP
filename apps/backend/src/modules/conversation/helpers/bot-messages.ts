@@ -204,6 +204,9 @@ _Comandos disponibles:_
 
 Por favor intenta de nuevo en unos momentos.`,
 
+  // Mensaje de retry cuando falla envío
+  ERROR_RETRY: `_Hubo un problema enviando el mensaje anterior. Por favor responde directamente escribiendo tu respuesta._`,
+
   // Mensajes de gestión de cuenta
   CONFIRM_RESTART: `¿Estás seguro que deseas reiniciar tu perfil? 🔄
 
