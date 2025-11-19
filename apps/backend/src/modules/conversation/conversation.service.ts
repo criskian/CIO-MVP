@@ -21,7 +21,6 @@ import {
   isDesktopDevice,
   normalizeRole,
   normalizeExperienceLevel,
-  getExperienceKeywords,
   normalizeLocation,
   normalizeWorkMode,
   normalizeJobType,
@@ -377,16 +376,32 @@ export class ConversationService {
 
     // Transición: ASK_LOCATION → ASK_WORK_MODE
     await this.updateSessionState(userId, ConversationState.ASK_WORK_MODE);
-    
+
     const deviceType = await this.getDeviceType(userId);
 
-    // Si es móvil, mostrar botones
+    // Si es móvil, mostrar lista desplegable (4 opciones)
     if (deviceType === 'MOBILE') {
       return {
         text: BotMessages.ASK_WORK_MODE,
-        buttons: [
-          { id: 'work_remoto', title: '🏠 Remoto' },
-          { id: 'work_presencial', title: '🏢 Presencial' },
+        listTitle: 'Elige modalidad',
+        listSections: [
+          {
+            title: 'Modalidad de Trabajo',
+            rows: [
+              { id: 'work_remoto', title: '🏠 Remoto', description: 'Trabajar desde casa' },
+              { id: 'work_presencial', title: '🏢 Presencial', description: 'Ir a la oficina' },
+              {
+                id: 'work_hibrido',
+                title: '🔄 Híbrido',
+                description: 'Mixto (remoto + presencial)',
+              },
+              {
+                id: 'work_sin_preferencia',
+                title: '✨ Sin preferencia',
+                description: 'Cualquier modalidad',
+              },
+            ],
+          },
         ],
       };
     }
@@ -396,30 +411,46 @@ export class ConversationService {
   }
 
   /**
-   * Estado ASK_WORK_MODE: Esperando modalidad (remoto/presencial)
+   * Estado ASK_WORK_MODE: Esperando modalidad (remoto/presencial/híbrido/sin preferencia)
    */
   private async handleAskWorkModeState(userId: string, text: string): Promise<BotReply> {
     const workMode = normalizeWorkMode(text);
 
     if (!workMode) {
       const deviceType = await this.getDeviceType(userId);
-      
+
       if (deviceType === 'MOBILE') {
         return {
           text: BotMessages.ERROR_WORK_MODE_INVALID,
-          buttons: [
-            { id: 'work_remoto', title: '🏠 Remoto' },
-            { id: 'work_presencial', title: '🏢 Presencial' },
+          listTitle: 'Elige modalidad',
+          listSections: [
+            {
+              title: 'Modalidad de Trabajo',
+              rows: [
+                { id: 'work_remoto', title: '🏠 Remoto', description: 'Trabajar desde casa' },
+                { id: 'work_presencial', title: '🏢 Presencial', description: 'Ir a la oficina' },
+                {
+                  id: 'work_hibrido',
+                  title: '🔄 Híbrido',
+                  description: 'Mixto (remoto + presencial)',
+                },
+                {
+                  id: 'work_sin_preferencia',
+                  title: '✨ Sin preferencia',
+                  description: 'Cualquier modalidad',
+                },
+              ],
+            },
           ],
         };
       }
-      
+
       return { text: BotMessages.ERROR_WORK_MODE_INVALID };
     }
 
     // Guardar modalidad en UserProfile
     await this.updateUserProfile(userId, {
-      remoteAllowed: workMode === 'remoto',
+      workMode,
     });
 
     // Transición: ASK_WORK_MODE → ASK_JOB_TYPE
@@ -949,7 +980,7 @@ Continúa con el proceso manual. 👇`,
       role: profile.role || 'No configurado',
       experience: this.formatExperienceLevel(profile.experienceLevel),
       location: profile.location || 'No configurado',
-      workMode: profile.remoteAllowed ? '🏠 Remoto' : '🏢 Presencial',
+      workMode: this.formatWorkMode(profile.workMode),
       jobType: this.formatJobType(profile.jobType),
       minSalary: profile.minSalary
         ? `$${profile.minSalary.toLocaleString('es-CO')} COP`
@@ -1063,7 +1094,7 @@ Selecciona qué quieres editar:`,
       case 'experiencia': {
         await this.updateSessionState(userId, ConversationState.EDIT_EXPERIENCE);
         const deviceType = await this.getDeviceType(userId);
-        
+
         if (deviceType === 'MOBILE') {
           return {
             text: BotMessages.ASK_EXPERIENCE,
@@ -1102,7 +1133,7 @@ Selecciona qué quieres editar:`,
             ],
           };
         }
-        
+
         return { text: BotMessages.ASK_EXPERIENCE };
       }
 
@@ -1113,17 +1144,33 @@ Selecciona qué quieres editar:`,
       case 'modalidad': {
         await this.updateSessionState(userId, ConversationState.EDIT_WORK_MODE);
         const deviceType = await this.getDeviceType(userId);
-        
+
         if (deviceType === 'MOBILE') {
           return {
             text: BotMessages.ASK_WORK_MODE,
-            buttons: [
-              { id: 'work_remoto', title: '🏠 Remoto' },
-              { id: 'work_presencial', title: '🏢 Presencial' },
+            listTitle: 'Elige modalidad',
+            listSections: [
+              {
+                title: 'Modalidad de Trabajo',
+                rows: [
+                  { id: 'work_remoto', title: '🏠 Remoto', description: 'Trabajar desde casa' },
+                  { id: 'work_presencial', title: '🏢 Presencial', description: 'Ir a la oficina' },
+                  {
+                    id: 'work_hibrido',
+                    title: '🔄 Híbrido',
+                    description: 'Mixto (remoto + presencial)',
+                  },
+                  {
+                    id: 'work_sin_preferencia',
+                    title: '✨ Sin preferencia',
+                    description: 'Cualquier modalidad',
+                  },
+                ],
+              },
             ],
           };
         }
-        
+
         return { text: BotMessages.ASK_WORK_MODE_DESKTOP };
       }
 
@@ -1270,27 +1317,46 @@ Selecciona qué quieres editar:`,
 
     if (!workMode) {
       const deviceType = await this.getDeviceType(userId);
-      
+
       if (deviceType === 'MOBILE') {
         return {
           text: BotMessages.ERROR_WORK_MODE_INVALID,
-          buttons: [
-            { id: 'work_remoto', title: '🏠 Remoto' },
-            { id: 'work_presencial', title: '🏢 Presencial' },
+          listTitle: 'Elige modalidad',
+          listSections: [
+            {
+              title: 'Modalidad de Trabajo',
+              rows: [
+                { id: 'work_remoto', title: '🏠 Remoto', description: 'Trabajar desde casa' },
+                { id: 'work_presencial', title: '🏢 Presencial', description: 'Ir a la oficina' },
+                {
+                  id: 'work_hibrido',
+                  title: '🔄 Híbrido',
+                  description: 'Mixto (remoto + presencial)',
+                },
+                {
+                  id: 'work_sin_preferencia',
+                  title: '✨ Sin preferencia',
+                  description: 'Cualquier modalidad',
+                },
+              ],
+            },
           ],
         };
       }
-      
+
       return { text: BotMessages.ERROR_WORK_MODE_INVALID };
     }
 
     await this.updateUserProfile(userId, {
-      remoteAllowed: workMode === 'remoto',
+      workMode,
     });
     await this.updateSessionState(userId, ConversationState.READY);
 
-    const displayMode = workMode === 'remoto' ? '🏠 Remoto' : '🏢 Presencial';
-    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('modalidad de trabajo', displayMode));
+    const displayMode = this.formatWorkMode(workMode);
+    return await this.returnToMainMenu(
+      userId,
+      BotMessages.FIELD_UPDATED('modalidad de trabajo', displayMode),
+    );
   }
 
   /**
@@ -1336,7 +1402,10 @@ Selecciona qué quieres editar:`,
     await this.updateUserProfile(userId, { jobType });
     await this.updateSessionState(userId, ConversationState.READY);
 
-    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('tipo de empleo', this.formatJobType(jobType)));
+    return await this.returnToMainMenu(
+      userId,
+      BotMessages.FIELD_UPDATED('tipo de empleo', this.formatJobType(jobType)),
+    );
   }
 
   /**
@@ -1346,7 +1415,10 @@ Selecciona qué quieres editar:`,
     if (text.trim() === '0') {
       await this.updateUserProfile(userId, { minSalary: 0 });
       await this.updateSessionState(userId, ConversationState.READY);
-      return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('salario mínimo', 'Sin filtro'));
+      return await this.returnToMainMenu(
+        userId,
+        BotMessages.FIELD_UPDATED('salario mínimo', 'Sin filtro'),
+      );
     }
 
     const minSalary = normalizeSalary(text);
@@ -1360,10 +1432,7 @@ Selecciona qué quieres editar:`,
 
     return await this.returnToMainMenu(
       userId,
-      BotMessages.FIELD_UPDATED(
-        'salario mínimo',
-        `$${minSalary.toLocaleString('es-CO')} COP`,
-      ),
+      BotMessages.FIELD_UPDATED('salario mínimo', `$${minSalary.toLocaleString('es-CO')} COP`),
     );
   }
 
@@ -1444,6 +1513,20 @@ Selecciona qué quieres editar:`,
     };
 
     return experienceMap[experienceLevel || ''] || 'No configurado';
+  }
+
+  /**
+   * Formatea el workMode para mostrar al usuario
+   */
+  private formatWorkMode(workMode: string | null | undefined): string {
+    const workModeMap: Record<string, string> = {
+      remoto: '🏠 Remoto',
+      presencial: '🏢 Presencial',
+      hibrido: '🔄 Híbrido',
+      sin_preferencia: '✨ Sin preferencia',
+    };
+
+    return workModeMap[workMode || ''] || 'No configurado';
   }
 
   // ========================================
@@ -1591,9 +1674,9 @@ Selecciona qué quieres editar:`,
       role: string;
       experienceLevel: string;
       location: string;
+      workMode: string;
       jobType: string;
       minSalary: number;
-      remoteAllowed: boolean;
     }>,
   ) {
     await this.prisma.userProfile.upsert({

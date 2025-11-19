@@ -103,11 +103,16 @@ export class CloudApiProvider implements IWhatsappProvider {
         };
       }
 
+      // Timeout más largo para mensajes interactivos (listas y botones)
+      const isInteractive = reply.buttons || reply.listSections;
+      const timeout = isInteractive ? 30000 : 10000; // 30s para interactivos, 10s para texto
+
       await axios.post(url, messageBody, {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.accessToken}`,
         },
+        timeout,
       });
 
       this.logger.log(`✅ Mensaje enviado a ${formattedTo}`);
@@ -189,9 +194,7 @@ export class CloudApiProvider implements IWhatsappProvider {
               text = buttonTitle;
             }
 
-            this.logger.debug(
-              `🔘 Botón presionado - ID: ${buttonId}, Texto extraído: ${text}`,
-            );
+            this.logger.debug(`🔘 Botón presionado - ID: ${buttonId}, Texto extraído: ${text}`);
           } else if (interactiveType === 'list_reply') {
             // Respuesta de lista
             const listReplyId = message.interactive.list_reply.id;

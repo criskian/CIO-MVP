@@ -26,4 +26,3 @@ export class CvService {
     this.logger.log(`Procesando CV para usuario ${userId} desde ${mediaUrl}`);
   }
 }
-

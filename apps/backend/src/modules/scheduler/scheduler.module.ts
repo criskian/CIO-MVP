@@ -10,4 +10,3 @@ import { DatabaseModule } from '../database/database.module';
   exports: [SchedulerService], // Exportar para usar en ConversationModule si se necesita
 })
 export class SchedulerModule {}
-

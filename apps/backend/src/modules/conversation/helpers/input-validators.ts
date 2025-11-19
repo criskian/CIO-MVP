@@ -1,9 +1,4 @@
-import {
-  JobType,
-  UserIntent,
-  ExperienceLevel,
-  AlertFrequency,
-} from '../types/conversation-states';
+import { JobType, UserIntent, ExperienceLevel, AlertFrequency } from '../types/conversation-states';
 
 /**
  * Helpers para validar y normalizar respuestas del usuario
@@ -105,19 +100,21 @@ export function isRejection(text: string): boolean {
  */
 export function isSearchIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
+  
+  // Usar regex con word boundaries para evitar falsos positivos
   const searchPatterns = [
-    'buscar',
-    'búscar',
-    'buscar ahora',
-    'quiero buscar',
-    'empezar',
-    'busca',
-    'dame ofertas',
-    'mostrar ofertas',
-    'ver ofertas',
+    /\bbuscar\b/,
+    /\bbúscar\b/,
+    /buscar ahora/,
+    /quiero buscar/,
+    /\bempezar\b/,
+    /\bbusca\b/,
+    /dame ofertas/,
+    /mostrar ofertas/,
+    /ver ofertas/,
   ];
 
-  return searchPatterns.some((pattern) => normalizedText.includes(pattern));
+  return searchPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
 /**
@@ -125,19 +122,21 @@ export function isSearchIntent(text: string): boolean {
  */
 export function isUploadCVIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
+  
+  // Usar regex con word boundaries para evitar falsos positivos
   const cvPatterns = [
-    'cv',
-    'curriculum',
-    'currículum',
-    'hoja de vida',
-    'subir cv',
-    'enviar cv',
-    'adjuntar',
-    'tengo cv',
-    'mi curriculum',
+    /\bcv\b/,
+    /\bcurriculum\b/,
+    /\bcurrículum\b/,
+    /hoja de vida/,
+    /subir cv/,
+    /enviar cv/,
+    /\badjuntar\b/,
+    /tengo cv/,
+    /mi curriculum/,
   ];
 
-  return cvPatterns.some((pattern) => normalizedText.includes(pattern));
+  return cvPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
 /**
@@ -145,17 +144,19 @@ export function isUploadCVIntent(text: string): boolean {
  */
 export function isHelpIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
+  
+  // Usar regex con word boundaries para evitar falsos positivos (ej: "ayudante" no debe detectarse como "ayuda")
   const helpPatterns = [
-    'ayuda',
-    'help',
-    'qué puedo hacer',
-    'que puedo hacer',
-    'cómo funciona',
-    'como funciona',
-    'no entiendo',
+    /\bayuda\b/,
+    /\bhelp\b/,
+    /qué puedo hacer/,
+    /que puedo hacer/,
+    /cómo funciona/,
+    /como funciona/,
+    /no entiendo/,
   ];
 
-  return helpPatterns.some((pattern) => normalizedText.includes(pattern));
+  return helpPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
 /**
@@ -163,16 +164,18 @@ export function isHelpIntent(text: string): boolean {
  */
 export function isRestartIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
+  
+  // Usar regex con word boundaries para evitar falsos positivos
   const restartPatterns = [
-    'reiniciar',
-    'restart',
-    'reset',
-    'volver a empezar',
-    'comenzar de nuevo',
-    'empezar de nuevo',
+    /\breiniciar\b/,
+    /\brestart\b/,
+    /\breset\b/,
+    /volver a empezar/,
+    /comenzar de nuevo/,
+    /empezar de nuevo/,
   ];
 
-  return restartPatterns.some((pattern) => normalizedText.includes(pattern));
+  return restartPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
 /**
@@ -180,17 +183,19 @@ export function isRestartIntent(text: string): boolean {
  */
 export function isCancelServiceIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
+  
+  // Usar regex con word boundaries para evitar falsos positivos
   const cancelPatterns = [
-    'cancelar',
-    'cancel',
-    'dejar de usar',
-    'no quiero',
-    'eliminar cuenta',
-    'borrar datos',
-    'darme de baja',
+    /\bcancelar\b/,
+    /\bcancel\b/,
+    /dejar de usar/,
+    /no quiero/,
+    /eliminar cuenta/,
+    /borrar datos/,
+    /darme de baja/,
   ];
 
-  return cancelPatterns.some((pattern) => normalizedText.includes(pattern));
+  return cancelPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
 /**
@@ -198,17 +203,19 @@ export function isCancelServiceIntent(text: string): boolean {
  */
 export function isEditIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
+  
+  // Usar regex con word boundaries para evitar falsos positivos
   const editPatterns = [
-    'editar',
-    'edit',
-    'cambiar',
-    'modificar',
-    'actualizar',
-    'ajustar',
-    'corregir',
+    /\beditar\b/,
+    /\bedit\b/,
+    /\bcambiar\b/,
+    /\bmodificar\b/,
+    /\bactualizar\b/,
+    /\bajustar\b/,
+    /\bcorregir\b/,
   ];
 
-  return editPatterns.some((pattern) => normalizedText.includes(pattern));
+  return editPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
 /**
@@ -460,11 +467,46 @@ export function normalizeLocation(text: string): string | null {
 }
 
 /**
- * Normaliza la modalidad de trabajo (remoto/presencial)
- * Retorna: 'remoto' | 'presencial' | null
+ * Normaliza la modalidad de trabajo
+ * Retorna: 'remoto' | 'presencial' | 'hibrido' | 'sin_preferencia' | null
  */
-export function normalizeWorkMode(text: string): 'remoto' | 'presencial' | null {
+export function normalizeWorkMode(
+  text: string,
+): 'remoto' | 'presencial' | 'hibrido' | 'sin_preferencia' | null {
   const normalizedText = text.toLowerCase().trim();
+
+  // Detectar "sin preferencia"
+  const noPreferencePatterns = [
+    'sin preferencia',
+    'cualquiera',
+    'todas',
+    'todos',
+    'no importa',
+    'da igual',
+    'me da igual',
+    'cualquier modalidad',
+    '4', // Por si usamos lista numerada
+  ];
+
+  if (noPreferencePatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'sin_preferencia';
+  }
+
+  // Detectar "híbrido"
+  const hybridPatterns = [
+    'hibrido',
+    'híbrido',
+    'hybrid',
+    'mixto',
+    'mix',
+    'combinado',
+    'remoto y presencial',
+    '3', // Por si usamos lista numerada
+  ];
+
+  if (hybridPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'hibrido';
+  }
 
   // Detectar "remoto"
   const remotePatterns = [
@@ -681,12 +723,12 @@ export function generateTimeOptions(): Array<{ id: string; title: string }> {
   for (let hour = 6; hour <= 16; hour++) {
     const time = `${hour.toString().padStart(2, '0')}:00`;
     let label = time;
-    
+
     // Agregar etiquetas especiales
     if (hour === 6) label = '🌅 06:00 (Mañana)';
     else if (hour === 12) label = '☀️ 12:00 (Mediodía)';
     else if (hour === 16) label = '🌆 16:00 (Tarde)';
-    
+
     options.push({
       id: `time_${time}`,
       title: label,

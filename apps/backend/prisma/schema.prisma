@@ -32,7 +32,7 @@ model UserProfile {
   location        String?
   jobType         String?  // full_time, part_time, internship, freelance
   minSalary       Int?
-  remoteAllowed   Boolean?
+  workMode        String?  // presencial, remoto, hibrido, sin_preferencia
   experienceLevel String?  // none, junior, mid, senior, lead
   createdFromCV   Boolean  @default(false)
   cvUrl           String?

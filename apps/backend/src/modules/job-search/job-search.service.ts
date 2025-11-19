@@ -27,6 +27,26 @@ export class JobSearchService {
     'ventas de campo',
   ];
 
+  // Portales de empleo NO confiables (se excluyen completamente)
+  private readonly excludedSources = [
+    'bebee.com',
+    'jobrapido.com',
+    'jooble.com',
+    'jobleads.com',
+    'trabajozy.com',
+    'cazvid.com',
+  ];
+
+  // Portales de empleo confiables (se priorizan en el scoring)
+  private readonly trustedSources = [
+    'magneto365.com',
+    'magneto.com.co',
+    'elempleo.com',
+    'indeed.com',
+    'computrabajo.com',
+    'linkedin.com',
+  ];
+
   // Patrones de URL que indican páginas de búsqueda o listados múltiples (NO ofertas individuales)
   private readonly searchUrlPatterns = [
     '/search',
@@ -85,29 +105,41 @@ export class JobSearchService {
         location: profile.location || undefined,
         jobType: profile.jobType || undefined,
         minSalary: profile.minSalary || undefined,
-        remoteAllowed: profile.remoteAllowed || false,
+        workMode: profile.workMode || undefined,
         experienceKeywords,
       };
 
       // 3. Ejecutar búsqueda principal
-      let result = await this.searchJobs(searchQuery);
+      const result = await this.searchJobs(searchQuery);
       let allJobs = [...result.jobs];
 
-      // 4. Si el usuario quiere remoto pero hay pocas ofertas, buscar presenciales en su ciudad
-      if (profile.remoteAllowed && allJobs.length < 3 && profile.location) {
-        this.logger.log(`📍 Pocas ofertas remotas (${allJobs.length}), buscando presenciales en ${profile.location}...`);
-        
-        const presencialQuery: JobSearchQuery = {
+      // 4. Si hay pocas ofertas con la modalidad específica, buscar sin filtro de modalidad
+      if (
+        profile.workMode &&
+        profile.workMode !== 'sin_preferencia' &&
+        allJobs.length < 3 &&
+        profile.location
+      ) {
+        this.logger.log(
+          `📍 Pocas ofertas con modalidad "${profile.workMode}" (${allJobs.length}), buscando sin filtro de modalidad...`,
+        );
+
+        // Buscar sin especificar modalidad (todas las modalidades)
+        const generalQuery: JobSearchQuery = {
           ...searchQuery,
-          remoteAllowed: false, // Buscar solo presenciales
+          workMode: undefined, // Sin filtro de modalidad
         };
 
-        const presencialResult = await this.searchJobs(presencialQuery);
-        
-        // Agregar ofertas presenciales al final (después de las remotas)
-        allJobs = [...allJobs, ...presencialResult.jobs];
-        
-        this.logger.log(`✅ Se agregaron ${presencialResult.jobs.length} ofertas presenciales en ${profile.location}`);
+        const generalResult = await this.searchJobs(generalQuery);
+
+        // Agregar solo las ofertas que no estén ya en la lista
+        const existingUrls = new Set(allJobs.map((j) => j.url));
+        const newJobs = generalResult.jobs.filter((j) => !existingUrls.has(j.url));
+        allJobs = [...allJobs, ...newJobs];
+
+        this.logger.log(
+          `✅ Se agregaron ${newJobs.length} ofertas adicionales. Total: ${allJobs.length}`,
+        );
       }
 
       // 5. Registrar en log
@@ -148,9 +180,8 @@ export class JobSearchService {
 
       // Determinar ubicación para SerpApi
       // Si es "Remoto", usar "Colombia" como ubicación base
-      const normalizedLocation = query.location?.toLowerCase() === 'remoto' 
-        ? 'Colombia' 
-        : (query.location || 'Colombia');
+      const normalizedLocation =
+        query.location?.toLowerCase() === 'remoto' ? 'Colombia' : query.location || 'Colombia';
 
       // Llamar a SerpApi con engine=google_jobs (método GET según documentación)
       const response = await axios.get(this.serpApiUrl, {
@@ -185,20 +216,27 @@ export class JobSearchService {
 
       this.logger.log(`✅ Después de filtrar: ${rankedJobs.length} ofertas válidas`);
 
+      // Eliminar duplicados (misma empresa + mismo rol en diferentes portales)
+      const uniqueJobs = this.removeDuplicateJobs(rankedJobs);
+
+      this.logger.log(`✅ Después de eliminar duplicados: ${uniqueJobs.length} ofertas únicas`);
+
       // Si no hay resultados y el rol tiene múltiples palabras, intentar búsqueda más amplia
-      if (rankedJobs.length === 0 && query.role.split(' ').length > 1) {
-        this.logger.log(`🔄 No se encontraron resultados con "${query.role}". Intentando búsqueda más amplia...`);
-        
+      if (uniqueJobs.length === 0 && query.role.split(' ').length > 1) {
+        this.logger.log(
+          `🔄 No se encontraron resultados con "${query.role}". Intentando búsqueda más amplia...`,
+        );
+
         // Obtener la primera palabra del rol (ej: "diseñador UI" -> "diseñador")
         const broadRole = query.role.split(' ')[0];
         const broadQuery = { ...query, role: broadRole };
-        
+
         return await this.searchJobs(broadQuery);
       }
 
       return {
-        jobs: rankedJobs,
-        total: rankedJobs.length,
+        jobs: uniqueJobs,
+        total: uniqueJobs.length,
         query: queryString,
         executedAt: new Date(),
       };
@@ -230,9 +268,16 @@ export class JobSearchService {
     // Ubicación (ya se pasa como parámetro separado en location)
     // No la incluimos en el query para evitar redundancia
 
-    // Si es remoto, agregar al query
-    if (query.remoteAllowed) {
-      parts.push('remoto');
+    // Agregar modalidad de trabajo al query
+    if (query.workMode) {
+      if (query.workMode === 'remoto') {
+        parts.push('remoto');
+      } else if (query.workMode === 'hibrido') {
+        parts.push('híbrido');
+      } else if (query.workMode === 'presencial') {
+        parts.push('presencial');
+      }
+      // Si es 'sin_preferencia', no agregar nada (buscar todas)
     }
 
     // Tipo de jornada (simplificado)
@@ -274,20 +319,37 @@ export class JobSearchService {
     const company = item.company_name || undefined;
     const locationRaw = item.location || undefined;
 
-    // Salario: puede venir en detected_extensions
+    // Salario y tipo de empleo: pueden venir en detected_extensions
     let salaryRaw: string | undefined;
+    let jobTypeRaw: string | undefined;
+
     if (item.detected_extensions) {
       // Buscar salario en detected_extensions
       if (item.detected_extensions.salary) {
         salaryRaw = item.detected_extensions.salary;
-      } else if (item.detected_extensions.schedule_type) {
-        // A veces el salario viene en schedule_type si está presente
+      }
+
+      // Buscar tipo de empleo en schedule_type
+      if (item.detected_extensions.schedule_type) {
         const schedule = item.detected_extensions.schedule_type;
-        if (schedule && (schedule.includes('$') || schedule.toLowerCase().includes('cop'))) {
+        // Si schedule_type contiene salario, no es el tipo de empleo
+        if (schedule && !(schedule.includes('$') || schedule.toLowerCase().includes('cop'))) {
+          jobTypeRaw = schedule;
+        } else if (schedule && (schedule.includes('$') || schedule.toLowerCase().includes('cop'))) {
+          // A veces el salario viene en schedule_type
           salaryRaw = schedule;
         }
       }
     }
+
+    // Fecha de publicación: puede venir en detected_extensions.posted_at
+    let postedAtRaw: string | undefined;
+    if (item.detected_extensions?.posted_at) {
+      postedAtRaw = item.detected_extensions.posted_at;
+    }
+
+    // Intentar parsear la fecha a Date
+    const publishedAt = postedAtRaw ? this.parsePostedAtDate(postedAtRaw) : undefined;
 
     return {
       title: item.title || 'Sin título',
@@ -297,6 +359,9 @@ export class JobSearchService {
       company,
       locationRaw,
       salaryRaw,
+      jobTypeRaw,
+      postedAtRaw,
+      publishedAt,
     };
   }
 
@@ -421,7 +486,15 @@ export class JobSearchService {
         return false;
       }
 
-      // 2. Filtrar por palabras excluidas
+      // 2. FILTRAR PORTALES NO CONFIABLES
+      for (const excludedSource of this.excludedSources) {
+        if (job.source.includes(excludedSource)) {
+          this.logger.debug(`🚫 Portal no confiable excluido: ${job.title} (${job.source})`);
+          return false;
+        }
+      }
+
+      // 3. Filtrar por palabras excluidas
       const textToCheck = `${job.title} ${job.snippet}`.toLowerCase();
       for (const keyword of this.excludedKeywords) {
         if (textToCheck.includes(keyword)) {
@@ -430,13 +503,13 @@ export class JobSearchService {
         }
       }
 
-      // 3. Filtrar títulos que indican listados múltiples
+      // 4. Filtrar títulos que indican listados múltiples
       if (this.isMultipleJobListing(job)) {
         this.logger.debug(`🚫 Listado múltiple excluido: ${job.title}`);
         return false;
       }
 
-      // 4. Filtrar por salario mínimo si está presente
+      // 5. Filtrar por salario mínimo si está presente
       if (query.minSalary && job.salaryRaw) {
         const extractedSalary = this.extractSalaryNumber(job.salaryRaw);
         if (extractedSalary && extractedSalary < query.minSalary) {
@@ -616,10 +689,10 @@ export class JobSearchService {
     }
 
     // +5 puntos extra si todas las palabras del rol aparecen (aunque no juntas)
-    const roleWords = roleLower.split(' ').filter(w => w.length > 2);
+    const roleWords = roleLower.split(' ').filter((w) => w.length > 2);
     if (roleWords.length > 1) {
       const allWordsPresent = roleWords.every(
-        word => titleLower.includes(word) || snippetLower.includes(word)
+        (word) => titleLower.includes(word) || snippetLower.includes(word),
       );
       if (allWordsPresent) {
         score += 5;
@@ -633,10 +706,18 @@ export class JobSearchService {
       }
     }
 
-    // +5 puntos si es remoto y el usuario lo permite
-    if (query.remoteAllowed && job.locationRaw?.toLowerCase().includes('remoto')) {
-      score += 5;
+    // +5 puntos si el tipo de empleo coincide
+    if (query.jobType && job.jobTypeRaw) {
+      const normalizedJobType = this.normalizeJobType(job.jobTypeRaw);
+      if (normalizedJobType === query.jobType) {
+        score += 5;
+      }
     }
+
+    // Nota: La modalidad de trabajo (remoto/presencial/híbrido) se usa solo como
+    // filtro de palabras clave en el query, NO como atributo estructurado porque
+    // Google Jobs no devuelve este campo directamente. El filtrado se hace por keyword
+    // en el buildQueryString() y SerpAPI lo procesa en la búsqueda.
 
     // +7 puntos si el nivel de experiencia coincide (prioriza, pero no filtra)
     if (query.experienceKeywords && query.experienceKeywords.length > 0) {
@@ -660,15 +741,27 @@ export class JobSearchService {
       score += 2;
     }
 
-    // +5 puntos por fuentes confiables
-    const trustedSources = ['linkedin.com', 'elempleo.com', 'computrabajo.com', 'magneto365.com'];
-    if (trustedSources.some((source) => job.source.includes(source))) {
+    // +5 puntos por fuentes confiables (priorizadas)
+    if (this.trustedSources.some((source) => job.source.includes(source))) {
       score += 5;
     }
 
     // +10 puntos EXTRA si la URL parece ser de una oferta individual
     if (this.looksLikeIndividualJob(urlLower)) {
       score += 10;
+    }
+
+    // Puntos por antigüedad de la oferta (favorece ofertas recientes sin opacar concordancia)
+    const ageDays = this.getJobAgeDays(job);
+    if (ageDays !== null) {
+      if (ageDays <= 7) {
+        score += 6; // Muy reciente (última semana)
+      } else if (ageDays <= 15) {
+        score += 4; // Reciente (últimas 2 semanas)
+      } else if (ageDays <= 30) {
+        score += 2; // Relativamente reciente (último mes)
+      }
+      // Si es mayor a 30 días, no suma puntos pero tampoco resta
     }
 
     // -5 puntos si el título es muy genérico o corto (probable listado)
@@ -766,6 +859,235 @@ export class JobSearchService {
   }
 
   /**
+   * Normaliza texto para comparación (elimina acentos, minúsculas, espacios extra)
+   */
+  private normalizeTextForComparison(text: string): string {
+    if (!text) return '';
+
+    return text
+      .toLowerCase()
+      .normalize('NFD') // Descomponer caracteres con acento
+      .replace(/[\u0300-\u036f]/g, '') // Eliminar marcas diacríticas
+      .replace(/[^\w\s]/g, '') // Eliminar caracteres especiales
+      .replace(/\s+/g, ' ') // Normalizar espacios
+      .trim();
+  }
+
+  /**
+   * Calcula similitud entre dos strings (Jaccard similarity basado en palabras)
+   * Retorna un valor entre 0 (totalmente diferente) y 1 (idéntico)
+   */
+  private calculateTextSimilarity(text1: string, text2: string): number {
+    const words1 = new Set(this.normalizeTextForComparison(text1).split(' '));
+    const words2 = new Set(this.normalizeTextForComparison(text2).split(' '));
+
+    // Calcular intersección y unión
+    const intersection = new Set([...words1].filter((word) => words2.has(word)));
+    const union = new Set([...words1, ...words2]);
+
+    // Jaccard similarity = |intersección| / |unión|
+    return union.size === 0 ? 0 : intersection.size / union.size;
+  }
+
+  /**
+   * Elimina ofertas duplicadas basándose en empresa + título
+   * Considera duplicadas las ofertas con empresa y título muy similares
+   */
+  private removeDuplicateJobs(jobs: JobPosting[]): JobPosting[] {
+    const uniqueJobs: JobPosting[] = [];
+    const seenJobs = new Map<string, JobPosting>();
+
+    for (const job of jobs) {
+      let isDuplicate = false;
+
+      // Si no tiene empresa, no podemos comparar por empresa
+      // Solo verificamos por URL exacta
+      if (!job.company) {
+        if (!seenJobs.has(job.url)) {
+          uniqueJobs.push(job);
+          seenJobs.set(job.url, job);
+        }
+        continue;
+      }
+
+      // Comparar con ofertas ya vistas
+      for (const seenJob of seenJobs.values()) {
+        // Si no tiene empresa la oferta vista, skip
+        if (!seenJob.company) continue;
+
+        // Calcular similitud de empresa y título
+        const companySimilarity = this.calculateTextSimilarity(job.company, seenJob.company);
+        const titleSimilarity = this.calculateTextSimilarity(job.title, seenJob.title);
+
+        // Si empresa es muy similar (>=80%) Y título es muy similar (>=70%), es duplicado
+        if (companySimilarity >= 0.8 && titleSimilarity >= 0.7) {
+          isDuplicate = true;
+          this.logger.debug(
+            `🔄 Duplicado detectado: "${job.title}" en ${job.company} (${job.source}) - Similar a "${seenJob.title}" en ${seenJob.company} (${seenJob.source})`,
+          );
+          break;
+        }
+      }
+
+      // Si no es duplicado, agregarlo
+      if (!isDuplicate) {
+        uniqueJobs.push(job);
+        // Usar empresa + título normalizado como key
+        const key = `${this.normalizeTextForComparison(job.company)}_${this.normalizeTextForComparison(job.title)}`;
+        seenJobs.set(key, job);
+      }
+    }
+
+    return uniqueJobs;
+  }
+
+  /**
+   * Normaliza el tipo de empleo de SerpAPI a nuestro formato interno
+   * Ejemplos: "Full-time" -> "full_time", "Part-time" -> "part_time"
+   */
+  private normalizeJobType(jobTypeText: string): string | undefined {
+    const lowerText = jobTypeText.toLowerCase().trim();
+
+    // Mapeo de términos comunes
+    if (lowerText.includes('full') && lowerText.includes('time')) {
+      return 'full_time';
+    }
+    if (lowerText.includes('part') && lowerText.includes('time')) {
+      return 'part_time';
+    }
+    if (lowerText.includes('medio tiempo')) {
+      return 'part_time';
+    }
+    if (lowerText.includes('tiempo completo')) {
+      return 'full_time';
+    }
+    if (
+      lowerText.includes('internship') ||
+      lowerText.includes('pasantía') ||
+      lowerText.includes('practicante')
+    ) {
+      return 'internship';
+    }
+    if (
+      lowerText.includes('freelance') ||
+      lowerText.includes('contractor') ||
+      lowerText.includes('contrato')
+    ) {
+      return 'freelance';
+    }
+    if (lowerText.includes('temporal') || lowerText.includes('temporary')) {
+      return 'freelance';
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Intenta parsear el texto de fecha de publicación a Date
+   * Ejemplos: "hace 20 días", "2 days ago", "Today", "hace 1 hora"
+   */
+  private parsePostedAtDate(postedAtText: string): Date | undefined {
+    try {
+      const now = new Date();
+      const lowerText = postedAtText.toLowerCase();
+
+      // Patrones en español
+      if (lowerText.includes('hace') && lowerText.includes('día')) {
+        const match = lowerText.match(/hace\s+(\d+)\s+día/);
+        if (match) {
+          const daysAgo = parseInt(match[1]);
+          const date = new Date(now);
+          date.setDate(date.getDate() - daysAgo);
+          return date;
+        }
+      }
+
+      if (lowerText.includes('hace') && lowerText.includes('hora')) {
+        const match = lowerText.match(/hace\s+(\d+)\s+hora/);
+        if (match) {
+          const hoursAgo = parseInt(match[1]);
+          const date = new Date(now);
+          date.setHours(date.getHours() - hoursAgo);
+          return date;
+        }
+      }
+
+      if (lowerText.includes('hace') && lowerText.includes('mes')) {
+        const match = lowerText.match(/hace\s+(\d+)\s+mes/);
+        if (match) {
+          const monthsAgo = parseInt(match[1]);
+          const date = new Date(now);
+          date.setMonth(date.getMonth() - monthsAgo);
+          return date;
+        }
+      }
+
+      // Patrones en inglés
+      if (lowerText.includes('day') && lowerText.includes('ago')) {
+        const match = lowerText.match(/(\d+)\s+day/);
+        if (match) {
+          const daysAgo = parseInt(match[1]);
+          const date = new Date(now);
+          date.setDate(date.getDate() - daysAgo);
+          return date;
+        }
+      }
+
+      if (lowerText.includes('hour') && lowerText.includes('ago')) {
+        const match = lowerText.match(/(\d+)\s+hour/);
+        if (match) {
+          const hoursAgo = parseInt(match[1]);
+          const date = new Date(now);
+          date.setHours(date.getHours() - hoursAgo);
+          return date;
+        }
+      }
+
+      if (lowerText.includes('month') && lowerText.includes('ago')) {
+        const match = lowerText.match(/(\d+)\s+month/);
+        if (match) {
+          const monthsAgo = parseInt(match[1]);
+          const date = new Date(now);
+          date.setMonth(date.getMonth() - monthsAgo);
+          return date;
+        }
+      }
+
+      // Casos especiales
+      if (lowerText.includes('today') || lowerText.includes('hoy')) {
+        return now;
+      }
+
+      if (lowerText.includes('yesterday') || lowerText.includes('ayer')) {
+        const date = new Date(now);
+        date.setDate(date.getDate() - 1);
+        return date;
+      }
+
+      return undefined;
+    } catch (error) {
+      this.logger.debug(`No se pudo parsear fecha: ${postedAtText}`);
+      return undefined;
+    }
+  }
+
+  /**
+   * Calcula cuántos días de antigüedad tiene una oferta
+   * Retorna null si no se puede determinar
+   */
+  private getJobAgeDays(job: JobPosting): number | null {
+    if (!job.publishedAt) {
+      return null;
+    }
+
+    const now = new Date();
+    const diffMs = now.getTime() - job.publishedAt.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    return diffDays >= 0 ? diffDays : null;
+  }
+
+  /**
    * Formatea ofertas para enviar por WhatsApp
    */
   formatJobsForWhatsApp(jobs: JobPosting[]): string {
@@ -791,6 +1113,11 @@ Intenta de nuevo más tarde o ajusta tus preferencias.`;
 
         if (job.salaryRaw) {
           text += `💰 ${job.salaryRaw}\n`;
+        }
+
+        // Mostrar fecha de publicación si está disponible
+        if (job.postedAtRaw) {
+          text += `📅 Publicada ${job.postedAtRaw}\n`;
         }
 
         text += `🔗 ${job.url}\n`;
