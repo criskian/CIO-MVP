@@ -45,15 +45,15 @@ export default function HowItWorks() {
               className="relative group"
             >
               {/* Card con efecto hover */}
-              <div className="relative bg-white p-8 rounded-3xl border-2 border-gray-200 hover:border-purple-300 transition-all duration-300 hover:shadow-xl h-full">
+              <div className="relative bg-white p-8 rounded-3xl border-2 border-gray-200 hover:border-[#B68DE0] transition-all duration-300 hover:shadow-xl h-full">
                 {/* Número grande de fondo */}
-                <div className="absolute top-4 right-4 text-8xl font-bold text-gray-100 group-hover:text-purple-100 transition-colors">
+                <div className="absolute top-4 right-4 text-8xl font-bold text-gray-100 group-hover:text-[#F3EAFB] transition-colors">
                   {step.number}
                 </div>
 
                 {/* Badge con número */}
                 <div className="relative mb-6">
-                  <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl shadow-lg">
+                  <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-[#9054C6] to-[#7A3FC3] rounded-2xl shadow-lg">
                     <span className="text-2xl font-bold text-white">{step.number}</span>
                   </div>
                 </div>
@@ -66,7 +66,7 @@ export default function HowItWorks() {
 
                 {/* Indicador de progreso (línea conectora) - solo visible en desktop */}
                 {index < steps.length - 1 && (
-                  <div className="hidden md:block absolute top-1/2 -right-5 w-10 h-0.5 bg-gradient-to-r from-purple-300 to-transparent"></div>
+                  <div className="hidden md:block absolute top-1/2 -right-5 w-10 h-0.5 bg-gradient-to-r from-[#B68DE0] to-transparent"></div>
                 )}
               </div>
             </div>
@@ -77,7 +77,7 @@ export default function HowItWorks() {
         <div className="mt-16 text-center">
           <p className="text-gray-600 text-lg">
             ¿Todo listo?{' '}
-            <a href="#hero" className="text-purple-600 hover:text-purple-700 font-semibold underline decoration-2 underline-offset-4 transition-colors">
+            <a href="#hero" className="text-[#9054C6] hover:text-[#7A3FC3] font-semibold underline decoration-2 underline-offset-4 transition-colors">
               Comienza ahora mismo
             </a>
           </p>
