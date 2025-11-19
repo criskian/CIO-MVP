@@ -41,6 +41,149 @@ export default function Hero({ whatsappLink }: HeroProps) {
 
       <div className="flex-1 flex items-start justify-center px-4 pt-44 pb-12">
         <div className="max-w-4xl mx-auto text-center relative z-10">
+          {/* Tarjetas con logos laterales */}
+          <div className="pointer-events-none hidden lg:block">
+            {/* Columna izquierda */}
+            <div
+              className="absolute flex flex-col gap-14"
+              style={{ top: '-140px', left: '-310px' }}
+            >
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '120px',
+                  height: '120px',
+                  backgroundColor: '#F8F8F8',
+                  borderRadius: '18px',
+                  padding: '12px',
+                  boxShadow: '0px 4px 40px rgba(100, 99, 99, 0.3)',
+                  transform: 'rotate(-12deg)',
+                }}
+              >
+                <Image
+                  src="/assets/images/MagnetoLogo.jpg"
+                  alt="Magneto"
+                  width={108}
+                  height={108}
+                  style={{ objectFit: 'cover', borderRadius: '18px' }}
+                />
+              </div>
+
+              <div
+                className="flex items-center justify-center mx-auto"
+                style={{
+                  width: '86px',
+                  height: '86px',
+                  backgroundColor: '#F8F8F8',
+                  borderRadius: '18px',
+                  padding: '10px',
+                  boxShadow: '0px 4px 40px rgba(100, 99, 99, 0.3)',
+                  transform: 'rotate(-14deg)',
+                  marginLeft: '100px',
+                }}
+              >
+                <Image
+                  src="/assets/images/indeedLogo.png"
+                  alt="Indeed"
+                  width={86}
+                  height={86}
+                  style={{ objectFit: 'cover', borderRadius: '18px' }}
+                />
+              </div>
+
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '120px',
+                  height: '120px',
+                  backgroundColor: '#F8F8F8',
+                  borderRadius: '18px',
+                  padding: '12px',
+                  boxShadow: '0px 4px 40px rgba(100, 99, 99, 0.3)',
+                  transform: 'rotate(10deg)',
+                }}
+              >
+                <Image
+                  src="/assets/images/computrabajoLogo.png"
+                  alt="Computrabajo"
+                  width={108}
+                  height={108}
+                  style={{ objectFit: 'contain' }}
+                />
+              </div>
+            </div>
+
+            {/* Columna derecha */}
+            <div
+              className="absolute flex flex-col gap-14 items-end"
+              style={{ top: '-120px', right: '-310px' }}
+            >
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '120px',
+                  height: '120px',
+                  backgroundColor: '#F8F8F8',
+                  borderRadius: '18px',
+                  padding: '12px',
+                  boxShadow: '0px 4px 40px rgba(100, 99, 99, 0.3)',
+                  transform: 'rotate(12deg)',
+                }}
+              >
+                <Image
+                  src="/assets/images/Linkedin_icon.svg.webp"
+                  alt="LinkedIn"
+                  width={108}
+                  height={108}
+                  style={{ objectFit: 'contain' }}
+                />
+              </div>
+
+              <div
+                className="flex items-center justify-center mr-6"
+                style={{
+                  width: '86px',
+                  height: '86px',
+                  backgroundColor: '#F8F8F8',
+                  borderRadius: '18px',
+                  padding: '10px',
+                  boxShadow: '0px 4px 40px rgba(100, 99, 99, 0.3)',
+                  transform: 'rotate(-14deg)',
+                  marginRight: '100px',
+                }}
+              >
+                <Image
+                  src="/assets/images/elempleoLogo.png"
+                  alt="Elempleo"
+                  width={72}
+                  height={72}
+                  style={{ objectFit: 'contain' }}
+                />
+              </div>
+
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '120px',
+                  height: '120px',
+                  backgroundColor: '#F8F8F8',
+                  borderRadius: '18px',
+                  padding: '12px',
+                  boxShadow: '0px 4px 40px rgba(100, 99, 99, 0.3)',
+                  transform: 'rotate(10deg)',
+                }}
+              >
+                <Image
+                  src="/assets/images/GoogleLogo.png"
+                  alt="Google Jobs"
+                  width={108}
+                  height={108}
+                  style={{ objectFit: 'contain' }}
+                />
+              </div>
+            </div>
+          </div>
+ 
 
         {/* Texto Superior */}
         <p className="text-lg md:text-xl text-[#646363] font-normal mb-5">
@@ -99,8 +242,8 @@ export default function Hero({ whatsappLink }: HeroProps) {
               }}
             >
               {/* Estadística 1 */}
-              <div className="flex items-center justify-center gap-2 flex-1 flex-wrap md:flex-nowrap">
-                <span className="text-2xl md:text-3xl font-medium text-[#A6A6A6] whitespace-nowrap">
+              <div className="flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 flex-1 text-center md:text-left">
+                <span className="text-2xl md:text-4xl font-medium text-[#A6A6A6] whitespace-nowrap">
                   +20
                 </span>
                 <span className="text-sm md:text-base font-normal text-[#A6A6A6] text-center md:text-left">
@@ -110,7 +253,7 @@ export default function Hero({ whatsappLink }: HeroProps) {
 
               {/* Estadística 2 */}
               <div className="flex items-center justify-center gap-2 flex-1 flex-wrap md:flex-nowrap">
-                <span className="text-2xl md:text-3xl font-medium text-[#A6A6A6] whitespace-nowrap">
+                <span className="text-2xl md:text-4xl font-medium text-[#A6A6A6] whitespace-nowrap">
                   +5.000
                 </span>
                 <span className="text-sm md:text-base font-normal text-[#A6A6A6] text-center md:text-left">
@@ -120,7 +263,7 @@ export default function Hero({ whatsappLink }: HeroProps) {
 
               {/* Estadística 3 */}
               <div className="flex items-center justify-center gap-2 flex-1 flex-wrap md:flex-nowrap">
-                <span className="text-2xl md:text-3xl font-medium text-[#A6A6A6] whitespace-nowrap">
+                <span className="text-2xl md:text-4xl font-medium text-[#A6A6A6] whitespace-nowrap">
                   90%
                 </span>
                 <span className="text-sm md:text-base font-normal text-[#A6A6A6] text-center md:text-left">
