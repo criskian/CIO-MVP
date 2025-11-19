@@ -69,8 +69,10 @@ Ejemplo: "Bogotá", "Medellín", "Cali", etc.`,
 
 🏠 *Remoto* - Trabajar desde casa
 🏢 *Presencial* - Ir a la oficina
+🔄 *Híbrido* - Mixto (remoto + presencial)
+✨ *Sin preferencia* - Cualquier modalidad
 
-Responde "Remoto" o "Presencial".`,
+Selecciona una opción.`,
 
   ASK_JOB_TYPE: `¿Qué tipo de jornada prefieres?
 
@@ -141,10 +143,12 @@ Ejemplo: "Desarrollador", "Contador", "Asistente", etc.`,
 
 Ejemplo: "Bogotá", "Medellín", "Cali", etc.`,
 
-  ERROR_WORK_MODE_INVALID: `No entendí tu respuesta. Por favor responde:
+  ERROR_WORK_MODE_INVALID: `No entendí tu respuesta. Por favor elige una opción:
 
-🏠 *"Remoto"* - Para trabajar desde casa
-🏢 *"Presencial"* - Para ir a la oficina`,
+🏠 *"Remoto"* - Trabajar desde casa
+🏢 *"Presencial"* - Ir a la oficina
+🔄 *"Híbrido"* - Mixto (remoto + presencial)
+✨ *"Sin preferencia"* - Cualquier modalidad`,
 
   ERROR_JOB_TYPE_INVALID: `No entendí tu respuesta. Por favor responde con:
 
@@ -318,7 +322,9 @@ Escribe el *número* o el *nombre* de tu opción:
 
 Escribe una de estas opciones:
 • *"Remoto"* - Para trabajar desde casa 🏠
-• *"Presencial"* - Para ir a la oficina 🏢`,
+• *"Presencial"* - Para ir a la oficina 🏢
+• *"Híbrido"* - Para trabajar mixto (remoto + presencial) 🔄
+• *"Sin preferencia"* - Para cualquier modalidad ✨`,
 
   CONFIRM_RESTART_DESKTOP: `⚠️ ¿Estás seguro de que quieres *reiniciar tu perfil*?
 

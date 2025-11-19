@@ -27,7 +27,7 @@ export interface JobSearchQuery {
   location?: string;
   jobType?: string;
   minSalary?: number;
-  remoteAllowed?: boolean;
+  workMode?: string; // presencial, remoto, hibrido, sin_preferencia
   experienceKeywords?: string[]; // Palabras clave para filtrar por experiencia (e.g., ['junior', 'jr'])
 }
 

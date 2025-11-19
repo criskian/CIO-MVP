@@ -105,7 +105,7 @@ export class JobSearchService {
         location: profile.location || undefined,
         jobType: profile.jobType || undefined,
         minSalary: profile.minSalary || undefined,
-        remoteAllowed: profile.remoteAllowed || false,
+        workMode: profile.workMode || undefined,
         experienceKeywords,
       };
 
@@ -113,24 +113,32 @@ export class JobSearchService {
       const result = await this.searchJobs(searchQuery);
       let allJobs = [...result.jobs];
 
-      // 4. Si el usuario quiere remoto pero hay pocas ofertas, buscar presenciales en su ciudad
-      if (profile.remoteAllowed && allJobs.length < 3 && profile.location) {
+      // 4. Si hay pocas ofertas con la modalidad específica, buscar sin filtro de modalidad
+      if (
+        profile.workMode &&
+        profile.workMode !== 'sin_preferencia' &&
+        allJobs.length < 3 &&
+        profile.location
+      ) {
         this.logger.log(
-          `📍 Pocas ofertas remotas (${allJobs.length}), buscando presenciales en ${profile.location}...`,
+          `📍 Pocas ofertas con modalidad "${profile.workMode}" (${allJobs.length}), buscando sin filtro de modalidad...`,
         );
 
-        const presencialQuery: JobSearchQuery = {
+        // Buscar sin especificar modalidad (todas las modalidades)
+        const generalQuery: JobSearchQuery = {
           ...searchQuery,
-          remoteAllowed: false, // Buscar solo presenciales
+          workMode: undefined, // Sin filtro de modalidad
         };
 
-        const presencialResult = await this.searchJobs(presencialQuery);
+        const generalResult = await this.searchJobs(generalQuery);
 
-        // Agregar ofertas presenciales al final (después de las remotas)
-        allJobs = [...allJobs, ...presencialResult.jobs];
+        // Agregar solo las ofertas que no estén ya en la lista
+        const existingUrls = new Set(allJobs.map((j) => j.url));
+        const newJobs = generalResult.jobs.filter((j) => !existingUrls.has(j.url));
+        allJobs = [...allJobs, ...newJobs];
 
         this.logger.log(
-          `✅ Se agregaron ${presencialResult.jobs.length} ofertas presenciales en ${profile.location}`,
+          `✅ Se agregaron ${newJobs.length} ofertas adicionales. Total: ${allJobs.length}`,
         );
       }
 
@@ -260,9 +268,16 @@ export class JobSearchService {
     // Ubicación (ya se pasa como parámetro separado en location)
     // No la incluimos en el query para evitar redundancia
 
-    // Si es remoto, agregar al query
-    if (query.remoteAllowed) {
-      parts.push('remoto');
+    // Agregar modalidad de trabajo al query
+    if (query.workMode) {
+      if (query.workMode === 'remoto') {
+        parts.push('remoto');
+      } else if (query.workMode === 'hibrido') {
+        parts.push('híbrido');
+      } else if (query.workMode === 'presencial') {
+        parts.push('presencial');
+      }
+      // Si es 'sin_preferencia', no agregar nada (buscar todas)
     }
 
     // Tipo de jornada (simplificado)
@@ -699,10 +714,10 @@ export class JobSearchService {
       }
     }
 
-    // +5 puntos si es remoto y el usuario lo permite
-    if (query.remoteAllowed && job.locationRaw?.toLowerCase().includes('remoto')) {
-      score += 5;
-    }
+    // Nota: La modalidad de trabajo (remoto/presencial/híbrido) se usa solo como
+    // filtro de palabras clave en el query, NO como atributo estructurado porque
+    // Google Jobs no devuelve este campo directamente. El filtrado se hace por keyword
+    // en el buildQueryString() y SerpAPI lo procesa en la búsqueda.
 
     // +7 puntos si el nivel de experiencia coincide (prioriza, pero no filtra)
     if (query.experienceKeywords && query.experienceKeywords.length > 0) {

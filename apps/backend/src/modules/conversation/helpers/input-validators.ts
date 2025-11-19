@@ -455,11 +455,46 @@ export function normalizeLocation(text: string): string | null {
 }
 
 /**
- * Normaliza la modalidad de trabajo (remoto/presencial)
- * Retorna: 'remoto' | 'presencial' | null
+ * Normaliza la modalidad de trabajo
+ * Retorna: 'remoto' | 'presencial' | 'hibrido' | 'sin_preferencia' | null
  */
-export function normalizeWorkMode(text: string): 'remoto' | 'presencial' | null {
+export function normalizeWorkMode(
+  text: string,
+): 'remoto' | 'presencial' | 'hibrido' | 'sin_preferencia' | null {
   const normalizedText = text.toLowerCase().trim();
+
+  // Detectar "sin preferencia"
+  const noPreferencePatterns = [
+    'sin preferencia',
+    'cualquiera',
+    'todas',
+    'todos',
+    'no importa',
+    'da igual',
+    'me da igual',
+    'cualquier modalidad',
+    '4', // Por si usamos lista numerada
+  ];
+
+  if (noPreferencePatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'sin_preferencia';
+  }
+
+  // Detectar "híbrido"
+  const hybridPatterns = [
+    'hibrido',
+    'híbrido',
+    'hybrid',
+    'mixto',
+    'mix',
+    'combinado',
+    'remoto y presencial',
+    '3', // Por si usamos lista numerada
+  ];
+
+  if (hybridPatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'hibrido';
+  }
 
   // Detectar "remoto"
   const remotePatterns = [

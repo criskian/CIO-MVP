@@ -379,13 +379,15 @@ export class ConversationService {
 
     const deviceType = await this.getDeviceType(userId);
 
-    // Si es móvil, mostrar botones
+    // Si es móvil, mostrar botones (4 opciones)
     if (deviceType === 'MOBILE') {
       return {
         text: BotMessages.ASK_WORK_MODE,
         buttons: [
           { id: 'work_remoto', title: '🏠 Remoto' },
           { id: 'work_presencial', title: '🏢 Presencial' },
+          { id: 'work_hibrido', title: '🔄 Híbrido' },
+          { id: 'work_sin_preferencia', title: '✨ Sin preferencia' },
         ],
       };
     }
@@ -395,7 +397,7 @@ export class ConversationService {
   }
 
   /**
-   * Estado ASK_WORK_MODE: Esperando modalidad (remoto/presencial)
+   * Estado ASK_WORK_MODE: Esperando modalidad (remoto/presencial/híbrido/sin preferencia)
    */
   private async handleAskWorkModeState(userId: string, text: string): Promise<BotReply> {
     const workMode = normalizeWorkMode(text);
@@ -409,6 +411,8 @@ export class ConversationService {
           buttons: [
             { id: 'work_remoto', title: '🏠 Remoto' },
             { id: 'work_presencial', title: '🏢 Presencial' },
+            { id: 'work_hibrido', title: '🔄 Híbrido' },
+            { id: 'work_sin_preferencia', title: '✨ Sin preferencia' },
           ],
         };
       }
@@ -418,7 +422,7 @@ export class ConversationService {
 
     // Guardar modalidad en UserProfile
     await this.updateUserProfile(userId, {
-      remoteAllowed: workMode === 'remoto',
+      workMode,
     });
 
     // Transición: ASK_WORK_MODE → ASK_JOB_TYPE
@@ -948,7 +952,7 @@ Continúa con el proceso manual. 👇`,
       role: profile.role || 'No configurado',
       experience: this.formatExperienceLevel(profile.experienceLevel),
       location: profile.location || 'No configurado',
-      workMode: profile.remoteAllowed ? '🏠 Remoto' : '🏢 Presencial',
+      workMode: this.formatWorkMode(profile.workMode),
       jobType: this.formatJobType(profile.jobType),
       minSalary: profile.minSalary
         ? `$${profile.minSalary.toLocaleString('es-CO')} COP`
@@ -1119,6 +1123,8 @@ Selecciona qué quieres editar:`,
             buttons: [
               { id: 'work_remoto', title: '🏠 Remoto' },
               { id: 'work_presencial', title: '🏢 Presencial' },
+              { id: 'work_hibrido', title: '🔄 Híbrido' },
+              { id: 'work_sin_preferencia', title: '✨ Sin preferencia' },
             ],
           };
         }
@@ -1276,6 +1282,8 @@ Selecciona qué quieres editar:`,
           buttons: [
             { id: 'work_remoto', title: '🏠 Remoto' },
             { id: 'work_presencial', title: '🏢 Presencial' },
+            { id: 'work_hibrido', title: '🔄 Híbrido' },
+            { id: 'work_sin_preferencia', title: '✨ Sin preferencia' },
           ],
         };
       }
@@ -1284,11 +1292,11 @@ Selecciona qué quieres editar:`,
     }
 
     await this.updateUserProfile(userId, {
-      remoteAllowed: workMode === 'remoto',
+      workMode,
     });
     await this.updateSessionState(userId, ConversationState.READY);
 
-    const displayMode = workMode === 'remoto' ? '🏠 Remoto' : '🏢 Presencial';
+    const displayMode = this.formatWorkMode(workMode);
     return await this.returnToMainMenu(
       userId,
       BotMessages.FIELD_UPDATED('modalidad de trabajo', displayMode),
@@ -1451,6 +1459,20 @@ Selecciona qué quieres editar:`,
     return experienceMap[experienceLevel || ''] || 'No configurado';
   }
 
+  /**
+   * Formatea el workMode para mostrar al usuario
+   */
+  private formatWorkMode(workMode: string | null | undefined): string {
+    const workModeMap: Record<string, string> = {
+      remoto: '🏠 Remoto',
+      presencial: '🏢 Presencial',
+      hibrido: '🔄 Híbrido',
+      sin_preferencia: '✨ Sin preferencia',
+    };
+
+    return workModeMap[workMode || ''] || 'No configurado';
+  }
+
   // ========================================
   // Métodos auxiliares de base de datos
   // ========================================
@@ -1596,9 +1618,9 @@ Selecciona qué quieres editar:`,
       role: string;
       experienceLevel: string;
       location: string;
+      workMode: string;
       jobType: string;
       minSalary: number;
-      remoteAllowed: boolean;
     }>,
   ) {
     await this.prisma.userProfile.upsert({
