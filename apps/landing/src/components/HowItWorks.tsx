@@ -31,12 +31,12 @@ export default function HowItWorks({ whatsappLink }: HowItWorksProps) {
   ];
 
   return (
-    <section className="py-16 md:py-24 px-4 bg-white overflow-hidden">
+    <section className="py-16 md:py-6 px-4 bg-white overflow-hidden">
       <div className="max-w-[1440px] mx-auto">
         <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
           
-          {/* Columna Izquierda: Celular y Textura */}
-          <div className="w-full lg:w-[45%] relative flex justify-end items-center min-h-[600px]">
+          {/* Columna Izquierda: Celular y Textura - oculta en móvil */}
+          <div className="hidden lg:flex w-full lg:w-[45%] relative justify-end items-center min-h-[600px]">
             {/* Textura de fondo - detrás del teléfono */}
             <div 
               className="absolute top-1/2 right-0 transform translate-x-[27%] -translate-y-1/2"
@@ -44,8 +44,8 @@ export default function HowItWorks({ whatsappLink }: HowItWorksProps) {
                 width: '1000px', 
                 height: '1100px',
                 zIndex: 1,
-                maskImage: 'linear-gradient(to bottom, transparent 0%, transparent 10%, black 25%, black 75%, transparent 90%, transparent 100%), linear-gradient(to right, transparent 0%, transparent 15%, black 30%, black 100%)',
-                WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, transparent 10%, black 25%, black 75%, transparent 90%, transparent 100%), linear-gradient(to right, transparent 0%, transparent 15%, black 30%, black 100%)',
+                maskImage: 'linear-gradient(to bottom, transparent 0%, transparent 20%, black 35%, black 65%, transparent 80%, transparent 100%), linear-gradient(to right, transparent 0%, transparent 15%, black 30%, black 100%)',
+                WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, transparent 20%, black 35%, black 65%, transparent 80%, transparent 100%), linear-gradient(to right, transparent 0%, transparent 15%, black 30%, black 100%)',
                 maskComposite: 'intersect',
                 WebkitMaskComposite: 'source-in'
               }}
@@ -118,12 +118,12 @@ export default function HowItWorks({ whatsappLink }: HowItWorksProps) {
           </div>
 
           {/* Columna Derecha: Título y Cards */}
-          <div className="w-full lg:w-[59%] flex flex-col justify-center" style={{ transform: 'translateX(-20px)' }}>
-            <h2 className="text-2xl md:text-4xl font-bold text-[#1B1B1B] mb-14 mt-[-100px] text-center font-poppins">
+          <div className="w-full lg:w-[59%] flex flex-col justify-center items-center lg:items-start" style={{ transform: 'translateX(0px)' }}>
+            <h2 className="text-2xl md:text-4xl font-bold text-[#1B1B1B] mb-8 lg:mb-14 mt-0 lg:mt-[-100px] text-center font-poppins lg:transform lg:translate-x-[-20px]">
               ¿Cómo funciona?
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 md:gap-x-12 gap-y-8 md:gap-y-10 items-center">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 md:gap-x-12 gap-y-6 md:gap-y-10 items-center w-full max-w-[500px] lg:max-w-none lg:transform lg:translate-x-[-20px]">
               {infoCards.map((card, index) => (
                 <div
                   key={index}
