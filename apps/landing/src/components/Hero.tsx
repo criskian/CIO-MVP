@@ -8,7 +8,7 @@ interface HeroProps {
 
 export default function Hero({ whatsappLink }: HeroProps) {
   return (
-    <section className="w-full h-auto min-h-[850px] xl:h-screen xl:max-h-[1100px] flex flex-col bg-white relative overflow-hidden">
+    <section className="w-full h-auto min-h-[920px] xl:h-screen xl:min-h-[920px] xl:max-h-[1100px] flex flex-col bg-white relative overflow-hidden">
       {/* Logo Almia en la parte superior */}
       <div className="w-full pt-12 md:pt-14 relative z-10">
         <div className="max-w-[1440px] mx-auto w-full flex justify-center md:justify-start">
