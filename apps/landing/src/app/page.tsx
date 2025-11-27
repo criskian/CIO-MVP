@@ -1,6 +1,6 @@
 import Hero from '@/components/Hero';
 import WhatIsCIO from '@/components/WhatIsCIO';
-import Features from '@/components/Features';
+import Benefits from '@/components/Benefits';
 import HowItWorks from '@/components/HowItWorks';
 import Footer from '@/components/Footer';
 
@@ -19,11 +19,11 @@ export default function Home() {
       {/* What is CIO Section */}
       <WhatIsCIO />
 
-      {/* Features Section */}
-      <Features />
-
       {/* How It Works Section */}
       <HowItWorks whatsappLink={whatsappLink} />
+
+      {/* Benefits Section */}
+      <Benefits />
 
       {/* Footer */}
       <Footer />
