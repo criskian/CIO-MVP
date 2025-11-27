@@ -19,11 +19,11 @@ export default function Home() {
       {/* What is CIO Section */}
       <WhatIsCIO />
 
-      {/* Features Section */}
-      <Features />
-
       {/* How It Works Section */}
       <HowItWorks whatsappLink={whatsappLink} />
+
+      {/* Features Section */}
+      <Features />
 
       {/* Footer */}
       <Footer />
