@@ -1,97 +1,165 @@
+'use client';
+
 interface HowItWorksProps {
   whatsappLink: string;
 }
 
-const steps = [
-  {
-    number: '1',
-    title: 'Inicia la conversación',
-    description:
-      'Haz clic en el botón de WhatsApp y saluda a CIO. Es rápido, fácil y sin complicaciones.',
-  },
-  {
-    number: '2',
-    title: 'Cuéntale qué buscas',
-    description:
-      'CIO te guiará con preguntas sobre el cargo, ubicación, salario y tipo de trabajo ideal para ti.',
-  },
-  {
-    number: '3',
-    title: 'Configura tus alertas',
-    description:
-      'Elige el horario perfecto para recibir nuevas oportunidades laborales cada día.',
-  },
-  {
-    number: '4',
-    title: 'Recibe ofertas personalizadas',
-    description:
-      'CIO buscará las mejores ofertas para ti y te las enviará directamente por WhatsApp.',
-  },
-];
+import Image from 'next/image';
 
 export default function HowItWorks({ whatsappLink }: HowItWorksProps) {
+  const infoCards = [
+    {
+      title: 'Momento de elegir',
+      description:
+        'Tú eliges qué hacer con cada oportunidad. El Cazador te envía vacantes relevantes y actualizadas; tu decides si aplicas, las guardas o las revisás más tarde. Tu proceso sigue siendo completamente personal.',
+    },
+    {
+      title: 'Registro simple y guiado',
+      description:
+        'Comparte tu información básica por WhatsApp o a través del formulario: tu experiencia, tu industria y las áreas en las que querés crecer. Con esto, el Cazador Inteligente de Oportunidades analiza y comprende tu perfil profesional para empezar la búsqueda.',
+    },
+    {
+      title: 'Selección automatizada de oportunidades',
+      description:
+        'Nuestro motor analiza miles de fuentes laborales y cruza datos para identificar vacantes alineadas con tu perfil.',
+    },
+    {
+      title: 'Envío directo de vacantes',
+      description:
+        'Recibe oportunidades relevantes directamente en tu WhatsApp, organizadas y listas para aplicar, sin tener que navegar por portales complejo ni perder tiempo filtrando información.',
+    },
+  ];
+
   return (
-    <section className="py-20 md:py-28 px-4 bg-white">
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold text-gray-900 mb-4">
-            ¿Cómo funciona?
-          </h2>
-          <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
-            En 4 simples pasos estarás recibiendo ofertas de empleo personalizadas
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10">
-          {steps.map((step, index) => (
-            <div
-              key={index}
-              className="relative group"
+    <section className="py-16 md:py-24 px-4 bg-white overflow-hidden">
+      <div className="max-w-[1440px] mx-auto">
+        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
+          
+          {/* Columna Izquierda: Celular y Textura */}
+          <div className="w-full lg:w-[45%] relative flex justify-end items-center min-h-[600px]">
+            {/* Textura de fondo - detrás del teléfono */}
+            <div 
+              className="absolute top-1/2 right-0 transform translate-x-[27%] -translate-y-1/2"
+              style={{ 
+                width: '1000px', 
+                height: '1100px',
+                zIndex: 1,
+                maskImage: 'linear-gradient(to bottom, transparent 0%, transparent 10%, black 25%, black 75%, transparent 90%, transparent 100%), linear-gradient(to right, transparent 0%, transparent 15%, black 30%, black 100%)',
+                WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, transparent 10%, black 25%, black 75%, transparent 90%, transparent 100%), linear-gradient(to right, transparent 0%, transparent 15%, black 30%, black 100%)',
+                maskComposite: 'intersect',
+                WebkitMaskComposite: 'source-in'
+              }}
             >
-              {/* Card con efecto hover */}
-              <div className="relative bg-white p-8 rounded-3xl border-2 border-gray-200 hover:border-[#B68DE0] transition-all duration-300 hover:shadow-xl h-full">
-                {/* Número grande de fondo */}
-                <div className="absolute top-4 right-4 text-8xl font-bold text-gray-100 group-hover:text-[#F3EAFB] transition-colors">
-                  {step.number}
-                </div>
+              <Image
+                src="/assets/vectors/texturaIphone15.svg"
+                alt="Background Texture"
+                width={994}
+                height={1171}
+                style={{ 
+                  width: '100%', 
+                  height: '100%', 
+                  objectFit: 'contain',
+                  opacity: 0.85 
+                }}
+                className=""
+              />
+            </div>
 
-                {/* Badge con número */}
-                <div className="relative mb-6">
-                  <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-[#9054C6] to-[#7A3FC3] rounded-2xl shadow-lg">
-                    <span className="text-2xl font-bold text-white">{step.number}</span>
-                  </div>
-                </div>
+            {/* Contenedor del celular para posicionar las burbujas relativo a él */}
+            <div className="relative w-full max-w-[400px] md:max-w-[520px] z-20 ml-auto mr-0" style={{ transform: 'translateX(55px)' }}>
+               <Image
+                src="/images/iPhone 15 - HowItWorks.svg"
+                alt="iPhone Mockup"
+                width={500}
+                height={1000}
+                style={{ width: '100%', height: 'auto' }}
+                priority
+              />
 
-                {/* Contenido */}
-                <div className="relative">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-3">{step.title}</h3>
-                  <p className="text-gray-600 leading-relaxed text-lg">{step.description}</p>
+              {/* Burbuja de chat izquierda (text-box-1) */}
+              <div 
+                className="absolute top-[15%] -left-[14%] w-[70%] md:w-[64%] animate-float-slow"
+                style={{
+                  filter: 'drop-shadow(0px 4px 12px rgba(255, 255, 255, 0.8))'
+                }}
+              >
+                <div className="bg-white border border-[#A6A6A6] rounded-2xl p-3 md:p-4 shadow-lg">
+                  <p 
+                    className="text-[#1B1B1B] font-poppins leading-relaxed"
+                    style={{ fontSize: '11px' }}
+                  >
+                    ¡Hola! 👋 Soy CIO, tu cazador inteligente de oportunidades. 
+                    <br />
+                    Estoy aquí para ayudarte a encontrar las mejores ofertas laborales según tu perfil.
+                    <br />
+                    <br />
+                    ¿Te gustaría empezar? 😊
+                  </p>
                 </div>
+              </div>
 
-                {/* Indicador de progreso (línea conectora) - solo visible en desktop */}
-                {index < steps.length - 1 && (
-                  <div className="hidden md:block absolute top-1/2 -right-5 w-10 h-0.5 bg-gradient-to-r from-[#B68DE0] to-transparent"></div>
-                )}
+              {/* Burbuja de chat derecha (text-box-2) */}
+              <div 
+                className="absolute top-[40%] -right-[-6%] w-[60%] md:w-[52%] animate-float-delayed"
+                style={{
+                  filter: 'drop-shadow(0px 4px 12px rgba(255, 255, 255, 0.8))'
+                }}
+              >
+                <div className="bg-white border border-[#A6A6A6] rounded-2xl p-3 md:p-4 shadow-lg">
+                  <p 
+                    className="text-[#1B1B1B] font-poppins leading-relaxed"
+                    style={{ fontSize: '11px' }}
+                  >
+                    ¡Hola! 👋 Soy CIO, tu cazador inteligente de oportunidades.
+                  </p>
+                </div>
               </div>
             </div>
-          ))}
-        </div>
+          </div>
 
-        {/* CTA adicional */}
-        <div className="mt-16 text-center">
-          <p className="text-gray-600 text-lg">
-            ¿Todo listo?{' '}
-            <a 
-              href={whatsappLink} 
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#9054C6] hover:text-[#7A3FC3] font-semibold underline decoration-2 underline-offset-4 transition-colors"
-            >
-              Comienza ahora mismo
-            </a>
-          </p>
+          {/* Columna Derecha: Título y Cards */}
+          <div className="w-full lg:w-[59%] flex flex-col justify-center" style={{ transform: 'translateX(-20px)' }}>
+            <h2 className="text-2xl md:text-4xl font-bold text-[#1B1B1B] mb-14 mt-[-100px] text-center font-poppins">
+              ¿Cómo funciona?
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 md:gap-x-12 gap-y-8 md:gap-y-10 items-center">
+              {infoCards.map((card, index) => (
+                <div
+                  key={index}
+                  className="bg-white border border-[#A6A6A6] rounded-3xl py-4 md:py-6 px-3 md:px-5 flex flex-col gap-4 shadow-[-3px_8px_8px_0px_rgba(0,0,0,0.12),3px_8px_8px_0px_rgba(0,0,0,0.12)] transition-transform hover:-translate-y-1 duration-300 h-auto self-center"
+                  style={{ transformOrigin: 'center' }}
+                >
+                  <h3 className="text-lg md:text-[19px] font-medium text-[#1B1B1B] font-poppins">
+                    {card.title}
+                  </h3>
+                  <p className="text-sm md:text-[14.2px] text-[#1B1B1B] font-regular font-poppins leading-relaxed">
+                    {card.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
+      
+      {/* Estilos globales para animación de flotación suave si no existen */}
+      <style jsx global>{`
+        @keyframes float-slow {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+        @keyframes float-delayed {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-8px); }
+        }
+        .animate-float-slow {
+          animation: float-slow 6s ease-in-out infinite;
+        }
+        .animate-float-delayed {
+          animation: float-delayed 7s ease-in-out infinite 1s;
+        }
+      `}</style>
     </section>
   );
 }
