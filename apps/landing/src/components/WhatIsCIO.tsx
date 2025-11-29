@@ -64,14 +64,14 @@ export default function WhatIsCIO() {
         </div>
         {/* Título */}
         <h2 className="text-3xl md:text-4xl font-bold text-gray-900 text-center mb-6">
-          ¿Qué es CIO?
+        Existen más de 2.000 ofertas nuevas cada día.
         </h2>
 
         {/* Descripción principal */}
         <p className="text-base md:text-lg text-gray-500 text-center max-w-4xl mx-auto mb-6 leading-relaxed">
-          El Cazador Inteligente de Oportunidades es una herramienta con IA para encontrar trabajo sin
+          CIO - Cazador Inteligente de Ofertas, es un agente de IA para encontrar trabajo sin
           esfuerzo. Analiza tu perfil, entiende tu experiencia y rastrea todas las plataformas laborales para
-          enviarte a tu WhatsApp, todas las vacantes que realmente encajan contigo.
+          enviarte a tu WhatsApp, las ofertas que realmente hacen match con tu perfil.
         </p>
 
         {/* Subtexto */}

@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import Link from 'next/link';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -92,10 +93,34 @@ export default function Footer() {
         </div>
 
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            {/* Copyright */}
-            <p className="text-white/80 text-sm">
-              © {currentYear} Almia Consulting SAS - All rights reserved
-            </p>
+            {/* Enlaces legales y Copyright */}
+            <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
+              <p className="text-white/80 text-sm">
+                © {currentYear} Almia Consulting SAS - All rights reserved
+              </p>
+              <div className="flex items-center gap-4 text-sm">
+                <Link 
+                  href="/privacy-policy" 
+                  className="text-white/70 hover:text-white transition-colors"
+                >
+                  Privacidad
+                </Link>
+                <span className="text-white/40">|</span>
+                <Link 
+                  href="/terms-of-service" 
+                  className="text-white/70 hover:text-white transition-colors"
+                >
+                  Términos
+                </Link>
+                <span className="text-white/40">|</span>
+                <Link 
+                  href="/data-deletion" 
+                  className="text-white/70 hover:text-white transition-colors"
+                >
+                  Eliminar datos
+                </Link>
+              </div>
+            </div>
 
             {/* Redes sociales */}
             <div className="flex items-center gap-3">
