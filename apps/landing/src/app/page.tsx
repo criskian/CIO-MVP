@@ -23,7 +23,7 @@ export default function Home() {
       <HowItWorks whatsappLink={whatsappLink} />
 
       {/* Benefits Section */}
-      <Benefits />
+      <Benefits whatsappLink={whatsappLink} />
 
       {/* Footer */}
       <Footer />

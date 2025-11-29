@@ -9,29 +9,29 @@ import Image from 'next/image';
 export default function HowItWorks({ whatsappLink }: HowItWorksProps) {
   const infoCards = [
     {
-      title: 'Momento de elegir',
+      title: 'Registro fácil',
       description:
-        'Tú eliges qué hacer con cada oportunidad. El Cazador te envía vacantes relevantes y actualizadas; tu decides si aplicas, las guardas o las revisás más tarde. Tu proceso sigue siendo completamente personal.',
+        'Chatea con CIO y cuéntanos tus datos de contacto y preferencias de búsqueda: rol, salario y ciudad.',
     },
     {
-      title: 'Registro simple y guiado',
+      title: 'Vacantes filtradas',
       description:
-        'Comparte tu información básica por WhatsApp o a través del formulario: tu experiencia, tu industria y las áreas en las que querés crecer. Con esto, el Cazador Inteligente de Oportunidades analiza y comprende tu perfil profesional para empezar la búsqueda.',
+        'Nuestro agente analiza miles de ofertas y selecciona solo las que hacen match con tu perfil.',
     },
     {
-      title: 'Selección automatizada de oportunidades',
+      title: 'Vacantes en tu mano',
       description:
-        'Nuestro motor analiza miles de fuentes laborales y cruza datos para identificar vacantes alineadas con tu perfil.',
+        'Recibe las oportunidades directamente en tu WhatsApp, sin portales ni mil pestañas abiertas.',
     },
     {
-      title: 'Envío directo de vacantes',
+      title: 'Tú decides el momento',
       description:
-        'Recibe oportunidades relevantes directamente en tu WhatsApp, organizadas y listas para aplicar, sin tener que navegar por portales complejo ni perder tiempo filtrando información.',
+        'Activa alertas para recibir nuevas vacantes cuando quieras: diario, cada tres días, cada semana o cada mes.',
     },
   ];
 
   return (
-    <section className="py-16 md:py-6 px-4 bg-white overflow-hidden">
+    <section className="py-16 md:py-0 px-4 bg-white overflow-hidden">
       <div className="max-w-[1440px] mx-auto">
         <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
           
@@ -110,7 +110,7 @@ export default function HowItWorks({ whatsappLink }: HowItWorksProps) {
                     className="text-[#1B1B1B] font-poppins leading-relaxed"
                     style={{ fontSize: '11px' }}
                   >
-                    ¡Hola! 👋 Soy CIO, tu cazador inteligente de oportunidades.
+                    Sí, busca oferta para: Analista Financiero
                   </p>
                 </div>
               </div>
