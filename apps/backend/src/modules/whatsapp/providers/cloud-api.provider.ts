@@ -151,6 +151,17 @@ export class CloudApiProvider implements IWhatsappProvider {
       const messageId = message.id;
       const timestamp = new Date(parseInt(message.timestamp) * 1000);
 
+      // Extraer el Phone Number ID del payload (está en metadata.phone_number_id)
+      const incomingPhoneNumberId = change?.value?.metadata?.phone_number_id;
+
+      // FILTRO: Solo procesar mensajes del número configurado en .env
+      if (incomingPhoneNumberId && incomingPhoneNumberId !== this.phoneNumberId) {
+        this.logger.debug(
+          `🚫 Mensaje ignorado: llegó al número ${incomingPhoneNumberId}, pero este backend está configurado para ${this.phoneNumberId}`,
+        );
+        return null;
+      }
+
       let text: string | undefined;
       let mediaUrl: string | undefined;
 

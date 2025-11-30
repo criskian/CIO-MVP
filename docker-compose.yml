@@ -1,0 +1,41 @@
+# Docker Compose para desarrollo local - CIO MVP
+# PostgreSQL para ambiente de desarrollo aislado de producción
+
+version: '3.8'
+
+services:
+  # Base de datos PostgreSQL para desarrollo
+  postgres:
+    image: postgres:15-alpine
+    container_name: cio-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cio_user
+      POSTGRES_PASSWORD: cio_dev_password_2024
+      POSTGRES_DB: cio_dev
+    ports:
+      - "5433:5432"  # Puerto 5433 local para no conflictar con PostgreSQL instalado
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cio_user -d cio_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Adminer - Interfaz web para administrar la base de datos (opcional)
+  adminer:
+    image: adminer:latest
+    container_name: cio-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+
+volumes:
+  postgres_data:
+    driver: local
+
