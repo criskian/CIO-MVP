@@ -60,7 +60,7 @@ export class SchedulerService implements OnModuleInit {
       }
 
       // 2. Filtrar usuarios que deben recibir alerta AHORA
-      const usersToNotify = alertPreferences.filter((pref) => this.shouldSendAlertNow(pref));
+      const usersToNotify = alertPreferences.filter((pref: any) => this.shouldSendAlertNow(pref));
 
       this.logger.log(`📮 ${usersToNotify.length} usuarios deben recibir alerta ahora`);
 

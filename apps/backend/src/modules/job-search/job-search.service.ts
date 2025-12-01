@@ -809,7 +809,7 @@ export class JobSearchService {
         select: { url: true },
       });
 
-      const sentUrls = new Set(sentJobs.map((job) => job.url));
+      const sentUrls = new Set(sentJobs.map((job: { url: string }) => job.url));
 
       // Filtrar ofertas ya enviadas
       return jobs.filter((job) => !sentUrls.has(job.url));
