@@ -113,43 +113,48 @@ export class JobSearchService {
       const result = await this.searchJobs(searchQuery);
       let allJobs = [...result.jobs];
 
-      // 4. Si hay pocas ofertas con la modalidad específica, buscar sin filtro de modalidad
-      if (
-        profile.workMode &&
-        profile.workMode !== 'sin_preferencia' &&
-        allJobs.length < 3 &&
-        profile.location
-      ) {
-        this.logger.log(
-          `📍 Pocas ofertas con modalidad "${profile.workMode}" (${allJobs.length}), buscando sin filtro de modalidad...`,
-        );
+      // ========================================
+      // BÚSQUEDA ADICIONAL SIN FILTRO DE MODALIDAD - COMENTADO TEMPORALMENTE
+      // Esta lógica complementaba el filtro de modalidad. Como el filtro de modalidad
+      // está desactivado, esta búsqueda adicional no es necesaria.
+      // Descomentar junto con el filtro de modalidad en buildQueryString()
+      // ========================================
+      // if (
+      //   profile.workMode &&
+      //   profile.workMode !== 'sin_preferencia' &&
+      //   allJobs.length < 3 &&
+      //   profile.location
+      // ) {
+      //   this.logger.log(
+      //     `📍 Pocas ofertas con modalidad "${profile.workMode}" (${allJobs.length}), buscando sin filtro de modalidad...`,
+      //   );
+      //
+      //   // Buscar sin especificar modalidad (todas las modalidades)
+      //   const generalQuery: JobSearchQuery = {
+      //     ...searchQuery,
+      //     workMode: undefined, // Sin filtro de modalidad
+      //   };
+      //
+      //   const generalResult = await this.searchJobs(generalQuery);
+      //
+      //   // Agregar solo las ofertas que no estén ya en la lista
+      //   const existingUrls = new Set(allJobs.map((j) => j.url));
+      //   const newJobs = generalResult.jobs.filter((j) => !existingUrls.has(j.url));
+      //   allJobs = [...allJobs, ...newJobs];
+      //
+      //   this.logger.log(
+      //     `✅ Se agregaron ${newJobs.length} ofertas adicionales. Total: ${allJobs.length}`,
+      //   );
+      // }
 
-        // Buscar sin especificar modalidad (todas las modalidades)
-        const generalQuery: JobSearchQuery = {
-          ...searchQuery,
-          workMode: undefined, // Sin filtro de modalidad
-        };
-
-        const generalResult = await this.searchJobs(generalQuery);
-
-        // Agregar solo las ofertas que no estén ya en la lista
-        const existingUrls = new Set(allJobs.map((j) => j.url));
-        const newJobs = generalResult.jobs.filter((j) => !existingUrls.has(j.url));
-        allJobs = [...allJobs, ...newJobs];
-
-        this.logger.log(
-          `✅ Se agregaron ${newJobs.length} ofertas adicionales. Total: ${allJobs.length}`,
-        );
-      }
-
-      // 5. Registrar en log
+      // 4. Registrar en log
       await this.logSearch(userId, {
         ...result,
         jobs: allJobs,
         total: allJobs.length,
       });
 
-      // 6. Filtrar ofertas ya enviadas
+      // 5. Filtrar ofertas ya enviadas
       const filteredJobs = await this.filterAlreadySentJobs(userId, allJobs);
 
       this.logger.log(
@@ -268,17 +273,20 @@ export class JobSearchService {
     // Ubicación (ya se pasa como parámetro separado en location)
     // No la incluimos en el query para evitar redundancia
 
-    // Agregar modalidad de trabajo al query
-    if (query.workMode) {
-      if (query.workMode === 'remoto') {
-        parts.push('remoto');
-      } else if (query.workMode === 'hibrido') {
-        parts.push('híbrido');
-      } else if (query.workMode === 'presencial') {
-        parts.push('presencial');
-      }
-      // Si es 'sin_preferencia', no agregar nada (buscar todas)
-    }
+    // ========================================
+    // FILTRO DE MODALIDAD DE TRABAJO - COMENTADO TEMPORALMENTE
+    // Descomentar para volver a activar el filtro por modalidad (remoto/híbrido/presencial)
+    // ========================================
+    // if (query.workMode) {
+    //   if (query.workMode === 'remoto') {
+    //     parts.push('remoto');
+    //   } else if (query.workMode === 'hibrido') {
+    //     parts.push('híbrido');
+    //   } else if (query.workMode === 'presencial') {
+    //     parts.push('presencial');
+    //   }
+    //   // Si es 'sin_preferencia', no agregar nada (buscar todas)
+    // }
 
     // Tipo de jornada (simplificado)
     if (query.jobType) {

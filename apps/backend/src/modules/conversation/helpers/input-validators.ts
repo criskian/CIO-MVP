@@ -228,7 +228,7 @@ export function detectEditField(
   | 'rol'
   | 'experiencia'
   | 'ubicacion'
-  | 'modalidad'
+  // | 'modalidad' // COMENTADO TEMPORALMENTE
   | 'tipo'
   | 'salario'
   | 'frecuencia'
@@ -270,19 +270,23 @@ export function detectEditField(
     return 'ubicacion';
   }
 
-  // Detectar campo "modalidad" (remoto/presencial)
-  const workModePatterns = [
-    'modalidad',
-    'remoto',
-    'presencial',
-    'trabajo remoto',
-    'trabajo presencial',
-    'oficina',
-    'casa',
-  ];
-  if (workModePatterns.some((pattern) => normalizedText.includes(pattern))) {
-    return 'modalidad';
-  }
+  // ========================================
+  // DETECCIÓN DE CAMPO "MODALIDAD" - COMENTADA TEMPORALMENTE
+  // Descomentar junto con ASK_WORK_MODE y EDIT_WORK_MODE
+  // ========================================
+  // // Detectar campo "modalidad" (remoto/presencial)
+  // const workModePatterns = [
+  //   'modalidad',
+  //   'remoto',
+  //   'presencial',
+  //   'trabajo remoto',
+  //   'trabajo presencial',
+  //   'oficina',
+  //   'casa',
+  // ];
+  // if (workModePatterns.some((pattern) => normalizedText.includes(pattern))) {
+  //   return 'modalidad';
+  // }
 
   // Detectar campo "tipo de empleo/jornada"
   const jobTypePatterns = [

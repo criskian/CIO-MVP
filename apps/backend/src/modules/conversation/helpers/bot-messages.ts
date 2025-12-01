@@ -359,7 +359,6 @@ Escribe:
 🔹 *Rol:* ${profile.role}
 💡 *Experiencia:* ${profile.experience}
 📍 *Ubicación:* ${profile.location}
-🏠 *Modalidad:* ${profile.workMode}
 💼 *Tipo de empleo:* ${profile.jobType}
 💰 *Salario mínimo:* ${profile.minSalary}
 🔔 *Frecuencia:* ${profile.alertFrequency}
@@ -372,11 +371,19 @@ Escribe el *número* o *nombre* del campo que quieres editar:
 *1* - *Rol* - Cambiar tu cargo deseado
 *2* - *Experiencia* - Cambiar tu nivel de experiencia
 *3* - *Ubicación* - Cambiar la ciudad
-*4* - *Modalidad* - Cambiar entre remoto o presencial
-*5* - *Tipo* - Cambiar el tipo de empleo
-*6* - *Salario* - Cambiar el salario mínimo
-*7* - *Frecuencia* - Cambiar la frecuencia de alertas
-*8* - *Horario* - Cambiar la hora de alertas
+*4* - *Tipo* - Cambiar el tipo de empleo
+*5* - *Salario* - Cambiar el salario mínimo
+*6* - *Frecuencia* - Cambiar la frecuencia de alertas
+*7* - *Horario* - Cambiar la hora de alertas
 
 O escribe *"cancelar"* para volver al menú principal.`,
+
+  // ========================================
+  // NOTA: Se eliminó la opción de modalidad del menú.
+  // Si se quiere restaurar, agregar después de Ubicación:
+  // 🏠 *Modalidad:* ${profile.workMode}
+  // Y agregar en la lista de opciones:
+  // *4* - *Modalidad* - Cambiar entre remoto o presencial
+  // (ajustar la numeración de las opciones siguientes)
+  // ========================================
 };
