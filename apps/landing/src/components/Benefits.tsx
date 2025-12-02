@@ -1,3 +1,6 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 
 interface BenefitsProps {
@@ -5,8 +8,18 @@ interface BenefitsProps {
 }
 
 export default function Benefits({ whatsappLink }: BenefitsProps) {
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const checkDesktop = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+    checkDesktop();
+    window.addEventListener('resize', checkDesktop);
+    return () => window.removeEventListener('resize', checkDesktop);
+  }, []);
   return (
-    <section className="-mt-6 md:-mt-[240px] pb-32 lg:pb-0 px-4 bg-white overflow-hidden">
+    <section className="-mt-6 md:-mt-0 lg:-mt-[240px] pb-32 lg:pb-0 px-6 md:px-4 bg-white overflow-hidden">
       <div className="max-w-[1440px] mx-auto">
         <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
           
@@ -31,7 +44,7 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
           <div className="w-full lg:w-1/2 flex flex-col gap-6 mt-10 lg:mt-[60px] lg:scale-[0.9] lg:origin-top-left items-center lg:items-start">
             
             {/* Cuadro morado con overlay/borde */}
-            <div className="relative w-[90%] max-w-[500px] lg:max-w-none lg:ml-[-210px]" style={{ width: 'calc(100% + 215px)' }}>
+            <div className="relative w-[85%] max-w-[500px] lg:max-w-none lg:ml-[-210px]" style={isDesktop ? { width: 'calc(100% + 215px)' } : {}}>
               {/* Marco exterior - versión móvil */}
               <div className="lg:hidden absolute rounded-[16px] border-[1px] border-[#9054C6] border-solid" style={{ top: '-12px', bottom: '-12px', left: '-12px', right: '-12px' }} />
               {/* Marco exterior - versión desktop */}
@@ -39,13 +52,13 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
               
               {/* Cuadro morado interior */}
               <div 
-                className="relative bg-[#9054C6] rounded-[20px] px-6 py-6 md:px-9 md:py-4"
+                className="relative bg-[#9054C6] rounded-[20px] px-5 py-6 md:px-7 md:py-4 lg:px-8 xl:px-9"
                 style={{
                   zIndex: 2,
                 }}
               >
                 <p 
-                  className="text-[#F8F8F8] font-poppins text-center leading-relaxed text-[17px] md:text-[21px] xl:text-[23px] font-normal"
+                  className="text-[#F8F8F8] font-poppins text-center leading-relaxed text-[15px] md:text-[19px] lg:text-[20px] xl:text-[23px] font-normal"
                 >
                   Encontrar trabajo no es suerte, es estrategia.
                   <br />
@@ -55,10 +68,10 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
             </div>
 
             {/* Sección de Beneficios */}
-            <div className="mt-3 text-center lg:text-left lg:ml-[-90px]" style={{ transform: 'translateY(70px)' }}>
+            <div className="mt-1 md:mt-3 text-center lg:text-left lg:ml-[-90px]" style={{ transform: isDesktop ? 'translateY(70px)' : 'translateY(40px)' }}>
               {/* Título */}
               <h2 
-                className="font-poppins font-bold text-[#2C2C2C] mb-3 text-[26px] md:text-[34px] xl:text-[40px] leading-[1]"
+                className="font-poppins font-bold text-[#2C2C2C] mb-2 md:mb-3 text-[26px] md:text-[34px] xl:text-[40px] leading-[1]"
                 style={{ textShadow: '0px 2px 6px rgba(0, 0, 0, 0.28)' }}
               >
                 Pruébalo ya
@@ -66,7 +79,7 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
 
               {/* Texto con enlace */}
               <p 
-                className="font-poppins text-[#2C2C2C] text-[14px] md:text-[16px] xl:text-[18px] leading-relaxed font-normal mb-[80px]"
+                className="font-poppins text-[#2C2C2C] text-[14px] md:text-[16px] xl:text-[18px] leading-relaxed font-normal mb-8 md:mb-[80px]"
                 style={{ textShadow: '0px 2px 4px rgba(0, 0, 0, 0.18)' }}
               >
                 ¿Qué esperas para encontrar tu nueva oportunidad laboral? Empieza tu busqueda.

@@ -21,11 +21,11 @@ export default function WhatIsCIO() {
   };
 
   return (
-    <section className="pt-10 md:pt-16 pb-16 md:pb-24 px-4 bg-white relative overflow-hidden">
+    <section className="pt-10 md:pt-16 pb-16 md:pb-24 xl:pb-8 px-6 md:px-8 lg:px-12 xl:px-8 bg-white relative overflow-hidden">
       <div className="max-w-4xl mx-auto relative z-10">
         {/* Ícono de click izquierdo */}
         <div
-          className="absolute hidden md:block"
+          className="absolute hidden xl:block"
           style={{
             left: 'calc(50% - 560px)',
             bottom: '18%',
@@ -45,7 +45,7 @@ export default function WhatIsCIO() {
 
         {/* Ícono de click derecho */}
         <div
-          className="absolute hidden md:block"
+          className="absolute hidden xl:block"
           style={{
             right: 'calc(50% - 560px)',
             top: '45%',
@@ -63,19 +63,19 @@ export default function WhatIsCIO() {
           />
         </div>
         {/* Título */}
-        <h2 className="text-3xl md:text-4xl font-bold text-gray-900 text-center mb-6">
+        <h2 className="text-2xl md:text-3xl lg:text-3xl xl:text-4xl font-bold text-gray-900 text-center mb-6">
         Existen más de 2.000 ofertas nuevas cada día.
         </h2>
 
         {/* Descripción principal */}
-        <p className="text-base md:text-lg text-gray-500 text-center max-w-4xl mx-auto mb-6 leading-relaxed">
+        <p className="text-sm md:text-sm lg:text-sm xl:text-lg text-gray-500 text-center max-w-4xl mx-auto mb-6 leading-relaxed">
           CIO - Cazador Inteligente de Ofertas, es un agente de IA para encontrar trabajo sin
           esfuerzo. Analiza tu perfil, entiende tu experiencia y rastrea todas las plataformas laborales para
           enviarte a tu WhatsApp, las ofertas que realmente hacen match con tu perfil.
         </p>
 
         {/* Subtexto */}
-        <p className="text-base md:text-lg text-gray-500 text-center mb-12">
+        <p className="text-sm md:text-sm lg:text-sm xl:text-lg text-gray-500 text-center mb-12">
           Sin perder tiempo. Sin estrés. Sin repetir búsquedas infinitas.
         </p>
 
