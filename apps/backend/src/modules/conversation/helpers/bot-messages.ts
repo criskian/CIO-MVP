@@ -5,19 +5,16 @@
 
 export const BotMessages = {
   // Bienvenida
-  WELCOME: `¡Hola! 👋 Soy CIO, tu Cazador Inteligente de Oportunidades.
+  WELCOME: `¡Hola! 👋 Soy *CIO, tu Cazador Inteligente de Ofertas* by ALMIA.
 
-Estoy aquí para ayudarte a encontrar las mejores ofertas de empleo en Colombia.
+Estás usando la versión Free: Estoy aquí para ayudarte a encontrar las mejores ofertas de empleo en Colombia, de forma rápida y personalizada. Conmigo podrás:
 
-✨ Por ahora estoy en fase de pruebas, pero pronto podré:
-• Buscar empleos personalizados para ti
-• Enviarte alertas diarias
-• Filtrar por ubicación, salario y tipo de trabajo
-
-¡Gracias por probarme! 🚀`,
+✨ Buscar empleos ajustados a tu perfil
+✨ Recibir alertas diarias según tus intereses
+✨ Ajustar filtros por ubicación, salario y tipo de empleo`,
 
   // Pregunta sobre dispositivo
-  ASK_DEVICE: `Antes de empezar, ¿desde dónde me escribes?
+  ASK_DEVICE: `Antes de comenzar, *¿desde qué dispositivo me escribes?*
 
 📱 *Celular / Móvil*
 💻 *PC / Portátil / Computador*
@@ -29,11 +26,11 @@ Esto me ayuda a mostrarte las opciones de la mejor manera.`,
 
 📋 *Términos de Uso*
 
-• Recopilaré información sobre tu perfil laboral (cargo deseado, ubicación, preferencias salariales).
-• Si decides compartir tu CV, lo almacenaré de forma segura.
-• Buscaré ofertas de empleo públicas usando Google Empleos.
-• Te enviaré alertas diarias con nuevas oportunidades.
-• No compartiré tu información con terceros.
+• Recopilaré información básica sobre tu perfil laboral (cargo deseado, ubicación, preferencias salariales).
+• Si eliges compartir tu hoja de vida, lo almacenaré de forma segura.
+• Buscaré ofertas de empleo públicas.
+
+Ver política de privacidad: https://cioalmia.vercel.app/privacy-policy
 
 ¿Aceptas estos términos? (Responde "Sí" o "No")`,
 

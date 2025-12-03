@@ -14,7 +14,7 @@ export default function Hero({ whatsappLink }: HeroProps) {
         <div className="max-w-[1440px] mx-auto w-full flex justify-center md:justify-center lg:justify-start">
           <div className="pl-4 md:pl-0 lg:pl-[clamp(24px,6vw,120px)]">
             <Image
-              src="/assets/images/logoAlmia.png"
+              src="/assets/images/logoalmia.svg"
               alt="Almia Logo"
               width={150}
               height={48}
@@ -510,30 +510,30 @@ export default function Hero({ whatsappLink }: HeroProps) {
             >
               {/* Estadística 1 */}
               <div className="flex items-center justify-center gap-2 flex-1 flex-wrap md:flex-nowrap">
-                <span className="text-base md:text-lg lg:text-xl font-medium text-[#A6A6A6] whitespace-nowrap">
+                <span className="text-base md:text-lg lg:text-xl xl:text-3xl font-medium text-[#A6A6A6] whitespace-nowrap">
                   +20
                 </span>
-                <span className="text-[11px] md:text-[10px] lg:text-xs font-normal text-[#A6A6A6] text-center md:text-left whitespace-nowrap">
+                <span className="text-[11px] md:text-[10px] lg:text-xs xl:text-sm font-normal text-[#A6A6A6] text-center md:text-left whitespace-nowrap">
                   Plataformas de empleo.
                 </span>
               </div>
 
               {/* Estadística 2 */}
               <div className="flex items-center justify-center gap-2 flex-1 flex-wrap md:flex-nowrap">
-                <span className="text-base md:text-lg lg:text-xl font-medium text-[#A6A6A6] whitespace-nowrap">
+                <span className="text-base md:text-lg lg:text-xl xl:text-3xl font-medium text-[#A6A6A6] whitespace-nowrap">
                   95%
                 </span>
-                <span className="text-[11px] md:text-[10px] lg:text-xs font-normal text-[#A6A6A6] text-center md:text-left whitespace-nowrap">
+                <span className="text-[11px] md:text-[10px] lg:text-xs xl:text-sm font-normal text-[#A6A6A6] text-center md:text-left whitespace-nowrap">
                   Match entre las ofertas y tu perfil profesional.
                 </span>
               </div>
 
               {/* Estadística 3 */}
               <div className="flex items-center justify-center gap-2 flex-1 flex-wrap md:flex-nowrap">
-                <span className="text-base md:text-lg lg:text-xl font-medium text-[#A6A6A6] whitespace-nowrap">
+                <span className="text-base md:text-lg lg:text-xl xl:text-3xl font-medium text-[#A6A6A6] whitespace-nowrap">
                   3X
                 </span>
-                <span className="text-[11px] md:text-[10px] lg:text-xs font-normal text-[#A6A6A6] text-center md:text-left whitespace-nowrap">
+                <span className="text-[11px] md:text-[10px] lg:text-xs xl:text-sm font-normal text-[#A6A6A6] text-center md:text-left whitespace-nowrap">
                 Más rápida tú busqueda laboral.
                 </span>
               </div>

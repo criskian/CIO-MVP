@@ -10,19 +10,118 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ==========================================
+// ENUMS PARA SISTEMA DE PLANES
+// ==========================================
+
+enum PlanType {
+  FREEMIUM
+  PREMIUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+// ==========================================
+// MODELOS
+// ==========================================
+
 model User {
   id        String   @id @default(cuid())
   phone     String   @unique
+  
+  // Datos de identidad (se piden en onboarding)
+  name      String?              // Nombre del usuario
+  email     String?  @unique     // Email (se pide al agotar freemium)
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Relaciones existentes
   profile       UserProfile?
   sessions      Session[]
   alert         AlertPreference?
   searchLogs    JobSearchLog[]
   sentJobs      SentJob[]
+  
+  // Nuevas relaciones para sistema de planes
+  subscription  Subscription?
+  transactions  Transaction[]
 
   @@map("users")
+}
+
+// ==========================================
+// MODELO DE SUSCRIPCIÓN
+// ==========================================
+
+model Subscription {
+  id                String             @id @default(cuid())
+  userId            String             @unique
+  
+  // Plan actual
+  plan              PlanType           @default(FREEMIUM)
+  
+  // Control de usos freemium (3 búsquedas O 3 días)
+  freemiumUsesLeft  Int                @default(3)
+  freemiumStartDate DateTime           @default(now())
+  freemiumExpired   Boolean            @default(false)
+  
+  // Control de usos premium (5 por semana)
+  premiumUsesLeft   Int                @default(0)
+  premiumWeekStart  DateTime?
+  
+  // Fechas de suscripción premium
+  premiumStartDate  DateTime?
+  premiumEndDate    DateTime?          // Null = sin expiración
+  
+  // Estado de la suscripción
+  status            SubscriptionStatus @default(ACTIVE)
+  
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+// ==========================================
+// MODELO DE TRANSACCIONES (PAGOS WOMPI)
+// ==========================================
+
+model Transaction {
+  id              String    @id @default(cuid())
+  userId          String?                          // Puede ser null hasta vincular por email
+  
+  // Datos de Wompi
+  wompiId         String    @unique                // ID único de transacción en Wompi
+  wompiReference  String                           // Referencia de pago
+  wompiStatus     String                           // APPROVED, DECLINED, PENDING, VOIDED, ERROR
+  
+  // Datos del pago
+  amount          Int                              // Monto en centavos (COP)
+  currency        String    @default("COP")
+  paymentMethod   String?                          // PSE, CARD, NEQUI, BANCOLOMBIA, etc.
+  email           String                           // Email usado en el pago
+  
+  // Vinculación con usuario
+  linkedAt        DateTime?                        // Fecha cuando se vinculó al usuario
+  
+  // Metadata completa de Wompi
+  rawPayload      Json?                            // Payload completo del webhook
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user            User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([email])
+  @@index([wompiReference])
+  @@map("transactions")
 }
 
 model UserProfile {
