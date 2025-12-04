@@ -92,7 +92,7 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
                 {/* Botón principal - Empieza Ahora */}
                 <button
                   onClick={() => setIsModalOpen(true)}
-                  className="font-poppins inline-flex items-center justify-center gap-3 px-12 md:px-16 lg:px-20 py-2.5 md:py-3 bg-[#9054C6] text-white font-normal rounded-lg text-base md:text-lg transition-all duration-300 hover:bg-[#7a3fad] shadow-lg hover:shadow-xl transform hover:scale-105"
+                  className="font-poppins inline-flex items-center justify-center gap-3 px-12 md:px-16 lg:px-20 py-2.5 md:py-3 bg-[#9054C6] text-white font-normal rounded-lg border-2 border-[#9054C6] hover:bg-white hover:text-[#9054C6] transition-all duration-300 shadow-lg"
                 >
                   <span>Empieza Ahora</span>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
