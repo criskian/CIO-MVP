@@ -8,6 +8,7 @@ import { SchedulerModule } from './modules/scheduler/scheduler.module';
 import { LlmModule } from './modules/llm/llm.module';
 import { CvModule } from './modules/cv/cv.module';
 import { RegistrationModule } from './modules/registration/registration.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -23,6 +24,8 @@ import { RegistrationModule } from './modules/registration/registration.module';
     LlmModule,
     CvModule,
     RegistrationModule, // Módulo para registro desde landing page
+    AdminModule, // Módulo de administración de usuarios
   ],
 })
-export class AppModule {}
+export class AppModule { }
+
