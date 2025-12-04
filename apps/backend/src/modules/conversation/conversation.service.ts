@@ -56,31 +56,44 @@ export class ConversationService {
 
       this.logger.log(`💬 Procesando mensaje de ${phone}: ${text || '[media]'}`);
 
-      // 1. Obtener o crear usuario
-      const user = await this.getOrCreateUser(phone);
+      // 1. Buscar usuario por teléfono (NO crear, debe registrarse en landing)
+      const user = await this.findUserByPhone(phone);
 
-      // 2. Obtener o crear sesión activa
+      // 2. Si no está registrado, indicar que debe registrarse en la landing
+      if (!user) {
+        this.logger.log(`🚫 Usuario no registrado: ${phone}`);
+        return { text: BotMessages.NOT_REGISTERED };
+      }
+
+      // 3. Si está registrado pero no tiene nombre, también indicar registro
+      // (esto no debería pasar si el registro desde landing es correcto)
+      if (!user.name) {
+        this.logger.warn(`⚠️ Usuario ${phone} sin nombre completo`);
+        return { text: BotMessages.NOT_REGISTERED };
+      }
+
+      // 4. Obtener o crear sesión activa
       const session = await this.getOrCreateSession(user.id);
 
-      // 3. Si hay media (documento/imagen), podría ser un CV
+      // 5. Si hay media (documento/imagen), podría ser un CV
       if (mediaUrl && messageType === 'document') {
         return await this.handleCVUpload(user.id, mediaUrl);
       }
 
-      // 4. Si no hay texto, no podemos procesar
+      // 6. Si no hay texto, no podemos procesar
       if (!text) {
         return { text: BotMessages.UNKNOWN_INTENT };
       }
 
-      // 5. Detectar intención general (para comandos especiales)
+      // 7. Detectar intención general (para comandos especiales)
       const intent = detectIntent(text);
 
-      // 6. Manejar comandos especiales independientes del estado
+      // 8. Manejar comandos especiales independientes del estado
       if (intent === UserIntent.HELP) {
         return { text: BotMessages.HELP_MESSAGE };
       }
 
-      // 7. Procesar según el estado actual
+      // 9. Procesar según el estado actual
       const response = await this.handleStateTransition(user.id, session.state, text, intent);
 
       return response;
@@ -183,6 +196,18 @@ export class ConversationService {
       case ConversationState.EDIT_ALERT_TIME:
         return await this.handleEditAlertTimeState(userId, text);
 
+      // ========================================
+      // ESTADOS DEL SISTEMA DE PLANES
+      // ========================================
+      case ConversationState.FREEMIUM_EXPIRED:
+        return await this.handleFreemiumExpiredState(userId, text);
+
+      case ConversationState.ASK_EMAIL:
+        return await this.handleAskEmailState(userId, text);
+
+      case ConversationState.WAITING_PAYMENT:
+        return await this.handleWaitingPaymentState(userId, text);
+
       default:
         this.logger.warn(`Estado desconocido: ${currentState}`);
         return { text: BotMessages.UNKNOWN_INTENT };
@@ -190,16 +215,54 @@ export class ConversationService {
   }
 
   /**
-   * Estado NEW: Usuario nuevo, mostrar bienvenida y pasar a ASK_TERMS
+   * Estado NEW: Usuario registrado que inicia el onboarding
+   * NOTA: Solo llegan aquí usuarios ya registrados desde la landing
    */
   private async handleNewState(userId: string): Promise<BotReply> {
-    this.logger.log(`👤 Nuevo usuario: ${userId}`);
+    this.logger.log(`👤 Procesando estado NEW para usuario: ${userId}`);
 
-    // Transición: NEW → ASK_DEVICE
+    // Obtener usuario con su suscripción
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { subscription: true },
+    });
+
+    // CASO 1: Usuario premium activo
+    if (user?.subscription?.plan === 'PREMIUM' && user.subscription.status === 'ACTIVE') {
+      this.logger.log(`👑 Usuario premium ${userId}`);
+      await this.updateSessionState(userId, ConversationState.ASK_DEVICE);
+      return {
+        text: `${BotMessages.WELCOME_BACK_PREMIUM(user.name)}\n\n${BotMessages.ASK_DEVICE}`,
+      };
+    }
+
+    // CASO 2: Usuario con freemium expirado
+    if (user?.subscription?.freemiumExpired) {
+      this.logger.log(`⏰ Usuario ${userId} con freemium expirado`);
+      await this.updateSessionState(userId, ConversationState.FREEMIUM_EXPIRED);
+      return {
+        text: BotMessages.FREEMIUM_EXPIRED_RETURNING_USER(user?.name),
+      };
+    }
+
+    // CASO 3: Usuario sin suscripción → crear freemium
+    if (!user?.subscription) {
+      await this.prisma.subscription.create({
+        data: {
+          userId,
+          plan: 'FREEMIUM',
+          freemiumUsesLeft: 3,
+          freemiumStartDate: new Date(),
+        },
+      });
+    }
+
+    // CASO 4: Usuario freemium activo → dar bienvenida e iniciar onboarding
+    this.logger.log(`🆕 Usuario ${userId} iniciando onboarding`);
     await this.updateSessionState(userId, ConversationState.ASK_DEVICE);
-
+    
     return {
-      text: `${BotMessages.WELCOME}\n\n${BotMessages.ASK_DEVICE}`,
+      text: `${BotMessages.WELCOME_REGISTERED(user?.name || 'usuario')}\n\n${BotMessages.ASK_DEVICE}`,
     };
   }
 
@@ -846,7 +909,32 @@ export class ConversationService {
 
     // Detectar intención de buscar empleos
     if (intent === UserIntent.SEARCH_NOW) {
-      return await this.performJobSearch(userId);
+      // Verificar usos disponibles antes de buscar
+      const usageCheck = await this.checkAndDeductUsage(userId, 'search');
+
+      if (!usageCheck.allowed) {
+        // Redirigir al flujo de freemium agotado
+        await this.updateSessionState(userId, ConversationState.FREEMIUM_EXPIRED);
+        return { text: usageCheck.message || BotMessages.FREEMIUM_EXPIRED };
+      }
+
+      // Ejecutar búsqueda y agregar info de usos restantes
+      const searchResult = await this.performJobSearch(userId);
+
+      // Agregar info de usos restantes al mensaje
+      if (usageCheck.usesLeft !== undefined) {
+        const subscription = await this.prisma.subscription.findUnique({
+          where: { userId },
+        });
+
+        if (subscription?.plan === 'PREMIUM') {
+          searchResult.text += BotMessages.USES_REMAINING_PREMIUM(usageCheck.usesLeft);
+        } else {
+          searchResult.text += BotMessages.USES_REMAINING_FREEMIUM(usageCheck.usesLeft);
+        }
+      }
+
+      return searchResult;
     }
 
     // Mostrar menú de comandos disponibles
@@ -1553,6 +1641,275 @@ Selecciona qué quieres editar:`,
     );
   }
 
+  // ========================================
+  // HANDLERS DEL SISTEMA DE PLANES
+  // ========================================
+
+  /**
+   * Estado FREEMIUM_EXPIRED: El usuario agotó su freemium
+   */
+  private async handleFreemiumExpiredState(userId: string, text: string): Promise<BotReply> {
+    // Transición directa a pedir email
+    await this.updateSessionState(userId, ConversationState.ASK_EMAIL);
+    return { text: BotMessages.FREEMIUM_EXPIRED_ASK_EMAIL };
+  }
+
+  /**
+   * Estado ASK_EMAIL: Pedir email para vincular pago
+   */
+  private async handleAskEmailState(userId: string, text: string): Promise<BotReply> {
+    const email = text.trim().toLowerCase();
+
+    // Validar formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return { text: BotMessages.ERROR_EMAIL_INVALID };
+    }
+
+    // Buscar transacción aprobada con ese email que no esté vinculada
+    const transaction = await this.prisma.transaction.findFirst({
+      where: {
+        email,
+        wompiStatus: 'APPROVED',
+        userId: null, // No vinculada aún
+      },
+    });
+
+    if (transaction) {
+      // ¡Pago encontrado! Vincular y activar premium
+      await this.activatePremiumForUser(userId, email, transaction.id);
+
+      await this.updateSessionState(userId, ConversationState.READY);
+
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
+      return {
+        text: BotMessages.PAYMENT_CONFIRMED(user?.name),
+      };
+    }
+
+    // No hay pago con ese email, guardar email y mostrar enlace de pago
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { email },
+    });
+
+    await this.updateSessionState(userId, ConversationState.WAITING_PAYMENT);
+
+    return {
+      text: BotMessages.PAYMENT_LINK(email),
+    };
+  }
+
+  /**
+   * Estado WAITING_PAYMENT: Usuario esperando confirmación de pago
+   */
+  private async handleWaitingPaymentState(userId: string, text: string): Promise<BotReply> {
+    const lower = text.toLowerCase().trim();
+
+    // Si escribe "verificar", "comprobar" o similar, re-verificar pago
+    if (
+      lower.includes('verificar') ||
+      lower.includes('comprobar') ||
+      lower.includes('ya pague') ||
+      lower.includes('ya pagué')
+    ) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
+      if (!user?.email) {
+        await this.updateSessionState(userId, ConversationState.ASK_EMAIL);
+        return { text: 'Por favor, primero ingresa tu correo electrónico.' };
+      }
+
+      // Buscar transacción aprobada
+      const transaction = await this.prisma.transaction.findFirst({
+        where: {
+          email: user.email,
+          wompiStatus: 'APPROVED',
+          userId: null,
+        },
+      });
+
+      if (transaction) {
+        await this.activatePremiumForUser(userId, user.email, transaction.id);
+        await this.updateSessionState(userId, ConversationState.READY);
+
+        return {
+          text: BotMessages.PAYMENT_CONFIRMED(user.name),
+        };
+      }
+
+      return {
+        text: BotMessages.PAYMENT_NOT_FOUND,
+      };
+    }
+
+    // Si escribe un email, actualizar
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (emailRegex.test(text.trim())) {
+      const newEmail = text.trim().toLowerCase();
+
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { email: newEmail },
+      });
+
+      return {
+        text: `✅ Email actualizado a *${newEmail}*.\n\nEscribe *"verificar"* cuando hayas realizado el pago.`,
+      };
+    }
+
+    // Mostrar ayuda
+    return {
+      text: BotMessages.WAITING_PAYMENT_HELP,
+    };
+  }
+
+  /**
+   * Activa plan premium para un usuario
+   */
+  private async activatePremiumForUser(
+    userId: string,
+    email: string,
+    transactionId: string,
+  ): Promise<void> {
+    // Actualizar usuario con email
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { email },
+    });
+
+    // Vincular transacción
+    await this.prisma.transaction.update({
+      where: { id: transactionId },
+      data: {
+        userId,
+        linkedAt: new Date(),
+      },
+    });
+
+    // Actualizar suscripción a premium
+    await this.prisma.subscription.update({
+      where: { userId },
+      data: {
+        plan: 'PREMIUM',
+        status: 'ACTIVE',
+        premiumStartDate: new Date(),
+        premiumUsesLeft: 5,
+        premiumWeekStart: this.getWeekStart(new Date()),
+      },
+    });
+
+    this.logger.log(`👑 Usuario ${userId} activado como PREMIUM`);
+  }
+
+  /**
+   * Verifica si el usuario puede usar el servicio y deduce un uso
+   * @returns { allowed: boolean, message?: string, usesLeft?: number }
+   */
+  async checkAndDeductUsage(
+    userId: string,
+    usageType: 'search' | 'alert',
+  ): Promise<{ allowed: boolean; message?: string; usesLeft?: number }> {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+    });
+
+    // Si no tiene suscripción, crear una freemium
+    if (!subscription) {
+      await this.prisma.subscription.create({
+        data: {
+          userId,
+          plan: 'FREEMIUM',
+          freemiumUsesLeft: 2, // Ya usó 1
+        },
+      });
+      return { allowed: true, usesLeft: 2 };
+    }
+
+    // PLAN PREMIUM
+    if (subscription.plan === 'PREMIUM' && subscription.status === 'ACTIVE') {
+      // Verificar si es nueva semana
+      const weekStart = subscription.premiumWeekStart;
+      const now = new Date();
+
+      if (!weekStart || this.isNewWeek(weekStart, now)) {
+        // Resetear usos semanales
+        await this.prisma.subscription.update({
+          where: { userId },
+          data: {
+            premiumUsesLeft: 4, // 5 - 1 que está usando ahora
+            premiumWeekStart: this.getWeekStart(now),
+          },
+        });
+        return { allowed: true, usesLeft: 4 };
+      }
+
+      if (subscription.premiumUsesLeft > 0) {
+        const newUsesLeft = subscription.premiumUsesLeft - 1;
+        await this.prisma.subscription.update({
+          where: { userId },
+          data: { premiumUsesLeft: newUsesLeft },
+        });
+        return { allowed: true, usesLeft: newUsesLeft };
+      }
+
+      return {
+        allowed: false,
+        message: BotMessages.PREMIUM_WEEKLY_LIMIT_REACHED,
+      };
+    }
+
+    // PLAN FREEMIUM
+    // Verificar si pasaron 3 días (expiración por tiempo)
+    const daysSinceStart = Math.floor(
+      (Date.now() - subscription.freemiumStartDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    if (daysSinceStart >= 3 || subscription.freemiumUsesLeft <= 0) {
+      // Marcar freemium como expirado
+      await this.prisma.subscription.update({
+        where: { userId },
+        data: { freemiumExpired: true },
+      });
+
+      return {
+        allowed: false,
+        message: BotMessages.FREEMIUM_EXPIRED,
+      };
+    }
+
+    // Deducir uso freemium
+    const newUsesLeft = subscription.freemiumUsesLeft - 1;
+    await this.prisma.subscription.update({
+      where: { userId },
+      data: { freemiumUsesLeft: newUsesLeft },
+    });
+
+    return { allowed: true, usesLeft: newUsesLeft };
+  }
+
+  /**
+   * Verifica si estamos en una nueva semana (lunes a domingo)
+   */
+  private isNewWeek(weekStart: Date, now: Date): boolean {
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    return now >= weekEnd;
+  }
+
+  /**
+   * Obtiene el inicio de la semana actual (lunes 00:00)
+   */
+  private getWeekStart(date: Date): Date {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    d.setDate(diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
   /**
    * Helper: Formatea el tipo de empleo para mostrar
    */
@@ -1598,7 +1955,21 @@ Selecciona qué quieres editar:`,
   // ========================================
 
   /**
+   * Busca un usuario por teléfono (NO crea si no existe)
+   * El registro ahora se hace desde la landing page
+   */
+  private async findUserByPhone(phone: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { phone },
+      include: { subscription: true },
+    });
+
+    return user;
+  }
+
+  /**
    * Obtiene o crea un usuario
+   * @deprecated Usar findUserByPhone - el registro ahora es desde landing
    */
   private async getOrCreateUser(phone: string) {
     let user = await this.prisma.user.findUnique({ where: { phone } });
@@ -1814,17 +2185,37 @@ Selecciona qué quieres editar:`,
   }
 
   /**
-   * Elimina completamente al usuario y todos sus datos
+   * "Cancela" el servicio: elimina preferencias pero mantiene datos de identidad y suscripción
+   * Esto evita que el usuario pueda re-registrarse para una nueva prueba gratuita
    */
   private async deleteUserCompletely(userId: string) {
-    // Prisma Cascade Delete eliminará automáticamente:
-    // - UserProfile
-    // - Session
-    // - AlertPreference
-    // - JobSearchLog
-    // - SentJob
-    await this.prisma.user.delete({ where: { id: userId } });
+    // Eliminar UserProfile (preferencias de búsqueda)
+    try {
+      await this.prisma.userProfile.delete({ where: { userId } });
+    } catch {
+      // No existe, continuar
+    }
 
-    this.logger.log(`🗑️ Usuario eliminado completamente: ${userId}`);
+    // Eliminar AlertPreference
+    try {
+      await this.prisma.alertPreference.delete({ where: { userId } });
+    } catch {
+      // No existe, continuar
+    }
+
+    // Eliminar búsquedas y trabajos enviados
+    await this.prisma.jobSearchLog.deleteMany({ where: { userId } });
+    await this.prisma.sentJob.deleteMany({ where: { userId } });
+
+    // Resetear sesión a NEW
+    await this.prisma.session.updateMany({
+      where: { userId },
+      data: { state: ConversationState.NEW, data: {}, updatedAt: new Date() },
+    });
+
+    // NO eliminar User ni Subscription
+    // El usuario mantiene su identidad y estado de suscripción
+
+    this.logger.log(`🗑️ Preferencias eliminadas para usuario ${userId} (usuario NO eliminado)`);
   }
 }

@@ -1,9 +1,10 @@
 /**
  * Estados de la máquina de conversación
- * Flujo: NEW → ASK_DEVICE → ASK_TERMS → ASK_ROLE → ASK_EXPERIENCE → ASK_LOCATION → ASK_WORK_MODE → ASK_JOB_TYPE → ASK_MIN_SALARY → ASK_ALERT_FREQUENCY → ASK_ALERT_TIME → READY
+ * Flujo actualizado: NEW → ASK_NAME → ASK_DEVICE → ASK_TERMS → ASK_ROLE → ASK_EXPERIENCE → ASK_LOCATION → ASK_JOB_TYPE → ASK_MIN_SALARY → ASK_ALERT_FREQUENCY → ASK_ALERT_TIME → READY
  */
 export enum ConversationState {
   NEW = 'NEW',
+  ASK_NAME = 'ASK_NAME', // Preguntar nombre al inicio (NUEVO)
   ASK_DEVICE = 'ASK_DEVICE', // Preguntar si está en celular o PC
   ASK_TERMS = 'ASK_TERMS',
   ASK_ROLE = 'ASK_ROLE',
@@ -15,6 +16,7 @@ export enum ConversationState {
   ASK_ALERT_FREQUENCY = 'ASK_ALERT_FREQUENCY', // Pregunta con qué frecuencia desea alertas
   ASK_ALERT_TIME = 'ASK_ALERT_TIME', // Pregunta a qué hora desea alertas
   READY = 'READY',
+  
   // Estados adicionales para flujos especiales
   WAITING_CV = 'WAITING_CV', // Usuario quiere enviar CV
   PROCESSING_CV = 'PROCESSING_CV', // CV siendo procesado
@@ -29,6 +31,11 @@ export enum ConversationState {
   EDIT_MIN_SALARY = 'EDIT_MIN_SALARY', // Editando salario mínimo
   EDIT_ALERT_FREQUENCY = 'EDIT_ALERT_FREQUENCY', // Editando frecuencia de alertas
   EDIT_ALERT_TIME = 'EDIT_ALERT_TIME', // Editando horario de alertas
+  
+  // Estados para sistema de planes (NUEVOS)
+  FREEMIUM_EXPIRED = 'FREEMIUM_EXPIRED', // Freemium agotado, mostrar opciones de pago
+  ASK_EMAIL = 'ASK_EMAIL', // Pedir email para vincular pago
+  WAITING_PAYMENT = 'WAITING_PAYMENT', // Esperando confirmación de pago
 }
 
 /**

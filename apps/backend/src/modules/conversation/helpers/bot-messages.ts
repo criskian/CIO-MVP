@@ -4,7 +4,11 @@
  */
 
 export const BotMessages = {
-  // Bienvenida
+  // ==========================================
+  // BIENVENIDA Y NOMBRE
+  // ==========================================
+  
+  // Bienvenida (usada internamente, ya no se muestra sola)
   WELCOME: `¡Hola! 👋 Soy *CIO, tu Cazador Inteligente de Ofertas* by ALMIA.
 
 Estás usando la versión Free: Estoy aquí para ayudarte a encontrar las mejores ofertas de empleo en Colombia, de forma rápida y personalizada. Conmigo podrás:
@@ -12,6 +16,26 @@ Estás usando la versión Free: Estoy aquí para ayudarte a encontrar las mejore
 ✨ Buscar empleos ajustados a tu perfil
 ✨ Recibir alertas diarias según tus intereses
 ✨ Ajustar filtros por ubicación, salario y tipo de empleo`,
+
+  // Usuario no registrado - debe registrarse en la landing
+  NOT_REGISTERED: `👋 ¡Hola! Veo que aún no estás registrado en CIO.
+
+Para usar el *Cazador Inteligente de Ofertas*, primero debes registrarte en nuestra página web:
+
+🔗 *Regístrate aquí:* https://cioalmia.vercel.app
+
+El registro es *gratis* y solo toma 30 segundos. Una vez registrado, podrás comenzar a buscar ofertas de empleo personalizadas.
+
+¿Tienes dudas? Escríbenos a soporte@almia.co`,
+
+  // Bienvenida para usuario registrado (primera vez en el chat)
+  WELCOME_REGISTERED: (name: string) => `¡Hola *${name}*! 👋 Bienvenido a CIO, tu Cazador Inteligente de Ofertas.
+
+Estoy aquí para ayudarte a encontrar las mejores ofertas de empleo en Colombia. 🇨🇴`,
+
+  // ==========================================
+  // DISPOSITIVO
+  // ==========================================
 
   // Pregunta sobre dispositivo
   ASK_DEVICE: `Antes de comenzar, *¿desde qué dispositivo me escribes?*
@@ -221,9 +245,9 @@ Esto eliminará toda tu información y no recibirás más alertas.
 
 Responde *"Sí"* para confirmar o *"No"* para continuar usando el servicio.`,
 
-  SERVICE_CANCELLED: `Entiendo. Tu información ha sido eliminada y ya no recibirás alertas.
+  SERVICE_CANCELLED: `Entiendo. Tus preferencias de búsqueda han sido eliminadas y ya no recibirás alertas.
 
-Si cambias de opinión en el futuro, puedes escribirme nuevamente.
+Tu cuenta permanece registrada. Si cambias de opinión en el futuro, puedes escribirme nuevamente para reconfigurar tus preferencias.
 
 ¡Mucha suerte en tu búsqueda de empleo! 🍀`,
 
@@ -383,4 +407,105 @@ O escribe *"cancelar"* para volver al menú principal.`,
   // *4* - *Modalidad* - Cambiar entre remoto o presencial
   // (ajustar la numeración de las opciones siguientes)
   // ========================================
+
+  // ==========================================
+  // MENSAJES DE SISTEMA DE PLANES
+  // ==========================================
+
+  // Freemium agotado (primera vez)
+  FREEMIUM_EXPIRED: `😔 *Tu período de prueba gratuita ha terminado.*
+
+Has usado tus 3 búsquedas/alertas gratuitas o han pasado 3 días desde tu registro.
+
+✨ Para seguir usando CIO sin límites, activa el *Plan Premium*:
+• 5 búsquedas/alertas por semana
+• Sin límite de tiempo
+• Acceso prioritario a nuevas funciones
+
+🔗 *Enlace de pago:* https://checkout.wompi.co/l/LINK_PENDIENTE
+
+Una vez realices el pago, ingresa el *correo electrónico* que usaste para pagar y verificaremos tu suscripción automáticamente.`,
+
+  // Freemium agotado (usuario que vuelve después de cancelar)
+  FREEMIUM_EXPIRED_RETURNING_USER: (name?: string | null) => `¡Hola${name ? ` ${name}` : ''}! 👋
+
+Veo que ya agotaste tu período de prueba gratuita anteriormente.
+
+Para continuar usando CIO, necesitas activar el *Plan Premium*.
+
+🔗 *Enlace de pago:* https://checkout.wompi.co/l/LINK_PENDIENTE
+
+Una vez realices el pago, ingresa el *correo electrónico* que usaste para pagar.`,
+
+  // Pedir email para vincular pago
+  FREEMIUM_EXPIRED_ASK_EMAIL: `Para verificar tu pago, ingresa el *correo electrónico* que usaste al momento de realizar el pago:`,
+
+  // Email registrado, mostrar enlace de pago
+  PAYMENT_LINK: (email: string) => `✅ Hemos registrado tu correo: *${email}*
+
+🔗 *Realiza tu pago aquí:* https://checkout.wompi.co/l/LINK_PENDIENTE
+
+💡 *Importante:* Usa el mismo correo (*${email}*) al momento de pagar para que podamos vincular tu cuenta automáticamente.
+
+Una vez realizado el pago, escribe *"verificar"* y confirmaremos tu suscripción.`,
+
+  // Pago no encontrado
+  PAYMENT_NOT_FOUND: `😕 No encontramos un pago asociado a tu correo electrónico.
+
+Verifica que:
+1. Hayas completado el pago exitosamente
+2. El correo que ingresaste sea el mismo que usaste para pagar
+
+Si el problema persiste, escribe otro correo o contacta soporte.
+
+🔗 *Enlace de pago:* https://checkout.wompi.co/l/LINK_PENDIENTE`,
+
+  // Pago confirmado exitosamente
+  PAYMENT_CONFIRMED: (name?: string | null) => `🎉 *¡Felicidades${name ? ` ${name}` : ''}!*
+
+Tu pago ha sido *confirmado exitosamente*.
+
+✨ Ya tienes acceso al *Plan Premium*:
+• 5 búsquedas/alertas por semana
+• Sin límite de tiempo
+• Soporte prioritario
+
+¿Qué te gustaría hacer?
+• Escribe *"buscar"* para encontrar ofertas ahora`,
+
+  // Ayuda mientras espera pago
+  WAITING_PAYMENT_HELP: `💡 *¿Necesitas ayuda?*
+
+• Escribe *"verificar"* para comprobar si tu pago fue procesado
+• Escribe tu *correo electrónico* si quieres cambiarlo o corregirlo
+
+🔗 *Enlace de pago:* https://checkout.wompi.co/l/LINK_PENDIENTE`,
+
+  // Límite semanal de premium alcanzado
+  PREMIUM_WEEKLY_LIMIT_REACHED: `⏳ Has alcanzado tu límite de 5 búsquedas/alertas esta semana.
+
+Tus búsquedas se renovarán el próximo *lunes*.
+
+Mientras tanto, puedes:
+• Revisar las ofertas que ya te enviamos
+• Editar tu perfil para mejores resultados la próxima semana`,
+
+  // Email inválido
+  ERROR_EMAIL_INVALID: `Por favor, ingresa un correo electrónico válido.
+
+Ejemplo: tu.correo@ejemplo.com`,
+
+  // Bienvenida para usuario premium que vuelve
+  WELCOME_BACK_PREMIUM: (name?: string | null) => `¡Hola de nuevo${name ? `, ${name}` : ''}! 👋
+
+Veo que tienes el *Plan Premium* activo. ¡Continuemos!`,
+
+  // Info de usos restantes (mostrar después de búsqueda)
+  USES_REMAINING_FREEMIUM: (usesLeft: number) => `
+
+📊 _Te quedan *${usesLeft}* búsqueda${usesLeft !== 1 ? 's' : ''} gratuita${usesLeft !== 1 ? 's' : ''}._`,
+
+  USES_REMAINING_PREMIUM: (usesLeft: number) => `
+
+📊 _Te quedan *${usesLeft}* búsqueda${usesLeft !== 1 ? 's' : ''} esta semana._`,
 };
