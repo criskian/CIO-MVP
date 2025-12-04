@@ -7,6 +7,7 @@ import { JobSearchModule } from './modules/job-search/job-search.module';
 import { SchedulerModule } from './modules/scheduler/scheduler.module';
 import { LlmModule } from './modules/llm/llm.module';
 import { CvModule } from './modules/cv/cv.module';
+import { RegistrationModule } from './modules/registration/registration.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { CvModule } from './modules/cv/cv.module';
     SchedulerModule,
     LlmModule,
     CvModule,
+    RegistrationModule, // Módulo para registro desde landing page
   ],
 })
 export class AppModule {}
