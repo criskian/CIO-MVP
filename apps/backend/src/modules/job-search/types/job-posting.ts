@@ -39,4 +39,5 @@ export interface JobSearchResult {
   total: number;
   query: string;
   executedAt: Date;
+  offersExhausted?: boolean; // true cuando no hay más ofertas disponibles (cache vacío + sin más páginas)
 }

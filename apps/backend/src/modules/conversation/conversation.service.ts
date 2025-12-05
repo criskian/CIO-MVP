@@ -45,7 +45,7 @@ export class ConversationService {
     private readonly jobSearchService: JobSearchService,
     private readonly llmService: LlmService,
     private readonly cvService: CvService,
-  ) {}
+  ) { }
 
   /**
    * Punto de entrada principal: procesa un mensaje entrante y devuelve una respuesta
@@ -260,7 +260,7 @@ export class ConversationService {
     // CASO 4: Usuario freemium activo → dar bienvenida e iniciar onboarding
     this.logger.log(`🆕 Usuario ${userId} iniciando onboarding`);
     await this.updateSessionState(userId, ConversationState.ASK_DEVICE);
-    
+
     return {
       text: `${BotMessages.WELCOME_REGISTERED(user?.name || 'usuario')}\n\n${BotMessages.ASK_DEVICE}`,
     };
@@ -1000,6 +1000,16 @@ Intenta de nuevo más tarde o escribe "reiniciar" para ajustar tus preferencias.
       // Marcar ofertas como enviadas
       await this.jobSearchService.markJobsAsSent(userId, result.jobs);
 
+      // Mensaje de advertencia si se agotaron las ofertas disponibles
+      let exhaustedMessage = '';
+      if (result.offersExhausted) {
+        exhaustedMessage = `
+
+⚠️ *¡Atención!* Has visto todas las ofertas disponibles para tu perfil actual. Para tu próxima búsqueda puedes:
+• Esperar un tiempo mientras se publican nuevas ofertas
+• Escribir *"editar"* para ajustar tus preferencias y encontrar más opciones`;
+      }
+
       // Agregar menú de opciones al final
       const menuText = `
 
@@ -1012,7 +1022,7 @@ Intenta de nuevo más tarde o escribe "reiniciar" para ajustar tus preferencias.
 • Escribe *"reiniciar"* para reconfigurar tu perfil
 • Escribe *"cancelar"* para dejar de usar el servicio`;
 
-      return { text: formattedJobs + menuText };
+      return { text: formattedJobs + exhaustedMessage + menuText };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Error en búsqueda de empleos: ${errorMessage}`);

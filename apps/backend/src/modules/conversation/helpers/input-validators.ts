@@ -100,7 +100,7 @@ export function isRejection(text: string): boolean {
  */
 export function isSearchIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
-  
+
   // Usar regex con word boundaries para evitar falsos positivos
   const searchPatterns = [
     /\bbuscar\b/,
@@ -122,7 +122,7 @@ export function isSearchIntent(text: string): boolean {
  */
 export function isUploadCVIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
-  
+
   // Usar regex con word boundaries para evitar falsos positivos
   const cvPatterns = [
     /\bcv\b/,
@@ -144,7 +144,7 @@ export function isUploadCVIntent(text: string): boolean {
  */
 export function isHelpIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
-  
+
   // Usar regex con word boundaries para evitar falsos positivos (ej: "ayudante" no debe detectarse como "ayuda")
   const helpPatterns = [
     /\bayuda\b/,
@@ -164,7 +164,7 @@ export function isHelpIntent(text: string): boolean {
  */
 export function isRestartIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
-  
+
   // Usar regex con word boundaries para evitar falsos positivos
   const restartPatterns = [
     /\breiniciar\b/,
@@ -183,7 +183,7 @@ export function isRestartIntent(text: string): boolean {
  */
 export function isCancelServiceIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
-  
+
   // Usar regex con word boundaries para evitar falsos positivos
   const cancelPatterns = [
     /\bcancelar\b/,
@@ -203,7 +203,7 @@ export function isCancelServiceIntent(text: string): boolean {
  */
 export function isEditIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
-  
+
   // Usar regex con word boundaries para evitar falsos positivos
   const editPatterns = [
     /\beditar\b/,
@@ -228,7 +228,7 @@ export function detectEditField(
   | 'rol'
   | 'experiencia'
   | 'ubicacion'
-  // | 'modalidad' // COMENTADO TEMPORALMENTE
+  | 'modalidad'
   | 'tipo'
   | 'salario'
   | 'frecuencia'
@@ -270,23 +270,20 @@ export function detectEditField(
     return 'ubicacion';
   }
 
-  // ========================================
-  // DETECCIÓN DE CAMPO "MODALIDAD" - COMENTADA TEMPORALMENTE
-  // Descomentar junto con ASK_WORK_MODE y EDIT_WORK_MODE
-  // ========================================
-  // // Detectar campo "modalidad" (remoto/presencial)
-  // const workModePatterns = [
-  //   'modalidad',
-  //   'remoto',
-  //   'presencial',
-  //   'trabajo remoto',
-  //   'trabajo presencial',
-  //   'oficina',
-  //   'casa',
-  // ];
-  // if (workModePatterns.some((pattern) => normalizedText.includes(pattern))) {
-  //   return 'modalidad';
-  // }
+  // Detectar campo "modalidad" (remoto/presencial)
+  const workModePatterns = [
+    'modalidad',
+    'remoto',
+    'presencial',
+    'trabajo remoto',
+    'trabajo presencial',
+    'oficina',
+    'casa',
+  ];
+  if (workModePatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'modalidad';
+  }
+
 
   // Detectar campo "tipo de empleo/jornada"
   const jobTypePatterns = [
