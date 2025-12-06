@@ -388,13 +388,73 @@ export function normalizeJobType(text: string): JobType | null {
 }
 
 /**
- * Valida que un texto sea una hora válida (HH:mm o HH:MM AM/PM)
+ * Valida y normaliza una hora desde múltiples formatos
+ * Acepta:
+ * - "8", "9", "14" (solo hora)
+ * - "8:00", "8:30", "14:00" (24h con minutos)
+ * - "8am", "8 am", "8:00 am", "8 AM" (12h)
+ * - "8pm", "8 pm", "8:00 pm", "8 PM" (12h)
+ * - "8 de la mañana", "10 de la noche"
+ * - "mediodía", "mediodia" (12:00)
+ * - "mañana" (genérico, asume 9:00)
+ * - "tarde" (genérico, asume 14:00)
+ * - "noche" (genérico, asume 20:00)
  */
 export function normalizeTime(text: string): string | null {
-  const normalizedText = text.trim();
+  const normalizedText = text.toLowerCase().trim();
 
-  // Formato 24h: HH:mm
-  const regex24h = /^(\d{1,2}):(\d{2})$/;
+  // Casos especiales textuales
+  if (normalizedText === 'mediodía' || normalizedText === 'mediodia' || normalizedText === '12') {
+    return '12:00';
+  }
+  if (normalizedText === 'mañana' || normalizedText === 'manana') {
+    return '09:00';
+  }
+  if (normalizedText === 'tarde') {
+    return '14:00';
+  }
+  if (normalizedText === 'noche') {
+    return '20:00';
+  }
+
+  // Detectar patrones de "X de la mañana/tarde/noche"
+  const deLaMatch = normalizedText.match(/^(\d{1,2})\s*(?:de la\s*)?(mañana|manana|tarde|noche)$/);
+  if (deLaMatch) {
+    let hours = parseInt(deLaMatch[1]);
+    const period = deLaMatch[2];
+
+    if (period === 'mañana' || period === 'manana') {
+      // Mañana: 1-11 queda igual, 12 = mediodía
+      if (hours >= 1 && hours <= 12) {
+        if (hours === 12) hours = 12;
+        return `${hours.toString().padStart(2, '0')}:00`;
+      }
+    } else if (period === 'tarde') {
+      // Tarde: 1-7 de la tarde = 13-19
+      if (hours >= 1 && hours <= 7) {
+        return `${(hours + 12).toString().padStart(2, '0')}:00`;
+      }
+      if (hours === 12) return '12:00';
+    } else if (period === 'noche') {
+      // Noche: 8-11 de la noche = 20-23
+      if (hours >= 7 && hours <= 11) {
+        return `${(hours + 12).toString().padStart(2, '0')}:00`;
+      }
+      if (hours === 12) return '00:00';
+    }
+  }
+
+  // Formato: solo número (hora)
+  const soloHora = normalizedText.match(/^(\d{1,2})$/);
+  if (soloHora) {
+    const hours = parseInt(soloHora[1]);
+    if (hours >= 0 && hours <= 23) {
+      return `${hours.toString().padStart(2, '0')}:00`;
+    }
+  }
+
+  // Formato 24h: HH:mm o HH.mm o HHhmm
+  const regex24h = /^(\d{1,2})[:.\s]?(\d{2})$/;
   const match24h = normalizedText.match(regex24h);
 
   if (match24h) {
@@ -406,13 +466,13 @@ export function normalizeTime(text: string): string | null {
     }
   }
 
-  // Formato 12h: HH:MM AM/PM
-  const regex12h = /^(\d{1,2}):(\d{2})\s*(am|pm|AM|PM|a\.m\.|p\.m\.)$/;
+  // Formato 12h: HH AM/PM o HH:MM AM/PM
+  const regex12h = /^(\d{1,2})(?:[:.]?(\d{2}))?\s*(am|pm|a\.?m\.?|p\.?m\.?)$/i;
   const match12h = normalizedText.match(regex12h);
 
   if (match12h) {
     let hours = parseInt(match12h[1]);
-    const minutes = parseInt(match12h[2]);
+    const minutes = match12h[2] ? parseInt(match12h[2]) : 0;
     const period = match12h[3].toLowerCase();
 
     if (hours < 1 || hours > 12 || minutes < 0 || minutes >= 60) {
@@ -420,9 +480,9 @@ export function normalizeTime(text: string): string | null {
     }
 
     // Convertir a 24h
-    if (period.startsWith('pm') || period.startsWith('p')) {
+    if (period.startsWith('p')) {
       if (hours !== 12) hours += 12;
-    } else if (period.startsWith('am') || period.startsWith('a')) {
+    } else if (period.startsWith('a')) {
       if (hours === 12) hours = 0;
     }
 
@@ -433,20 +493,148 @@ export function normalizeTime(text: string): string | null {
 }
 
 /**
- * Valida y normaliza un salario (extrae números)
+ * Valida y normaliza un salario desde múltiples formatos
+ * Acepta:
+ * - Números puros: "2000000"
+ * - Con separadores: "2.000.000", "2,000,000", "2'000.000"
+ * - Con palabra "millones": "2 millones", "2.5 millones"
+ * - Abreviaciones: "2M", "1.5M", "500k"
+ * - Números en palabras: "un millón", "dos millones", "medio millón"
  */
 export function normalizeSalary(text: string): number | null {
-  // Eliminar puntos y comas de miles
-  const cleanText = text.replace(/[.,]/g, '');
+  const normalizedText = text.toLowerCase().trim();
 
-  // Buscar números
-  const match = cleanText.match(/\d+/);
+  // Si el usuario escribe "0" o "sin filtro", aceptar sin filtro de salario
+  if (normalizedText === '0' || normalizedText === 'sin filtro' || normalizedText === 'cualquiera') {
+    return 0;
+  }
 
-  if (match) {
-    const salary = parseInt(match[0]);
-    // Validar que sea un salario razonable (entre 500k y 50M COP)
+  let salary: number | null = null;
+
+  // 1. Mapa de números en palabras a valores
+  const wordToNumber: Record<string, number> = {
+    'medio': 0.5,
+    'un': 1,
+    'uno': 1,
+    'una': 1,
+    'dos': 2,
+    'tres': 3,
+    'cuatro': 4,
+    'cinco': 5,
+    'seis': 6,
+    'siete': 7,
+    'ocho': 8,
+    'nueve': 9,
+    'diez': 10,
+    'quince': 15,
+    'veinte': 20,
+    'veinticinco': 25,
+    'treinta': 30,
+  };
+
+  // 2. Detectar patrón con "millón/millones"
+  const millionPatterns = [
+    // "2 millones", "2.5 millones", "un millon", "dos millones"
+    /(\w+(?:\.\d+)?)\s*(?:millon(?:es)?|mill(?:on)?)/i,
+    // "medio millón"
+    /medio\s*(?:millon|millón)/i,
+  ];
+
+  for (const pattern of millionPatterns) {
+    const match = normalizedText.match(pattern);
+    if (match) {
+      if (normalizedText.includes('medio')) {
+        salary = 500000;
+        break;
+      }
+
+      const numPart = match[1];
+      // Intentar convertir la parte numérica
+      let multiplier = parseFloat(numPart.replace(',', '.'));
+
+      // Si no es un número, buscar en el mapa de palabras
+      if (isNaN(multiplier)) {
+        multiplier = wordToNumber[numPart.toLowerCase()] || 0;
+      }
+
+      if (multiplier > 0) {
+        salary = multiplier * 1000000;
+        break;
+      }
+    }
+  }
+
+  // 3. Detectar abreviaciones M (millones) y K (miles)
+  if (!salary) {
+    // "2M", "1.5M", "2,5M"
+    const mMatch = normalizedText.match(/([\d.,]+)\s*m(?:illones?)?$/i);
+    if (mMatch) {
+      const num = parseFloat(mMatch[1].replace(',', '.'));
+      if (!isNaN(num)) {
+        salary = num * 1000000;
+      }
+    }
+
+    // "500K", "800k"
+    const kMatch = normalizedText.match(/([\d.,]+)\s*k$/i);
+    if (kMatch) {
+      const num = parseFloat(kMatch[1].replace(',', '.'));
+      if (!isNaN(num)) {
+        salary = num * 1000;
+      }
+    }
+  }
+
+  // 4. Detectar formatos numéricos con separadores
+  if (!salary) {
+    // Limpiar separadores de miles (puntos, comas, apóstrofes)
+    // Primero detectar si hay un patrón decimal (coma como decimal)
+    let cleanText = normalizedText;
+
+    // Si hay patrón como "2.500.000" o "2,500,000" o "2'000'000" -> quitar separadores
+    // Pero si hay "2,5" o "2.5" solos -> es decimal
+
+    // Detectar formato con separadores de miles
+    if (/[\d][.,'][\d]{3}/.test(cleanText)) {
+      // Tiene separadores de miles, quitarlos todos
+      cleanText = cleanText.replace(/[.,']/g, '');
+    } else {
+      // Puede ser un decimal simple como "2.5" o "2,5" - convertir coma a punto
+      cleanText = cleanText.replace(',', '.');
+    }
+
+    // Extraer número
+    const numMatch = cleanText.match(/([\d.]+)/);
+    if (numMatch) {
+      const num = parseFloat(numMatch[1]);
+      if (!isNaN(num)) {
+        // Si el número es muy pequeño, probablemente es millones
+        if (num < 100) {
+          salary = num * 1000000; // Asume millones
+        } else if (num < 10000) {
+          salary = num * 1000; // Asume miles
+        } else {
+          salary = num; // Ya es un valor completo
+        }
+      }
+    }
+  }
+
+  // 5. Validar rango razonable para salarios en COP (500K a 50M)
+  if (salary !== null && salary > 0) {
+    // Redondear a entero
+    salary = Math.round(salary);
+
     if (salary >= 500000 && salary <= 50000000) {
       return salary;
+    }
+
+    // Si está entre 50 y 500, multiplicar por 1000 (usuario puso "800" queriendo decir 800k)
+    if (salary >= 50 && salary < 500) {
+      salary = salary * 1000;
+      if (salary >= 500000 && salary <= 50000000) {
+        return salary;
+      }
     }
   }
 
