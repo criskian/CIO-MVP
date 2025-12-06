@@ -389,16 +389,6 @@ export function normalizeJobType(text: string): JobType | null {
 
 /**
  * Valida y normaliza una hora desde múltiples formatos
- * Acepta:
- * - "8", "9", "14" (solo hora)
- * - "8:00", "8:30", "14:00" (24h con minutos)
- * - "8am", "8 am", "8:00 am", "8 AM" (12h)
- * - "8pm", "8 pm", "8:00 pm", "8 PM" (12h)
- * - "8 de la mañana", "10 de la noche"
- * - "mediodía", "mediodia" (12:00)
- * - "mañana" (genérico, asume 9:00)
- * - "tarde" (genérico, asume 14:00)
- * - "noche" (genérico, asume 20:00)
  */
 export function normalizeTime(text: string): string | null {
   const normalizedText = text.toLowerCase().trim();

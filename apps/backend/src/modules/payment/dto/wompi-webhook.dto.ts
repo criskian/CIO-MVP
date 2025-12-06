@@ -1,8 +1,3 @@
-/**
- * DTOs para webhooks de Wompi
- * Documentación: https://docs.wompi.co/docs/colombia/eventos
- */
-
 export interface WompiWebhookPayload {
     event: string; // 'transaction.updated'
     data: {

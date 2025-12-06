@@ -11,10 +11,6 @@ export class PaymentController {
     /**
      * POST /webhook/wompi
      * Endpoint para recibir notificaciones de Wompi
-     * 
-     * Configurar en Wompi Dashboard:
-     * URL: https://TU-DOMINIO/webhook/wompi
-     * Eventos: transaction.updated
      */
     @Post('wompi')
     @HttpCode(200)
@@ -25,13 +21,11 @@ export class PaymentController {
         this.logger.log(`💳 Webhook de Wompi recibido: ${payload.event}`);
 
         try {
-            // Verificar que sea un evento válido
             if (!payload.event || !payload.data?.transaction) {
                 this.logger.warn('⚠️ Payload de webhook inválido');
                 return { status: 'error', message: 'Invalid payload' };
             }
 
-            // Verificar firma del webhook
             const isValid = this.paymentService.verifyWebhookSignature(payload, checksum);
 
             if (!isValid) {
@@ -39,13 +33,11 @@ export class PaymentController {
                 return { status: 'invalid_signature' };
             }
 
-            // Filtrar: solo procesar transacciones de CIO
             if (!this.paymentService.isCioTransaction(payload.data.transaction.reference)) {
                 this.logger.log(`⏭️ Ignorando transacción (no es de CIO): ${payload.data.transaction.reference}`);
                 return { status: 'ignored', message: 'Not a CIO transaction' };
             }
 
-            // Procesar según el evento
             if (payload.event === 'transaction.updated') {
                 await this.paymentService.handleTransactionUpdate(payload);
                 return { status: 'ok' };
@@ -63,7 +55,6 @@ export class PaymentController {
     /**
      * POST /webhook/wompi/test
      * Endpoint de prueba para verificar que el webhook está funcionando
-     * Útil para configuración inicial
      */
     @Post('wompi/test')
     @HttpCode(200)

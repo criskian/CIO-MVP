@@ -20,18 +20,12 @@ export class PaymentService {
         this.cioReferencePrefix = this.configService.get<string>('WOMPI_CIO_REFERENCE_PREFIX', 'CIO-');
     }
 
-    /**
-     * Verifica la firma del webhook de Wompi usando SHA256
-     * Documentación: https://docs.wompi.co/docs/colombia/eventos
-     */
     verifyWebhookSignature(payload: WompiWebhookPayload, checksum?: string): boolean {
         try {
             if (!this.wompiEventsSecret) {
                 this.logger.warn('⚠️ WOMPI_EVENTS_SECRET no configurado, aceptando webhook sin verificar');
                 return true;
             }
-
-            // Construir string para verificar según documentación de Wompi
             const properties = payload.signature.properties;
             const transaction = payload.data.transaction;
 
@@ -43,7 +37,6 @@ export class PaymentService {
             stringToSign += payload.timestamp;
             stringToSign += this.wompiEventsSecret;
 
-            // Calcular checksum SHA256
             const calculatedChecksum = crypto
                 .createHash('sha256')
                 .update(stringToSign)
@@ -63,18 +56,11 @@ export class PaymentService {
         }
     }
 
-    /**
-     * Obtiene propiedad anidada de un objeto (e.g., "transaction.id")
-     */
     private getNestedProperty(obj: any, path: string): string {
-        // Si el path empieza con "transaction.", quitarlo porque ya estamos en ese objeto
         const cleanPath = path.replace(/^transaction\./, '');
         return cleanPath.split('.').reduce((acc, part) => acc && acc[part], obj)?.toString() || '';
     }
 
-    /**
-     * Verifica si la transacción pertenece a CIO (por el prefijo de reference)
-     */
     isCioTransaction(reference: string): boolean {
         const isCio = reference.startsWith(this.cioReferencePrefix);
         if (!isCio) {
@@ -83,9 +69,6 @@ export class PaymentService {
         return isCio;
     }
 
-    /**
-     * Maneja actualización de transacción desde Wompi
-     */
     async handleTransactionUpdate(payload: WompiWebhookPayload): Promise<void> {
         const { transaction } = payload.data;
 
@@ -93,7 +76,7 @@ export class PaymentService {
             `💳 Transacción ${transaction.id}: ${transaction.status} - Email: ${transaction.customer_email} - Ref: ${transaction.reference}`,
         );
 
-        // Filtrar: solo procesar transacciones de CIO
+        // solo procesar transacciones de CIO
         if (!this.isCioTransaction(transaction.reference)) {
             this.logger.log(`⏭️ Ignorando transacción ${transaction.id} (no es de CIO)`);
             return;
@@ -121,7 +104,6 @@ export class PaymentService {
 
         this.logger.log(`✅ Transacción ${transaction.id} guardada en BD`);
 
-        // Si la transacción fue APROBADA, intentar vincular usuario automáticamente
         if (transaction.status === 'APPROVED') {
             await this.tryLinkAndActivatePremium(
                 transaction.id,
@@ -131,11 +113,9 @@ export class PaymentService {
     }
 
     /**
-     * Intenta vincular una transacción aprobada con un usuario existente
-     * y activar su plan premium automáticamente
+     * vincular una transacción aprobada con un usuario existente
      */
     private async tryLinkAndActivatePremium(wompiId: string, email: string): Promise<void> {
-        // Buscar usuario con ese email
         const user = await this.prisma.user.findFirst({
             where: { email },
             include: { subscription: true },
@@ -240,7 +220,7 @@ Tu pago ha sido confirmado exitosamente.
     }
 
     /**
-     * Busca una transacción aprobada por email (para verificación manual desde chat)
+     Busca una transacción aprobada por email (para verificación manual desde chat)
      */
     async findApprovedTransactionByEmail(email: string): Promise<any | null> {
         return this.prisma.transaction.findFirst({

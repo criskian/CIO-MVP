@@ -7,7 +7,7 @@ import { WhatsappModule } from '../whatsapp/whatsapp.module';
 @Module({
     imports: [
         DatabaseModule,
-        forwardRef(() => WhatsappModule), // forwardRef para evitar dependencia circular
+        forwardRef(() => WhatsappModule),
     ],
     controllers: [PaymentController],
     providers: [PaymentService],
