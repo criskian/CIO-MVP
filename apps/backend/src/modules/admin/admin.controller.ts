@@ -10,6 +10,7 @@ import {
     HttpCode,
     HttpStatus,
     Logger,
+    UseGuards,
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import {
@@ -17,14 +18,16 @@ import {
     UpdateSubscriptionDto,
     CreateUserDto,
 } from './dto/admin.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 /**
  * Controlador de administración
  *
  * Endpoints para gestión de usuarios y suscripciones.
- * NOTA: En producción, estos endpoints deberían estar protegidos con autenticación.
+ * PROTEGIDO: Requiere autenticación JWT Admin.
  */
 @Controller('api/admin')
+@UseGuards(JwtAuthGuard)
 export class AdminController {
     private readonly logger = new Logger(AdminController.name);
 

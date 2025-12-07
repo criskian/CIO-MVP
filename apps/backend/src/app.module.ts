@@ -10,6 +10,7 @@ import { CvModule } from './modules/cv/cv.module';
 import { RegistrationModule } from './modules/registration/registration.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { PaymentModule } from './modules/payment/payment.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { PaymentModule } from './modules/payment/payment.module';
     RegistrationModule, // Módulo para registro desde landing page
     AdminModule, // Módulo de administración de usuarios
     PaymentModule, // Módulo para webhooks de Wompi
+    AuthModule, // Módulo de autenticación (Admin)
   ],
 })
 export class AppModule { }

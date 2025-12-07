@@ -201,3 +201,20 @@ model SentJob {
   @@map("sent_jobs")
 }
 
+// ==========================================
+// MODELO DE ADMINISTRADORES
+// ==========================================
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         String   @default("ADMIN") // Para futuro RBAC
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("admin_users")
+}
+
