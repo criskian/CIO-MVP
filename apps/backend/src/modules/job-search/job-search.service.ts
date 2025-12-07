@@ -8,24 +8,14 @@ import { ExperienceLevel } from '../conversation/types/conversation-states';
 
 /**
  * Servicio de búsqueda de empleos
- * Utiliza SerpApi Google Jobs API para acceder al panel de "Google for Jobs"
- * NO contiene lógica de conversación, solo búsqueda y ranking
+ * Utiliza SerpApi Google Jobs API para acceder al panel de Google Jobs
  */
 @Injectable()
 export class JobSearchService {
   private readonly logger = new Logger(JobSearchService.name);
   private readonly serpApiKey: string;
-  private readonly serpApiUrl = 'https://serpapi.com/search'; // SerpApi endpoint
+  private readonly serpApiUrl = 'https://serpapi.com/search';
 
-  // Palabras excluidas de búsqueda (para filtrar ofertas no deseadas)
-  private readonly excludedKeywords = [
-    'call center',
-    'callcenter',
-    'telemarketing',
-    'vendedor',
-    'ventas puerta',
-    'ventas de campo',
-  ];
 
   // Portales de empleo NO confiables (se excluyen completamente)
   private readonly excludedSources = [
@@ -334,20 +324,7 @@ export class JobSearchService {
     // Ubicación (ya se pasa como parámetro separado en location)
     // No la incluimos en el query para evitar redundancia
 
-    // ========================================
-    // FILTRO DE MODALIDAD DE TRABAJO - COMENTADO TEMPORALMENTE
-    // Descomentar para volver a activar el filtro por modalidad (remoto/híbrido/presencial)
-    // ========================================
-    // if (query.workMode) {
-    //   if (query.workMode === 'remoto') {
-    //     parts.push('remoto');
-    //   } else if (query.workMode === 'hibrido') {
-    //     parts.push('híbrido');
-    //   } else if (query.workMode === 'presencial') {
-    //     parts.push('presencial');
-    //   }
-    //   // Si es 'sin_preferencia', no agregar nada (buscar todas)
-    // }
+
 
     // Tipo de jornada (simplificado)
     if (query.jobType) {
@@ -564,14 +541,7 @@ export class JobSearchService {
         }
       }
 
-      // 3. Filtrar por palabras excluidas
-      const textToCheck = `${job.title} ${job.snippet}`.toLowerCase();
-      for (const keyword of this.excludedKeywords) {
-        if (textToCheck.includes(keyword)) {
-          this.logger.debug(`🚫 Oferta excluida por keyword "${keyword}": ${job.title}`);
-          return false;
-        }
-      }
+
 
       // 4. Filtrar títulos que indican listados múltiples
       if (this.isMultipleJobListing(job)) {

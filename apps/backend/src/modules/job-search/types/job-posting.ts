@@ -1,22 +1,18 @@
 /**
- * Tipos para búsqueda de empleos
- */
-
-/**
  * Representa una oferta de empleo normalizada
  */
 export interface JobPosting {
   title: string;
   url: string;
-  source: string; // dominio (ej: "computrabajo.com.co")
+  source: string; // dominio
   snippet: string; // descripción corta
   company?: string;
   locationRaw?: string;
   salaryRaw?: string;
-  jobTypeRaw?: string; // Tipo de empleo como texto (ej: "Full-time", "Part-time")
-  postedAtRaw?: string; // Fecha como texto (ej: "hace 20 días", "2 days ago")
-  publishedAt?: Date; // Fecha parseada (si es posible)
-  score?: number; // score de relevancia (usado para ranking)
+  jobTypeRaw?: string; // Tipo de empleo como texto
+  postedAtRaw?: string; // Fecha como texto 
+  publishedAt?: Date; // Fecha parseada 
+  score?: number; // score de relevancia
 }
 
 /**
@@ -28,7 +24,7 @@ export interface JobSearchQuery {
   jobType?: string;
   minSalary?: number;
   workMode?: string; // presencial, remoto, hibrido, sin_preferencia
-  experienceKeywords?: string[]; // Palabras clave para filtrar por experiencia (e.g., ['junior', 'jr'])
+  experienceKeywords?: string[]; // Palabras clave para filtrar por experiencia 
 }
 
 /**
@@ -39,5 +35,5 @@ export interface JobSearchResult {
   total: number;
   query: string;
   executedAt: Date;
-  offersExhausted?: boolean; // true cuando no hay más ofertas disponibles (cache vacío + sin más páginas)
+  offersExhausted?: boolean; // true cuando no hay más ofertas disponibles
 }
