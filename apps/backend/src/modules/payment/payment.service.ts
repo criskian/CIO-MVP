@@ -152,7 +152,6 @@ export class PaymentService {
             return;
         }
 
-        // Vincular transacción al usuario
         await this.prisma.transaction.update({
             where: { wompiId },
             data: {
@@ -184,8 +183,6 @@ export class PaymentService {
         });
 
         this.logger.log(`🎉 Usuario ${user.id} (${user.phone}) activado como PREMIUM automáticamente`);
-
-        // Notificar al usuario por WhatsApp
         try {
             await this.whatsappService.sendBotReply(user.phone, {
                 text: `🎉 *¡Felicidades${user.name ? ', ' + user.name : ''}!*
