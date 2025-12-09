@@ -9,15 +9,14 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT', 3001);
 
-  // ============================================================
-  // CORS - Permite que la landing page (frontend) se comunique
-  // con este backend aunque estén en dominios diferentes
-  // ============================================================
+  // CORS - Para que la landing page (frontend) se comunique
+
   const additionalOrigin = configService.get<string>('CORS_ORIGIN');
   const corsOrigins: string[] = [
     'http://localhost:3000', // Landing en desarrollo
     'http://localhost:3001', // Backend local (para testing)
     'https://cioalmia.vercel.app', // Landing en producción
+    'https://cio-stg.almia.com.co', // Landing en producción
   ];
 
   if (additionalOrigin) {
@@ -31,10 +30,8 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-key'],
   });
 
-  // ============================================================
   // ValidationPipe - Valida automáticamente los DTOs
-  // Cuando el frontend envía datos, se validan con class-validator
-  // ============================================================
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true, // Elimina propiedades no definidas en el DTO
