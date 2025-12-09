@@ -19,7 +19,7 @@ export class SchedulerService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly jobSearchService: JobSearchService,
     private readonly whatsappService: WhatsappService,
-  ) {}
+  ) { }
 
   onModuleInit() {
     this.startJobAlertsCron();
@@ -98,6 +98,7 @@ export class SchedulerService implements OnModuleInit {
   private shouldSendAlertNow(alertPref: any): boolean {
     try {
       const now = dayjs().tz(alertPref.timezone || 'America/Bogota');
+      const userId = alertPref.userId;
 
       // Extraer hora y minutos configurados (formato "HH:mm" ej: "09:00")
       const [targetHour, targetMinute] = alertPref.alertTimeLocal.split(':').map(Number);
@@ -117,47 +118,62 @@ export class SchedulerService implements OnModuleInit {
 
       // Si no hay última notificación, es la primera vez → enviar
       if (!alertPref.lastNotification) {
-        this.logger.debug(`✅ Usuario ${alertPref.userId}: Primera notificación → enviar`);
+        this.logger.log(`✅ Usuario ${userId}: Primera notificación (${alertPref.alertFrequency}) → ENVIAR`);
         return true;
       }
 
-      // Verificar frecuencia
+      // Calcular tiempo desde última notificación
       const lastNotif = dayjs(alertPref.lastNotification).tz(
         alertPref.timezone || 'America/Bogota',
       );
-      const hoursSinceLastAlert = now.diff(lastNotif, 'hours');
 
+      // Usar diferencia en DÍAS para mayor precisión
+      const daysSinceLastAlert = now.diff(lastNotif, 'day', true); // true = con decimales
+      const hoursSinceLastAlert = now.diff(lastNotif, 'hour');
+
+      // Verificar según frecuencia configurada
       let shouldSend = false;
+      let requiredDays = 0;
 
       switch (alertPref.alertFrequency) {
         case 'daily':
-          // Enviar si pasaron al menos 22 horas (~1 día)
-          shouldSend = hoursSinceLastAlert >= 22;
+          requiredDays = 1;
+          // Enviar si pasó al menos 20 horas (para evitar dobles del mismo día)
+          shouldSend = hoursSinceLastAlert >= 20;
           break;
 
         case 'every_3_days':
-          // Enviar si pasaron al menos 70 horas (~3 días)
-          shouldSend = hoursSinceLastAlert >= 70;
+          requiredDays = 3;
+          // Enviar si pasaron al menos 2.8 días (~67 horas)
+          shouldSend = daysSinceLastAlert >= 2.8;
           break;
 
         case 'weekly':
-          // Enviar si pasaron al menos 166 horas (~7 días)
-          shouldSend = hoursSinceLastAlert >= 166;
+          requiredDays = 7;
+          // Enviar si pasaron al menos 6.8 días (~163 horas)
+          shouldSend = daysSinceLastAlert >= 6.8;
           break;
 
         case 'monthly':
-          // Enviar si pasaron al menos 718 horas (~30 días)
-          shouldSend = hoursSinceLastAlert >= 718;
+          requiredDays = 30;
+          // Enviar si pasaron al menos 29 días
+          shouldSend = daysSinceLastAlert >= 29;
           break;
 
         default:
-          // Default: diario
-          shouldSend = hoursSinceLastAlert >= 22;
+          // Si frecuencia no reconocida, loguear y usar diario
+          this.logger.warn(`⚠️ Usuario ${userId}: Frecuencia desconocida "${alertPref.alertFrequency}", usando diario`);
+          shouldSend = hoursSinceLastAlert >= 20;
       }
 
+      // Loguear decisión para debug
       if (shouldSend) {
+        this.logger.log(
+          `✅ Usuario ${userId}: Frecuencia=${alertPref.alertFrequency}, última alerta hace ${daysSinceLastAlert.toFixed(1)} días (requiere ${requiredDays}) → ENVIAR`,
+        );
+      } else {
         this.logger.debug(
-          `✅ Usuario ${alertPref.userId}: ${alertPref.alertFrequency}, última alerta hace ${hoursSinceLastAlert}h → enviar`,
+          `⏳ Usuario ${userId}: Frecuencia=${alertPref.alertFrequency}, última alerta hace ${daysSinceLastAlert.toFixed(1)} días (requiere ${requiredDays}) → NO ENVIAR AÚN`,
         );
       }
 
@@ -172,25 +188,38 @@ export class SchedulerService implements OnModuleInit {
   /**
    * Ejecuta búsqueda de empleos y notifica a un usuario específico
    * Método reutilizable para scheduler Y búsquedas manuales
+   * INCLUYE: Verificación de plan y descuento de uso
    */
   async runJobSearchAndNotifyUser(userId: string): Promise<void> {
     try {
       this.logger.log(`🔍 Buscando empleos para usuario ${userId}...`);
 
-      // 1. Buscar empleos usando el JobSearchService
-      const searchResult = await this.jobSearchService.searchJobsForUser(userId);
+      // 1. Verificar usos disponibles ANTES de buscar
+      const usageCheck = await this.checkAndDeductAlertUsage(userId);
+
+      if (!usageCheck.allowed) {
+        this.logger.log(`⏩ Usuario ${userId}: ${usageCheck.reason || 'Sin usos disponibles'}`);
+        // Si el plan expiró, opcionalmente notificar al usuario
+        if (usageCheck.shouldNotify) {
+          await this.notifyPlanExpired(userId);
+        }
+        return;
+      }
 
       // 2. Obtener teléfono del usuario
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { phone: true },
+        select: { phone: true, name: true },
       });
 
       if (!user) {
         throw new Error('Usuario no encontrado');
       }
 
-      // 3. Preparar y enviar mensaje
+      // 3. Buscar empleos usando el JobSearchService
+      const searchResult = await this.jobSearchService.searchJobsForUser(userId);
+
+      // 4. Preparar y enviar mensaje
       let messageText: string;
 
       if (searchResult.jobs.length === 0) {
@@ -202,16 +231,27 @@ Te volveré a notificar cuando encuentre algo interesante. ✨`;
         // Hay ofertas → formatear y enviar
         const formattedJobs = this.jobSearchService.formatJobsForWhatsApp(searchResult.jobs);
 
-        messageText = `🎯 *¡Nuevas ofertas de empleo para ti!*\n\n${formattedJobs}\n\n_Te seguiré enviando alertas según tu configuración._ ⏰`;
+        messageText = `🎯 *¡Nuevas ofertas de empleo para ti!*\n\n${formattedJobs}`;
 
-        // 4. Marcar ofertas como enviadas
+        // Marcar ofertas como enviadas
         await this.jobSearchService.markJobsAsSent(userId, searchResult.jobs);
       }
 
-      // 5. Enviar mensaje por WhatsApp
+      // 5. Agregar info de usos restantes al final del mensaje
+      if (usageCheck.usesLeft !== undefined) {
+        if (usageCheck.plan === 'PREMIUM') {
+          messageText += `\n\n📊 _Te quedan *${usageCheck.usesLeft}* búsqueda${usageCheck.usesLeft !== 1 ? 's' : ''} esta semana._`;
+        } else {
+          messageText += `\n\n📊 _Te quedan *${usageCheck.usesLeft}* búsqueda${usageCheck.usesLeft !== 1 ? 's' : ''} gratuita${usageCheck.usesLeft !== 1 ? 's' : ''}._`;
+        }
+      }
+
+      messageText += `\n\n_Te seguiré enviando alertas según tu configuración._ ⏰`;
+
+      // 6. Enviar mensaje por WhatsApp
       await this.whatsappService.sendBotReply(user.phone, { text: messageText });
 
-      // 6. Actualizar lastNotification en AlertPreference
+      // 7. Actualizar lastNotification en AlertPreference
       await this.prisma.alertPreference.updateMany({
         where: { userId },
         data: {
@@ -220,7 +260,7 @@ Te volveré a notificar cuando encuentre algo interesante. ✨`;
         },
       });
 
-      this.logger.log(`✅ Usuario ${userId} notificado con ${searchResult.jobs.length} ofertas`);
+      this.logger.log(`✅ Usuario ${userId} notificado con ${searchResult.jobs.length} ofertas (usos restantes: ${usageCheck.usesLeft})`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`❌ Error en runJobSearchAndNotifyUser para ${userId}: ${errorMessage}`);
@@ -244,4 +284,157 @@ Te volveré a notificar cuando encuentre algo interesante. ✨`;
       throw error;
     }
   }
+
+  /**
+   * Verifica si el usuario puede recibir una alerta y descuenta el uso
+   * Similar a checkAndDeductUsage en ConversationService pero para alertas
+   */
+  private async checkAndDeductAlertUsage(userId: string): Promise<{
+    allowed: boolean;
+    reason?: string;
+    usesLeft?: number;
+    plan?: 'FREEMIUM' | 'PREMIUM';
+    shouldNotify?: boolean;
+  }> {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+    });
+
+    // Si no tiene suscripción, no debería tener alertas activas
+    if (!subscription) {
+      return { allowed: false, reason: 'Sin suscripción' };
+    }
+
+    // PLAN PREMIUM
+    if (subscription.plan === 'PREMIUM' && subscription.status === 'ACTIVE') {
+      // Verificar si es nueva semana
+      const weekStart = subscription.premiumWeekStart;
+      const now = new Date();
+
+      if (!weekStart || this.isNewWeek(weekStart, now)) {
+        // Resetear usos semanales
+        await this.prisma.subscription.update({
+          where: { userId },
+          data: {
+            premiumUsesLeft: 4, // 5 - 1 que está usando ahora
+            premiumWeekStart: this.getWeekStart(now),
+          },
+        });
+        return { allowed: true, usesLeft: 4, plan: 'PREMIUM' };
+      }
+
+      if (subscription.premiumUsesLeft > 0) {
+        const newUsesLeft = subscription.premiumUsesLeft - 1;
+        await this.prisma.subscription.update({
+          where: { userId },
+          data: { premiumUsesLeft: newUsesLeft },
+        });
+        return { allowed: true, usesLeft: newUsesLeft, plan: 'PREMIUM' };
+      }
+
+      return {
+        allowed: false,
+        reason: 'Límite semanal premium alcanzado',
+        plan: 'PREMIUM',
+      };
+    }
+
+    // PLAN FREEMIUM
+    // Verificar si ya expiró (flag o días)
+    if (subscription.freemiumExpired) {
+      return {
+        allowed: false,
+        reason: 'Freemium expirado',
+        plan: 'FREEMIUM',
+        shouldNotify: true,
+      };
+    }
+
+    // Verificar si pasaron 3 días
+    const daysSinceStart = Math.floor(
+      (Date.now() - subscription.freemiumStartDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    if (daysSinceStart >= 3 || subscription.freemiumUsesLeft <= 0) {
+      // Marcar freemium como expirado
+      await this.prisma.subscription.update({
+        where: { userId },
+        data: { freemiumExpired: true },
+      });
+
+      return {
+        allowed: false,
+        reason: 'Freemium expirado (tiempo o usos agotados)',
+        plan: 'FREEMIUM',
+        shouldNotify: true,
+      };
+    }
+
+    // Deducir uso freemium
+    const newUsesLeft = subscription.freemiumUsesLeft - 1;
+    await this.prisma.subscription.update({
+      where: { userId },
+      data: { freemiumUsesLeft: newUsesLeft },
+    });
+
+    return { allowed: true, usesLeft: newUsesLeft, plan: 'FREEMIUM' };
+  }
+
+  /**
+   * Notifica al usuario que su plan expiró
+   */
+  private async notifyPlanExpired(userId: string): Promise<void> {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { phone: true, name: true },
+      });
+
+      if (!user) return;
+
+      const message = `⏰ *Hola${user.name ? ` ${user.name}` : ''}*
+
+Tu período de prueba gratuita ha terminado y no puedo seguir enviándote alertas de empleo.
+
+✨ Para continuar recibiendo ofertas personalizadas, activa el *Plan Premium*:
+
+🔗 *Enlace de pago:* ${process.env.WOMPI_CHECKOUT_LINK || 'https://cioalmia.vercel.app'}
+
+Una vez realices el pago, escríbeme por este chat para activar tu cuenta.`;
+
+      await this.whatsappService.sendBotReply(user.phone, { text: message });
+
+      // Desactivar alertas para no seguir intentando
+      await this.prisma.alertPreference.updateMany({
+        where: { userId },
+        data: { enabled: false },
+      });
+
+      this.logger.log(`📧 Usuario ${userId} notificado de expiración de plan`);
+    } catch (error) {
+      this.logger.error(`Error notificando expiración a usuario ${userId}`);
+    }
+  }
+
+  /**
+   * Verifica si estamos en una nueva semana (lunes a domingo)
+   */
+  private isNewWeek(weekStart: Date, now: Date): boolean {
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    return now >= weekEnd;
+  }
+
+  /**
+   * Obtiene el inicio de la semana actual (lunes 00:00)
+   */
+  private getWeekStart(date: Date): Date {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    d.setDate(diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
 }
+

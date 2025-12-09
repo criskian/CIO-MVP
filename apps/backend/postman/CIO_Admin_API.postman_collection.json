@@ -1,0 +1,518 @@
+{
+    "info": {
+        "name": "CIO Admin API",
+        "description": "Colección de endpoints para gestión de usuarios, suscripciones y administración del sistema CIO",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:3001",
+            "type": "string"
+        }
+    ],
+    "item": [
+        {
+            "name": "Usuarios",
+            "item": [
+                {
+                    "name": "Listar usuarios",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/users?page=1&limit=20&search=",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "users"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "20"
+                                },
+                                {
+                                    "key": "search",
+                                    "value": "",
+                                    "description": "Buscar por nombre, email o teléfono"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Obtener usuario por ID",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/users/:id",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "users",
+                                ":id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "user-id-aqui"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Obtener usuario por teléfono",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/users/phone/:phone",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "users",
+                                "phone",
+                                ":phone"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "phone",
+                                    "value": "573001234567"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Crear usuario",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"phone\": \"573001234567\",\n  \"name\": \"Juan Pérez\",\n  \"email\": \"juan@example.com\",\n  \"createSubscription\": true,\n  \"plan\": \"FREEMIUM\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/users",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "users"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Actualizar usuario",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"Juan Pérez Actualizado\",\n  \"email\": \"nuevo.email@example.com\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/users/:id",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "users",
+                                ":id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "user-id-aqui"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Eliminar usuario por ID",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/users/:id",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "users",
+                                ":id"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "user-id-aqui"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Eliminar usuario por teléfono",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/users/phone/:phone",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "users",
+                                "phone",
+                                ":phone"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "phone",
+                                    "value": "573001234567"
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Suscripciones",
+            "item": [
+                {
+                    "name": "Obtener suscripción de usuario",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/subscriptions/:userId",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "subscriptions",
+                                ":userId"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "userId",
+                                    "value": "user-id-aqui"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Actualizar suscripción",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"plan\": \"FREEMIUM\",\n  \"status\": \"ACTIVE\",\n  \"freemiumUsesLeft\": 3,\n  \"freemiumExpired\": false,\n  \"premiumUsesLeft\": 0\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/subscriptions/:userId",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "subscriptions",
+                                ":userId"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "userId",
+                                    "value": "user-id-aqui"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Activar Premium manualmente",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/subscriptions/:userId/activate-premium",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "subscriptions",
+                                ":userId",
+                                "activate-premium"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "userId",
+                                    "value": "user-id-aqui"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Reiniciar Freemium",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/subscriptions/:userId/reset-freemium",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "subscriptions",
+                                ":userId",
+                                "reset-freemium"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "userId",
+                                    "value": "user-id-aqui"
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Sesiones",
+            "item": [
+                {
+                    "name": "Obtener sesiones de usuario",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/sessions/:userId",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "sessions",
+                                ":userId"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "userId",
+                                    "value": "user-id-aqui"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Eliminar sesiones (reiniciar estado)",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/sessions/:userId",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "sessions",
+                                ":userId"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "userId",
+                                    "value": "user-id-aqui"
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Estadísticas",
+            "item": [
+                {
+                    "name": "Obtener estadísticas generales",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/stats",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "stats"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Registro (Landing)",
+            "item": [
+                {
+                    "name": "Registrar usuario freemium",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"Juan Pérez\",\n  \"email\": \"juan@example.com\",\n  \"phone\": \"573001234567\",\n  \"acceptedTerms\": true\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/registration/freemium",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "registration",
+                                "freemium"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Verificar teléfono",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/registration/check/:phone",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "registration",
+                                "check",
+                                ":phone"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "phone",
+                                    "value": "573001234567"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Verificar email",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/registration/check-email/:email",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "registration",
+                                "check-email",
+                                ":email"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "email",
+                                    "value": "juan@example.com"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Obtener estado de usuario",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/registration/status/:phone",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "registration",
+                                "status",
+                                ":phone"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "phone",
+                                    "value": "573001234567"
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}

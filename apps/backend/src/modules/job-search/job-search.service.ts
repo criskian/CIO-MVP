@@ -8,24 +8,14 @@ import { ExperienceLevel } from '../conversation/types/conversation-states';
 
 /**
  * Servicio de búsqueda de empleos
- * Utiliza SerpApi Google Jobs API para acceder al panel de "Google for Jobs"
- * NO contiene lógica de conversación, solo búsqueda y ranking
+ * Utiliza SerpApi Google Jobs API para acceder al panel de Google Jobs
  */
 @Injectable()
 export class JobSearchService {
   private readonly logger = new Logger(JobSearchService.name);
   private readonly serpApiKey: string;
-  private readonly serpApiUrl = 'https://serpapi.com/search'; // SerpApi endpoint
+  private readonly serpApiUrl = 'https://serpapi.com/search';
 
-  // Palabras excluidas de búsqueda (para filtrar ofertas no deseadas)
-  private readonly excludedKeywords = [
-    'call center',
-    'callcenter',
-    'telemarketing',
-    'vendedor',
-    'ventas puerta',
-    'ventas de campo',
-  ];
 
   // Portales de empleo NO confiables (se excluyen completamente)
   private readonly excludedSources = [
@@ -79,8 +69,9 @@ export class JobSearchService {
   }
 
   /**
-   * Busca empleos para un usuario específico
-   * Lee su perfil de la DB y ejecuta búsqueda
+   * Busca empleos para un usuario específico con sistema de caché inteligente
+   * - Primera búsqueda: 1 API call, envía 5, guarda resto + next_page_token
+   * - Siguientes: usa cache + API si necesario
    */
   async searchJobsForUser(userId: string): Promise<JobSearchResult> {
     try {
@@ -95,7 +86,19 @@ export class JobSearchService {
         throw new Error('Usuario no tiene perfil configurado');
       }
 
-      // 2. Construir query de búsqueda
+      // 2. Generar hash del perfil para detectar cambios
+      const profileHash = this.generateProfileHash(profile);
+
+      // 3. Obtener cache existente de la sesión
+      const session = await this.prisma.session.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const sessionData = (session?.data as any) || {};
+      const cache = sessionData.jobSearchCache;
+
+      // 4. Construir query de búsqueda
       const experienceKeywords = profile.experienceLevel
         ? getExperienceKeywords(profile.experienceLevel as ExperienceLevel)
         : undefined;
@@ -109,62 +112,92 @@ export class JobSearchService {
         experienceKeywords,
       };
 
-      // 3. Ejecutar búsqueda principal
-      const result = await this.searchJobs(searchQuery);
-      let allJobs = [...result.jobs];
+      let allJobs: JobPosting[] = [];
+      let newNextPageToken: string | undefined;
 
-      // ========================================
-      // BÚSQUEDA ADICIONAL SIN FILTRO DE MODALIDAD - COMENTADO TEMPORALMENTE
-      // Esta lógica complementaba el filtro de modalidad. Como el filtro de modalidad
-      // está desactivado, esta búsqueda adicional no es necesaria.
-      // Descomentar junto con el filtro de modalidad en buildQueryString()
-      // ========================================
-      // if (
-      //   profile.workMode &&
-      //   profile.workMode !== 'sin_preferencia' &&
-      //   allJobs.length < 3 &&
-      //   profile.location
-      // ) {
-      //   this.logger.log(
-      //     `📍 Pocas ofertas con modalidad "${profile.workMode}" (${allJobs.length}), buscando sin filtro de modalidad...`,
-      //   );
-      //
-      //   // Buscar sin especificar modalidad (todas las modalidades)
-      //   const generalQuery: JobSearchQuery = {
-      //     ...searchQuery,
-      //     workMode: undefined, // Sin filtro de modalidad
-      //   };
-      //
-      //   const generalResult = await this.searchJobs(generalQuery);
-      //
-      //   // Agregar solo las ofertas que no estén ya en la lista
-      //   const existingUrls = new Set(allJobs.map((j) => j.url));
-      //   const newJobs = generalResult.jobs.filter((j) => !existingUrls.has(j.url));
-      //   allJobs = [...allJobs, ...newJobs];
-      //
-      //   this.logger.log(
-      //     `✅ Se agregaron ${newJobs.length} ofertas adicionales. Total: ${allJobs.length}`,
-      //   );
-      // }
+      // 5. Lógica de caché: SIEMPRE combinar cache + nueva página API
+      const isCacheValid = cache && cache.profileHash === profileHash;
 
-      // 4. Registrar en log
+      if (isCacheValid && cache.nextPageToken) {
+        // Hay cache válido con token de siguiente página
+        // Combinar jobs cacheados + nueva página para tener pool más grande
+        const cachedJobs = cache.cachedJobs || [];
+        this.logger.log(`📦 Combinando ${cachedJobs.length} ofertas del caché con nueva página API...`);
+
+        // Llamar API para obtener siguiente página
+        const nextPageResult = await this.searchJobsSinglePage(searchQuery, cache.nextPageToken);
+
+        // Combinar cache + nuevos resultados
+        allJobs = [...cachedJobs, ...nextPageResult.jobs];
+        newNextPageToken = nextPageResult.nextPageToken;
+
+        this.logger.log(`📊 Pool combinado: ${allJobs.length} ofertas (${cachedJobs.length} cache + ${nextPageResult.jobs.length} nuevas)`);
+      } else {
+        // No hay cache válido o no hay más páginas - búsqueda nueva
+        if (cache && cache.profileHash !== profileHash) {
+          this.logger.log(`🔄 Perfil cambió, iniciando búsqueda nueva...`);
+        } else if (isCacheValid && !cache.nextPageToken) {
+          this.logger.log(`📄 Cache sin más páginas, usando solo cache restante...`);
+          allJobs = cache.cachedJobs || [];
+        } else {
+          this.logger.log(`🆕 Primera búsqueda para este perfil`);
+        }
+
+        // Si no hay jobs del cache o es búsqueda nueva, llamar API
+        if (allJobs.length === 0) {
+          const result = await this.searchJobsSinglePage(searchQuery);
+          allJobs = result.jobs;
+          newNextPageToken = result.nextPageToken;
+        }
+      }
+
+      // 6. Registrar en log
       await this.logSearch(userId, {
-        ...result,
         jobs: allJobs,
         total: allJobs.length,
+        query: this.buildQueryString(searchQuery),
+        executedAt: new Date(),
       });
 
-      // 5. Filtrar ofertas ya enviadas
+      // 7. Filtrar ofertas ya enviadas
       const filteredJobs = await this.filterAlreadySentJobs(userId, allJobs);
 
+      // 8. Separar: 5 para enviar, resto para cache
+      const jobsToSend = filteredJobs.slice(0, 5);
+      const jobsToCache = filteredJobs.slice(5);
+
+      // Detectar si se agotaron las ofertas
+      const offersExhausted = jobsToCache.length === 0 && !newNextPageToken;
+
       this.logger.log(
-        `✅ Búsqueda completada: ${filteredJobs.length} ofertas nuevas de ${allJobs.length} totales`,
+        `✅ Búsqueda completada: ${jobsToSend.length} para enviar, ${jobsToCache.length} para caché${offersExhausted ? ' (OFERTAS AGOTADAS)' : ''}`,
       );
 
+      // 9. Guardar cache actualizado en sesión
+      if (session) {
+        await this.prisma.session.update({
+          where: { id: session.id },
+          data: {
+            data: {
+              ...sessionData,
+              jobSearchCache: {
+                profileHash,
+                cachedJobs: jobsToCache,
+                nextPageToken: newNextPageToken,
+                lastSearchAt: new Date().toISOString(),
+              },
+            },
+          },
+        });
+        this.logger.debug(`💾 Caché actualizado: ${jobsToCache.length} jobs guardados`);
+      }
+
       return {
-        ...result,
-        jobs: filteredJobs.slice(0, 5), // Máximo 5 ofertas
+        jobs: jobsToSend,
         total: allJobs.length,
+        query: this.buildQueryString(searchQuery),
+        executedAt: new Date(),
+        offersExhausted,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -174,46 +207,67 @@ export class JobSearchService {
   }
 
   /**
-   * Ejecuta búsqueda en SerpApi con Google Jobs API
+   * Genera un hash único del perfil para detectar cambios
    */
-  private async searchJobs(query: JobSearchQuery): Promise<JobSearchResult> {
+  private generateProfileHash(profile: any): string {
+    const parts = [
+      profile.role || '',
+      profile.location || '',
+      profile.experienceLevel || '',
+      profile.workMode || '',
+      profile.jobType || '',
+      profile.minSalary?.toString() || '',
+    ];
+    return parts.join('|').toLowerCase();
+  }
+
+  /**
+   * Ejecuta una ÚNICA búsqueda en SerpApi (1 página = ~10 resultados)
+   * Retorna también el next_page_token para paginación posterior
+   */
+  private async searchJobsSinglePage(
+    query: JobSearchQuery,
+    nextPageToken?: string,
+  ): Promise<{ jobs: JobPosting[]; nextPageToken?: string }> {
     try {
-      // Construir query string
       const queryString = this.buildQueryString(query);
 
       this.logger.debug(`🔎 Query SerpApi Google Jobs: "${queryString}"`);
 
       // Determinar ubicación para SerpApi
-      // Si es "Remoto", usar "Colombia" como ubicación base
       const normalizedLocation =
         query.location?.toLowerCase() === 'remoto' ? 'Colombia' : query.location || 'Colombia';
 
-      // Llamar a SerpApi con engine=google_jobs (método GET según documentación)
+      // Construir parámetros
+      const params: Record<string, any> = {
+        engine: 'google_jobs',
+        q: queryString,
+        location: normalizedLocation,
+        gl: 'co',
+        hl: 'es',
+        api_key: this.serpApiKey,
+      };
+
+      // Si hay token de página siguiente, usarlo
+      if (nextPageToken) {
+        params.next_page_token = nextPageToken;
+        this.logger.debug(`📄 Usando next_page_token para página siguiente`);
+      }
+
       const response = await axios.get(this.serpApiUrl, {
-        params: {
-          engine: 'google_jobs', // Parámetro requerido para usar Google Jobs API
-          q: queryString,
-          location: normalizedLocation,
-          gl: 'co', // Country code: Colombia
-          hl: 'es', // Language: español
-          api_key: this.serpApiKey,
-          num: 20, // Número de resultados (máx 10 por página en SerpApi)
-        },
-        timeout: 15000, // 15 segundos timeout
+        params,
+        timeout: 15000,
       });
 
-      // Debug: Ver respuesta completa de SerpApi
-      this.logger.debug(`📊 Respuesta de SerpApi:`, JSON.stringify(response.data, null, 2));
-
-      // Normalizar resultados desde SerpApi
-      // SerpApi devuelve datos estructurados en response.data.jobs_results
       const jobsData = response.data.jobs_results || [];
+      const newNextPageToken = response.data.serpapi_pagination?.next_page_token;
 
-      this.logger.debug(`📊 SerpApi Google Jobs devolvió ${jobsData.length} resultados crudos`);
+      this.logger.log(
+        `📊 SerpApi devolvió ${jobsData.length} resultados (next_page_token: ${newNextPageToken ? 'sí' : 'no'})`,
+      );
 
+      // Normalizar resultados
       const jobs = jobsData.map((item: any) => this.normalizeSerpApiJobResult(item));
-
-      this.logger.debug(`📊 Después de normalizar: ${jobs.length} ofertas`);
 
       // Aplicar filtrado y ranking
       const filteredJobs = this.filterJobs(jobs, query);
@@ -221,29 +275,26 @@ export class JobSearchService {
 
       this.logger.log(`✅ Después de filtrar: ${rankedJobs.length} ofertas válidas`);
 
-      // Eliminar duplicados (misma empresa + mismo rol en diferentes portales)
+      // Eliminar duplicados
       const uniqueJobs = this.removeDuplicateJobs(rankedJobs);
 
       this.logger.log(`✅ Después de eliminar duplicados: ${uniqueJobs.length} ofertas únicas`);
 
       // Si no hay resultados y el rol tiene múltiples palabras, intentar búsqueda más amplia
-      if (uniqueJobs.length === 0 && query.role.split(' ').length > 1) {
+      if (uniqueJobs.length === 0 && query.role.split(' ').length > 1 && !nextPageToken) {
         this.logger.log(
           `🔄 No se encontraron resultados con "${query.role}". Intentando búsqueda más amplia...`,
         );
 
-        // Obtener la primera palabra del rol (ej: "diseñador UI" -> "diseñador")
         const broadRole = query.role.split(' ')[0];
         const broadQuery = { ...query, role: broadRole };
 
-        return await this.searchJobs(broadQuery);
+        return await this.searchJobsSinglePage(broadQuery);
       }
 
       return {
         jobs: uniqueJobs,
-        total: uniqueJobs.length,
-        query: queryString,
-        executedAt: new Date(),
+        nextPageToken: newNextPageToken,
       };
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -273,20 +324,7 @@ export class JobSearchService {
     // Ubicación (ya se pasa como parámetro separado en location)
     // No la incluimos en el query para evitar redundancia
 
-    // ========================================
-    // FILTRO DE MODALIDAD DE TRABAJO - COMENTADO TEMPORALMENTE
-    // Descomentar para volver a activar el filtro por modalidad (remoto/híbrido/presencial)
-    // ========================================
-    // if (query.workMode) {
-    //   if (query.workMode === 'remoto') {
-    //     parts.push('remoto');
-    //   } else if (query.workMode === 'hibrido') {
-    //     parts.push('híbrido');
-    //   } else if (query.workMode === 'presencial') {
-    //     parts.push('presencial');
-    //   }
-    //   // Si es 'sin_preferencia', no agregar nada (buscar todas)
-    // }
+
 
     // Tipo de jornada (simplificado)
     if (query.jobType) {
@@ -485,6 +523,7 @@ export class JobSearchService {
 
   /**
    * Filtra ofertas no deseadas
+   * NOTA: El salario ya NO es un filtro restrictivo - se usa solo para scoring
    */
   private filterJobs(jobs: JobPosting[], query: JobSearchQuery): JobPosting[] {
     return jobs.filter((job) => {
@@ -502,14 +541,7 @@ export class JobSearchService {
         }
       }
 
-      // 3. Filtrar por palabras excluidas
-      const textToCheck = `${job.title} ${job.snippet}`.toLowerCase();
-      for (const keyword of this.excludedKeywords) {
-        if (textToCheck.includes(keyword)) {
-          this.logger.debug(`🚫 Oferta excluida por keyword "${keyword}": ${job.title}`);
-          return false;
-        }
-      }
+
 
       // 4. Filtrar títulos que indican listados múltiples
       if (this.isMultipleJobListing(job)) {
@@ -517,16 +549,8 @@ export class JobSearchService {
         return false;
       }
 
-      // 5. Filtrar por salario mínimo si está presente
-      if (query.minSalary && job.salaryRaw) {
-        const extractedSalary = this.extractSalaryNumber(job.salaryRaw);
-        if (extractedSalary && extractedSalary < query.minSalary) {
-          this.logger.debug(
-            `🚫 Oferta excluida por salario bajo (${extractedSalary} < ${query.minSalary}): ${job.title}`,
-          );
-          return false;
-        }
-      }
+      // NOTA: El salario mínimo ya NO filtra ofertas
+      // Las ofertas con salario bajo tendrán menor puntuación, pero no se excluyen
 
       return true;
     });
@@ -722,10 +746,23 @@ export class JobSearchService {
       }
     }
 
-    // Nota: La modalidad de trabajo (remoto/presencial/híbrido) se usa solo como
-    // filtro de palabras clave en el query, NO como atributo estructurado porque
-    // Google Jobs no devuelve este campo directamente. El filtrado se hace por keyword
-    // en el buildQueryString() y SerpAPI lo procesa en la búsqueda.
+    // +8 puntos si la modalidad de trabajo coincide con la preferencia del usuario
+    if (query.workMode && query.workMode !== 'sin_preferencia') {
+      const workModeKeywords: Record<string, string[]> = {
+        remoto: ['remoto', 'remote', 'trabajo desde casa', 'home office', 'teletrabajo', 'work from home'],
+        presencial: ['presencial', 'on-site', 'oficina', 'sede', 'in-office'],
+        hibrido: ['híbrido', 'hibrido', 'hybrid', 'mixto'],
+      };
+
+      const keywords = workModeKeywords[query.workMode] || [];
+      const hasModalityMatch = keywords.some(
+        (keyword) => titleLower.includes(keyword) || snippetLower.includes(keyword),
+      );
+
+      if (hasModalityMatch) {
+        score += 8;
+      }
+    }
 
     // +7 puntos si el nivel de experiencia coincide (prioriza, pero no filtra)
     if (query.experienceKeywords && query.experienceKeywords.length > 0) {
@@ -739,7 +776,16 @@ export class JobSearchService {
       }
     }
 
-    // +3 puntos si tiene salario visible
+    // +5 puntos si el salario cumple o supera el mínimo esperado (no restrictivo)
+    if (query.minSalary && job.salaryRaw) {
+      const extractedSalary = this.extractSalaryNumber(job.salaryRaw);
+      if (extractedSalary && extractedSalary >= query.minSalary) {
+        score += 5; // Salario cumple el mínimo
+      }
+      // Si el salario es menor, no suma puntos pero tampoco resta (no es restrictivo)
+    }
+
+    // +3 puntos si tiene salario visible (independiente de si cumple el mínimo)
     if (job.salaryRaw) {
       score += 3;
     }

@@ -1,12 +1,6 @@
 import { JobType, UserIntent, ExperienceLevel, AlertFrequency } from '../types/conversation-states';
 
-/**
- * Helpers para validar y normalizar respuestas del usuario
- */
-
-/**
- * Detecta si el usuario está en móvil/celular
- */
+// Detecta si el usuario está en móvil/celular
 export function isMobileDevice(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
   const mobilePatterns = [
@@ -26,9 +20,7 @@ export function isMobileDevice(text: string): boolean {
   return mobilePatterns.some((pattern) => normalizedText.includes(pattern));
 }
 
-/**
- * Detecta si el usuario está en PC/desktop
- */
+//Detecta si el usuario está en PC/desktop
 export function isDesktopDevice(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
   const desktopPatterns = [
@@ -46,9 +38,7 @@ export function isDesktopDevice(text: string): boolean {
   return desktopPatterns.some((pattern) => normalizedText.includes(pattern));
 }
 
-/**
- * Detecta si el usuario está aceptando (sí, acepto, ok, dale, etc.)
- */
+//Detecta si el usuario está aceptando (sí, acepto, ok, dale, etc.)
 export function isAcceptance(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
   const acceptancePatterns = [
@@ -73,9 +63,7 @@ export function isAcceptance(text: string): boolean {
   );
 }
 
-/**
- * Detecta si el usuario está rechazando (no, rechazo, etc.)
- */
+//Detecta si el usuario está rechazando (no, rechazo, etc.)
 export function isRejection(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
   const rejectionPatterns = [
@@ -95,12 +83,10 @@ export function isRejection(text: string): boolean {
   );
 }
 
-/**
- * Detecta intención de buscar ahora
- */
+//Detecta intención de buscar ahora
 export function isSearchIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
-  
+
   // Usar regex con word boundaries para evitar falsos positivos
   const searchPatterns = [
     /\bbuscar\b/,
@@ -117,12 +103,10 @@ export function isSearchIntent(text: string): boolean {
   return searchPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
-/**
- * Detecta intención de subir CV
- */
+//Detecta intención de subir CV
 export function isUploadCVIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
-  
+
   // Usar regex con word boundaries para evitar falsos positivos
   const cvPatterns = [
     /\bcv\b/,
@@ -139,12 +123,10 @@ export function isUploadCVIntent(text: string): boolean {
   return cvPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
-/**
- * Detecta intención de ayuda
- */
+//Detecta intención de ayuda
 export function isHelpIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
-  
+
   // Usar regex con word boundaries para evitar falsos positivos (ej: "ayudante" no debe detectarse como "ayuda")
   const helpPatterns = [
     /\bayuda\b/,
@@ -159,12 +141,10 @@ export function isHelpIntent(text: string): boolean {
   return helpPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
-/**
- * Detecta intención de reiniciar perfil
- */
+//Detecta intención de reiniciar perfil
 export function isRestartIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
-  
+
   // Usar regex con word boundaries para evitar falsos positivos
   const restartPatterns = [
     /\breiniciar\b/,
@@ -178,12 +158,10 @@ export function isRestartIntent(text: string): boolean {
   return restartPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
-/**
- * Detecta intención de cancelar servicio
- */
+//Detecta intención de cancelar servicio
 export function isCancelServiceIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
-  
+
   // Usar regex con word boundaries para evitar falsos positivos
   const cancelPatterns = [
     /\bcancelar\b/,
@@ -198,12 +176,10 @@ export function isCancelServiceIntent(text: string): boolean {
   return cancelPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
-/**
- * Detecta intención de editar perfil
- */
+//Detecta intención de editar perfil
 export function isEditIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
-  
+
   // Usar regex con word boundaries para evitar falsos positivos
   const editPatterns = [
     /\beditar\b/,
@@ -218,17 +194,14 @@ export function isEditIntent(text: string): boolean {
   return editPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
-/**
- * Detecta qué campo del perfil el usuario quiere editar
- * Retorna el nombre del campo o null si no se detecta
- */
+//Detecta qué campo del perfil el usuario quiere editar
 export function detectEditField(
   text: string,
 ):
   | 'rol'
   | 'experiencia'
   | 'ubicacion'
-  // | 'modalidad' // COMENTADO TEMPORALMENTE
+  | 'modalidad'
   | 'tipo'
   | 'salario'
   | 'frecuencia'
@@ -270,23 +243,20 @@ export function detectEditField(
     return 'ubicacion';
   }
 
-  // ========================================
-  // DETECCIÓN DE CAMPO "MODALIDAD" - COMENTADA TEMPORALMENTE
-  // Descomentar junto con ASK_WORK_MODE y EDIT_WORK_MODE
-  // ========================================
-  // // Detectar campo "modalidad" (remoto/presencial)
-  // const workModePatterns = [
-  //   'modalidad',
-  //   'remoto',
-  //   'presencial',
-  //   'trabajo remoto',
-  //   'trabajo presencial',
-  //   'oficina',
-  //   'casa',
-  // ];
-  // if (workModePatterns.some((pattern) => normalizedText.includes(pattern))) {
-  //   return 'modalidad';
-  // }
+  // Detectar campo "modalidad" (remoto/presencial)
+  const workModePatterns = [
+    'modalidad',
+    'remoto',
+    'presencial',
+    'trabajo remoto',
+    'trabajo presencial',
+    'oficina',
+    'casa',
+  ];
+  if (workModePatterns.some((pattern) => normalizedText.includes(pattern))) {
+    return 'modalidad';
+  }
+
 
   // Detectar campo "tipo de empleo/jornada"
   const jobTypePatterns = [
@@ -338,9 +308,7 @@ export function detectEditField(
   return null;
 }
 
-/**
- * Detecta la intención general del usuario
- */
+//Detecta la intención general del usuario
 export function detectIntent(text: string): UserIntent {
   if (isAcceptance(text)) return UserIntent.ACCEPT;
   if (isRejection(text)) return UserIntent.REJECT;
@@ -350,9 +318,7 @@ export function detectIntent(text: string): UserIntent {
   return UserIntent.UNKNOWN;
 }
 
-/**
- * Normaliza texto de tipo de trabajo
- */
+//Normaliza texto de tipo de trabajo
 export function normalizeJobType(text: string): JobType | null {
   const normalizedText = text.toLowerCase().trim();
 
@@ -390,14 +356,58 @@ export function normalizeJobType(text: string): JobType | null {
   return null;
 }
 
-/**
- * Valida que un texto sea una hora válida (HH:mm o HH:MM AM/PM)
- */
+//Valida y normaliza una hora desde múltiples formatos
 export function normalizeTime(text: string): string | null {
-  const normalizedText = text.trim();
+  const normalizedText = text.toLowerCase().trim();
 
-  // Formato 24h: HH:mm
-  const regex24h = /^(\d{1,2}):(\d{2})$/;
+  // Casos especiales textuales
+  if (normalizedText === 'mediodía' || normalizedText === 'mediodia' || normalizedText === '12') {
+    return '12:00';
+  }
+  if (normalizedText === 'mañana' || normalizedText === 'manana') {
+    return '09:00';
+  }
+  if (normalizedText === 'tarde') {
+    return '14:00';
+  }
+  if (normalizedText === 'noche') {
+    return '20:00';
+  }
+
+  // Detectar patrones de "X de la mañana/tarde/noche"
+  const deLaMatch = normalizedText.match(/^(\d{1,2})\s*(?:de la\s*)?(mañana|manana|tarde|noche)$/);
+  if (deLaMatch) {
+    let hours = parseInt(deLaMatch[1]);
+    const period = deLaMatch[2];
+
+    if (period === 'mañana' || period === 'manana') {
+      if (hours >= 1 && hours <= 12) {
+        if (hours === 12) hours = 12;
+        return `${hours.toString().padStart(2, '0')}:00`;
+      }
+    } else if (period === 'tarde') {
+      if (hours >= 1 && hours <= 7) {
+        return `${(hours + 12).toString().padStart(2, '0')}:00`;
+      }
+      if (hours === 12) return '12:00';
+    } else if (period === 'noche') {
+      if (hours >= 7 && hours <= 11) {
+        return `${(hours + 12).toString().padStart(2, '0')}:00`;
+      }
+      if (hours === 12) return '00:00';
+    }
+  }
+
+  const soloHora = normalizedText.match(/^(\d{1,2})$/);
+  if (soloHora) {
+    const hours = parseInt(soloHora[1]);
+    if (hours >= 0 && hours <= 23) {
+      return `${hours.toString().padStart(2, '0')}:00`;
+    }
+  }
+
+  // Formato 24h: HH:mm o HH.mm o HHhmm
+  const regex24h = /^(\d{1,2})[:.\s]?(\d{2})$/;
   const match24h = normalizedText.match(regex24h);
 
   if (match24h) {
@@ -409,13 +419,13 @@ export function normalizeTime(text: string): string | null {
     }
   }
 
-  // Formato 12h: HH:MM AM/PM
-  const regex12h = /^(\d{1,2}):(\d{2})\s*(am|pm|AM|PM|a\.m\.|p\.m\.)$/;
+  // Formato 12h: HH AM/PM o HH:MM AM/PM
+  const regex12h = /^(\d{1,2})(?:[:.]?(\d{2}))?\s*(am|pm|a\.?m\.?|p\.?m\.?)$/i;
   const match12h = normalizedText.match(regex12h);
 
   if (match12h) {
     let hours = parseInt(match12h[1]);
-    const minutes = parseInt(match12h[2]);
+    const minutes = match12h[2] ? parseInt(match12h[2]) : 0;
     const period = match12h[3].toLowerCase();
 
     if (hours < 1 || hours > 12 || minutes < 0 || minutes >= 60) {
@@ -423,9 +433,9 @@ export function normalizeTime(text: string): string | null {
     }
 
     // Convertir a 24h
-    if (period.startsWith('pm') || period.startsWith('p')) {
+    if (period.startsWith('p')) {
       if (hours !== 12) hours += 12;
-    } else if (period.startsWith('am') || period.startsWith('a')) {
+    } else if (period.startsWith('a')) {
       if (hours === 12) hours = 0;
     }
 
@@ -435,30 +445,141 @@ export function normalizeTime(text: string): string | null {
   return null;
 }
 
-/**
- * Valida y normaliza un salario (extrae números)
- */
+//Valida y normaliza un salario desde múltiples formatos
 export function normalizeSalary(text: string): number | null {
-  // Eliminar puntos y comas de miles
-  const cleanText = text.replace(/[.,]/g, '');
+  const normalizedText = text.toLowerCase().trim();
 
-  // Buscar números
-  const match = cleanText.match(/\d+/);
+  // Si el usuario escribe "0" o "sin filtro", aceptar sin filtro de salario
+  if (normalizedText === '0' || normalizedText === 'sin filtro' || normalizedText === 'cualquiera') {
+    return 0;
+  }
 
-  if (match) {
-    const salary = parseInt(match[0]);
-    // Validar que sea un salario razonable (entre 500k y 50M COP)
+  let salary: number | null = null;
+
+  // Mapa de números en palabras a valores
+  const wordToNumber: Record<string, number> = {
+    'medio': 0.5,
+    'un': 1,
+    'uno': 1,
+    'una': 1,
+    'dos': 2,
+    'tres': 3,
+    'cuatro': 4,
+    'cinco': 5,
+    'seis': 6,
+    'siete': 7,
+    'ocho': 8,
+    'nueve': 9,
+    'diez': 10,
+    'quince': 15,
+    'veinte': 20,
+    'veinticinco': 25,
+    'treinta': 30,
+  };
+
+  // patrón con "millón/millones"
+  const millionPatterns = [
+    /(\w+(?:\.\d+)?)\s*(?:millon(?:es)?|mill(?:on)?)/i,
+    /medio\s*(?:millon|millón)/i,
+  ];
+
+  for (const pattern of millionPatterns) {
+    const match = normalizedText.match(pattern);
+    if (match) {
+      if (normalizedText.includes('medio')) {
+        salary = 500000;
+        break;
+      }
+
+      const numPart = match[1];
+      // Intentar convertir la parte numérica
+      let multiplier = parseFloat(numPart.replace(',', '.'));
+
+      // Si no es un número, buscar en el mapa de palabras
+      if (isNaN(multiplier)) {
+        multiplier = wordToNumber[numPart.toLowerCase()] || 0;
+      }
+
+      if (multiplier > 0) {
+        salary = multiplier * 1000000;
+        break;
+      }
+    }
+  }
+
+  // Detectar abreviaciones M (millones) y K (miles)
+  if (!salary) {
+    // "2M", "1.5M", "2,5M"
+    const mMatch = normalizedText.match(/([\d.,]+)\s*m(?:illones?)?$/i);
+    if (mMatch) {
+      const num = parseFloat(mMatch[1].replace(',', '.'));
+      if (!isNaN(num)) {
+        salary = num * 1000000;
+      }
+    }
+
+    // "500K", "800k"
+    const kMatch = normalizedText.match(/([\d.,]+)\s*k$/i);
+    if (kMatch) {
+      const num = parseFloat(kMatch[1].replace(',', '.'));
+      if (!isNaN(num)) {
+        salary = num * 1000;
+      }
+    }
+  }
+
+  // Detectar formatos numéricos con separadores
+  if (!salary) {
+    let cleanText = normalizedText;
+
+    // Detectar formato con separadores de miles
+    if (/[\d][.,'][\d]{3}/.test(cleanText)) {
+      // Tiene separadores de miles, quitarlos todos
+      cleanText = cleanText.replace(/[.,']/g, '');
+    } else {
+      // Puede ser un decimal simple como "2.5" o "2,5" - convertir coma a punto
+      cleanText = cleanText.replace(',', '.');
+    }
+
+    // Extraer número
+    const numMatch = cleanText.match(/([\d.]+)/);
+    if (numMatch) {
+      const num = parseFloat(numMatch[1]);
+      if (!isNaN(num)) {
+        // Si el número es muy pequeño, probablemente es millones
+        if (num < 100) {
+          salary = num * 1000000; // Asume millones
+        } else if (num < 10000) {
+          salary = num * 1000; // Asume miles
+        } else {
+          salary = num; // Ya es un valor completo
+        }
+      }
+    }
+  }
+
+  // Validar rango razonable para salarios en COP (500K a 50M)
+  if (salary !== null && salary > 0) {
+    // Redondear a entero
+    salary = Math.round(salary);
+
     if (salary >= 500000 && salary <= 50000000) {
       return salary;
+    }
+
+    // Si está entre 50 y 500, multiplicar por 1000 (usuario puso "800" queriendo decir 800k)
+    if (salary >= 50 && salary < 500) {
+      salary = salary * 1000;
+      if (salary >= 500000 && salary <= 50000000) {
+        return salary;
+      }
     }
   }
 
   return null;
 }
 
-/**
- * Valida que un texto sea una ciudad válida (por ahora, cualquier texto > 2 caracteres)
- */
+//Valida que un texto sea una ciudad válida (por ahora, cualquier texto > 2 caracteres)
 export function normalizeLocation(text: string): string | null {
   const normalizedText = text.trim();
 
@@ -470,10 +591,7 @@ export function normalizeLocation(text: string): string | null {
   return null;
 }
 
-/**
- * Normaliza la modalidad de trabajo
- * Retorna: 'remoto' | 'presencial' | 'hibrido' | 'sin_preferencia' | null
- */
+//Normaliza la modalidad de trabajo
 export function normalizeWorkMode(
   text: string,
 ): 'remoto' | 'presencial' | 'hibrido' | 'sin_preferencia' | null {
@@ -548,9 +666,7 @@ export function normalizeWorkMode(
   return null;
 }
 
-/**
- * Valida que un texto sea un rol válido (por ahora, cualquier texto > 2 caracteres)
- */
+//Valida que un texto sea un rol válido (por ahora, cualquier texto > 2 caracteres)
 export function normalizeRole(text: string): string | null {
   const normalizedText = text.trim();
 
@@ -561,10 +677,7 @@ export function normalizeRole(text: string): string | null {
   return null;
 }
 
-/**
- * Normaliza el nivel de experiencia del usuario
- * Retorna: ExperienceLevel enum o null
- */
+//Normaliza el nivel de experiencia del usuario
 export function normalizeExperienceLevel(text: string): ExperienceLevel | null {
   const normalizedText = text.toLowerCase().trim();
 
@@ -643,10 +756,7 @@ export function normalizeExperienceLevel(text: string): ExperienceLevel | null {
   return null;
 }
 
-/**
- * Obtiene las palabras clave de búsqueda para cada nivel de experiencia
- * Estas palabras se usan para filtrar/priorizar resultados en la búsqueda
- */
+//Obtiene las palabras clave de búsqueda para cada nivel de experiencia
 export function getExperienceKeywords(level: ExperienceLevel): string[] {
   switch (level) {
     case ExperienceLevel.NONE:
@@ -664,10 +774,7 @@ export function getExperienceKeywords(level: ExperienceLevel): string[] {
   }
 }
 
-/**
- * Normaliza la frecuencia de alertas del usuario
- * Retorna: AlertFrequency enum o null
- */
+//Normaliza la frecuencia de alertas del usuario
 export function normalizeAlertFrequency(text: string): AlertFrequency | null {
   const normalizedText = text.toLowerCase().trim();
 
@@ -698,9 +805,7 @@ export function normalizeAlertFrequency(text: string): AlertFrequency | null {
   return null;
 }
 
-/**
- * Convierte AlertFrequency enum a texto legible en español
- */
+//Convierte AlertFrequency enum a texto legible en español
 export function alertFrequencyToText(frequency: AlertFrequency): string {
   switch (frequency) {
     case AlertFrequency.DAILY:
@@ -716,10 +821,7 @@ export function alertFrequencyToText(frequency: AlertFrequency): string {
   }
 }
 
-/**
- * Genera lista de horas comunes para selector (6:00 AM a 4:00 PM)
- * WhatsApp limita las listas a 10 opciones
- */
+//Genera lista de horas comunes para selector (6:00 AM a 4:00 PM)
 export function generateTimeOptions(): Array<{ id: string; title: string }> {
   const options: Array<{ id: string; title: string }> = [];
 

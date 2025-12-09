@@ -1,17 +1,18 @@
 /**
  * Mensajes del bot CIO
- * Todos en español, tono amigable y profesional
  */
 
+// CONFIGURACIÓN DE LINKS
+const WOMPI_CHECKOUT_LINK = process.env.WOMPI_CHECKOUT_LINK || 'https://cioalmia.vercel.app';
+const LANDING_URL = 'https://cioalmia.vercel.app';
+
 export const BotMessages = {
-  // ==========================================
   // BIENVENIDA Y NOMBRE
-  // ==========================================
-  
+
   // Bienvenida (usada internamente, ya no se muestra sola)
   WELCOME: `¡Hola! 👋 Soy *CIO, tu Cazador Inteligente de Ofertas* by ALMIA.
 
-Estás usando la versión Free: Estoy aquí para ayudarte a encontrar las mejores ofertas de empleo en Colombia, de forma rápida y personalizada. Conmigo podrás:
+Estás usando la *versión Free*: Estoy aquí para ayudarte a encontrar las *mejores ofertas de empleo en Colombia*, de forma rápida y personalizada. Conmigo podrás:
 
 ✨ Buscar empleos ajustados a tu perfil
 ✨ Recibir alertas diarias según tus intereses
@@ -24,18 +25,19 @@ Para usar el *Cazador Inteligente de Ofertas*, primero debes registrarte en nues
 
 🔗 *Regístrate aquí:* https://cioalmia.vercel.app
 
-El registro es *gratis* y solo toma 30 segundos. Una vez registrado, podrás comenzar a buscar ofertas de empleo personalizadas.
-
-¿Tienes dudas? Escríbenos a soporte@almia.co`,
+El registro es *gratis* y solo toma unos segundos. Una vez registrado, podrás comenzar a buscar ofertas de empleo personalizadas.`,
 
   // Bienvenida para usuario registrado (primera vez en el chat)
   WELCOME_REGISTERED: (name: string) => `¡Hola *${name}*! 👋 Bienvenido a CIO, tu Cazador Inteligente de Ofertas.
 
-Estoy aquí para ayudarte a encontrar las mejores ofertas de empleo en Colombia. 🇨🇴`,
+Estás usando la *versión Free*: Estoy aquí para ayudarte a encontrar las *mejores ofertas de empleo en Colombia* 🇨🇴, de forma rápida y personalizada.
 
-  // ==========================================
+✨ *Incluye:*
+• 3 búsquedas personalizadas GRATIS
+• Válido por 3 días desde tu registro
+• Alertas de empleo según tus preferencias`,
+
   // DISPOSITIVO
-  // ==========================================
 
   // Pregunta sobre dispositivo
   ASK_DEVICE: `Antes de comenzar, *¿desde qué dispositivo me escribes?*
@@ -380,6 +382,7 @@ Escribe:
 🔹 *Rol:* ${profile.role}
 💡 *Experiencia:* ${profile.experience}
 📍 *Ubicación:* ${profile.location}
+🏠 *Modalidad:* ${profile.workMode}
 💼 *Tipo de empleo:* ${profile.jobType}
 💰 *Salario mínimo:* ${profile.minSalary}
 🔔 *Frecuencia:* ${profile.alertFrequency}
@@ -392,21 +395,13 @@ Escribe el *número* o *nombre* del campo que quieres editar:
 *1* - *Rol* - Cambiar tu cargo deseado
 *2* - *Experiencia* - Cambiar tu nivel de experiencia
 *3* - *Ubicación* - Cambiar la ciudad
-*4* - *Tipo* - Cambiar el tipo de empleo
-*5* - *Salario* - Cambiar el salario mínimo
-*6* - *Frecuencia* - Cambiar la frecuencia de alertas
-*7* - *Horario* - Cambiar la hora de alertas
+*4* - *Modalidad* - Cambiar entre remoto o presencial
+*5* - *Tipo* - Cambiar el tipo de empleo
+*6* - *Salario* - Cambiar el salario mínimo
+*7* - *Frecuencia* - Cambiar la frecuencia de alertas
+*8* - *Horario* - Cambiar la hora de alertas
 
 O escribe *"cancelar"* para volver al menú principal.`,
-
-  // ========================================
-  // NOTA: Se eliminó la opción de modalidad del menú.
-  // Si se quiere restaurar, agregar después de Ubicación:
-  // 🏠 *Modalidad:* ${profile.workMode}
-  // Y agregar en la lista de opciones:
-  // *4* - *Modalidad* - Cambiar entre remoto o presencial
-  // (ajustar la numeración de las opciones siguientes)
-  // ========================================
 
   // ==========================================
   // MENSAJES DE SISTEMA DE PLANES
@@ -422,7 +417,7 @@ Has usado tus 3 búsquedas/alertas gratuitas o han pasado 3 días desde tu regis
 • Sin límite de tiempo
 • Acceso prioritario a nuevas funciones
 
-🔗 *Enlace de pago:* https://checkout.wompi.co/l/LINK_PENDIENTE
+🔗 *Enlace de pago:* ${WOMPI_CHECKOUT_LINK}
 
 Una vez realices el pago, ingresa el *correo electrónico* que usaste para pagar y verificaremos tu suscripción automáticamente.`,
 
@@ -433,7 +428,7 @@ Veo que ya agotaste tu período de prueba gratuita anteriormente.
 
 Para continuar usando CIO, necesitas activar el *Plan Premium*.
 
-🔗 *Enlace de pago:* https://checkout.wompi.co/l/LINK_PENDIENTE
+🔗 *Enlace de pago:* ${WOMPI_CHECKOUT_LINK}
 
 Una vez realices el pago, ingresa el *correo electrónico* que usaste para pagar.`,
 
@@ -443,7 +438,7 @@ Una vez realices el pago, ingresa el *correo electrónico* que usaste para pagar
   // Email registrado, mostrar enlace de pago
   PAYMENT_LINK: (email: string) => `✅ Hemos registrado tu correo: *${email}*
 
-🔗 *Realiza tu pago aquí:* https://checkout.wompi.co/l/LINK_PENDIENTE
+🔗 *Realiza tu pago aquí:* ${WOMPI_CHECKOUT_LINK}
 
 💡 *Importante:* Usa el mismo correo (*${email}*) al momento de pagar para que podamos vincular tu cuenta automáticamente.
 
@@ -458,7 +453,7 @@ Verifica que:
 
 Si el problema persiste, escribe otro correo o contacta soporte.
 
-🔗 *Enlace de pago:* https://checkout.wompi.co/l/LINK_PENDIENTE`,
+🔗 *Enlace de pago:* ${WOMPI_CHECKOUT_LINK}`,
 
   // Pago confirmado exitosamente
   PAYMENT_CONFIRMED: (name?: string | null) => `🎉 *¡Felicidades${name ? ` ${name}` : ''}!*
@@ -479,7 +474,7 @@ Tu pago ha sido *confirmado exitosamente*.
 • Escribe *"verificar"* para comprobar si tu pago fue procesado
 • Escribe tu *correo electrónico* si quieres cambiarlo o corregirlo
 
-🔗 *Enlace de pago:* https://checkout.wompi.co/l/LINK_PENDIENTE`,
+🔗 *Enlace de pago:* ${WOMPI_CHECKOUT_LINK}`,
 
   // Límite semanal de premium alcanzado
   PREMIUM_WEEKLY_LIMIT_REACHED: `⏳ Has alcanzado tu límite de 5 búsquedas/alertas esta semana.
