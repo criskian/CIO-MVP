@@ -12,8 +12,8 @@ CREATE TYPE "PlanType" AS ENUM ('FREEMIUM', 'PREMIUM');
 CREATE TYPE "SubscriptionStatus" AS ENUM ('ACTIVE', 'EXPIRED', 'CANCELLED');
 
 -- AlterTable
-ALTER TABLE "user_profiles" DROP COLUMN "remoteAllowed",
-ADD COLUMN     "workMode" TEXT;
+ALTER TABLE "user_profiles" DROP COLUMN IF EXISTS "remoteAllowed";
+ALTER TABLE "user_profiles" ADD COLUMN IF NOT EXISTS "workMode" TEXT;
 
 -- AlterTable
 ALTER TABLE "users" ADD COLUMN     "email" TEXT,
