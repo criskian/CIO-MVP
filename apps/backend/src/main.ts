@@ -15,7 +15,7 @@ async function bootstrap() {
     'http://localhost:3001',
     'http://localhost:3002',
     'https://cio-stg.almia.com.co',
-    'https://api.cio.almia.com.co',
+    'https://api.cio-stg.almia.com.co',
   ];
 
   if (additionalOrigin) {
@@ -26,7 +26,7 @@ async function bootstrap() {
     origin: corsOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-key'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-key', 'x-event-checksum'],
   });
 
   app.useGlobalPipes(

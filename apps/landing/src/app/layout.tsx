@@ -12,6 +12,11 @@ const poppins = Poppins({
 export const metadata: Metadata = {
   title: 'CIO - Cazador Inteligente de Oportunidades',
   description: 'Tu asistente personal para encontrar empleo en Colombia',
+  icons: {
+    icon: '/assets/images/faviconalmia.svg',
+    shortcut: '/assets/images/faviconalmia.svg',
+    apple: '/assets/images/faviconalmia.svg',
+  },
 };
 
 export default function RootLayout({
