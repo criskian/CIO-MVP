@@ -1,5 +1,7 @@
+'use client';
+
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import Button from './Button';
+import { cn } from '@/lib/utils';
 
 interface PaginationProps {
   currentPage: number;
@@ -7,89 +9,73 @@ interface PaginationProps {
   onPageChange: (page: number) => void;
 }
 
-export default function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) {
-  const canGoPrevious = currentPage > 1;
-  const canGoNext = currentPage < totalPages;
+export default function Pagination({
+  currentPage,
+  totalPages,
+  onPageChange,
+}: PaginationProps) {
+  const pages = [];
+  const maxVisiblePages = 5;
 
-  const getPageNumbers = () => {
-    const pages: (number | string)[] = [];
-    const maxVisible = 5;
+  let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+  let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
 
-    if (totalPages <= maxVisible) {
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      if (currentPage <= 3) {
-        for (let i = 1; i <= 4; i++) pages.push(i);
-        pages.push('...');
-        pages.push(totalPages);
-      } else if (currentPage >= totalPages - 2) {
-        pages.push(1);
-        pages.push('...');
-        for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
-      } else {
-        pages.push(1);
-        pages.push('...');
-        for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
-        pages.push('...');
-        pages.push(totalPages);
-      }
-    }
+  if (endPage - startPage < maxVisiblePages - 1) {
+    startPage = Math.max(1, endPage - maxVisiblePages + 1);
+  }
 
-    return pages;
-  };
+  for (let i = startPage; i <= endPage; i++) {
+    pages.push(i);
+  }
 
   return (
-    <div className="flex items-center justify-between mt-6">
-      <p className="text-sm text-admin-text-secondary">
+    <div className="flex items-center justify-between">
+      <div className="text-sm text-admin-text-secondary">
         Página {currentPage} de {totalPages}
-      </p>
+      </div>
 
       <div className="flex items-center gap-2">
-        <Button
-          variant="secondary"
-          size="sm"
+        <button
           onClick={() => onPageChange(currentPage - 1)}
-          disabled={!canGoPrevious}
-        >
-          <ChevronLeft size={16} />
-          Anterior
-        </Button>
-
-        <div className="hidden sm:flex items-center gap-1">
-          {getPageNumbers().map((page, index) =>
-            typeof page === 'number' ? (
-              <button
-                key={index}
-                onClick={() => onPageChange(page)}
-                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                  currentPage === page
-                    ? 'bg-almia-purple-dark text-white'
-                    : 'text-admin-text-secondary hover:bg-gray-100'
-                }`}
-              >
-                {page}
-              </button>
-            ) : (
-              <span key={index} className="px-2 text-admin-text-secondary">
-                {page}
-              </span>
-            )
+          disabled={currentPage === 1}
+          className={cn(
+            'p-2 rounded-lg border transition-colors',
+            currentPage === 1
+              ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+              : 'border-gray-300 text-admin-text-primary hover:bg-gray-50'
           )}
-        </div>
-
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={!canGoNext}
         >
-          Siguiente
-          <ChevronRight size={16} />
-        </Button>
+          <ChevronLeft size={20} />
+        </button>
+
+        {pages.map((page) => (
+          <button
+            key={page}
+            onClick={() => onPageChange(page)}
+            className={cn(
+              'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+              page === currentPage
+                ? 'bg-almia-purple-dark text-white'
+                : 'text-admin-text-primary hover:bg-gray-100'
+            )}
+          >
+            {page}
+          </button>
+        ))}
+
+        <button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className={cn(
+            'p-2 rounded-lg border transition-colors',
+            currentPage === totalPages
+              ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+              : 'border-gray-300 text-admin-text-primary hover:bg-gray-50'
+          )}
+        >
+          <ChevronRight size={20} />
+        </button>
       </div>
     </div>
   );
 }
-
