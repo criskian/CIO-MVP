@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { AppController } from './app.controller';
 import { DatabaseModule } from './modules/database/database.module';
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { ConversationModule } from './modules/conversation/conversation.module';
@@ -38,6 +39,7 @@ import { AuthModule } from './modules/auth/auth.module';
     PaymentModule,
     AuthModule,
   ],
+  controllers: [AppController],
   providers: [
     {
       provide: APP_GUARD,
