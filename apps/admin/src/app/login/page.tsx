@@ -18,7 +18,6 @@ export default function LoginPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Si ya está autenticado, redirigir al dashboard
     if (isAuthenticated()) {
       router.push('/dashboard');
     }
@@ -46,16 +45,13 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-almia-purple-dark via-almia-purple to-almia-purple-light p-4">
-      {/* Decoración de fondo */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-1/2 -right-1/4 w-96 h-96 bg-almia-purple-light/20 rounded-full blur-3xl" />
         <div className="absolute -bottom-1/2 -left-1/4 w-96 h-96 bg-almia-purple-dark/20 rounded-full blur-3xl" />
       </div>
 
-      {/* Card de Login */}
       <div className="relative w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-2xl p-8">
-          {/* Logo */}
           <div className="flex justify-center mb-8">
             <Image
               src="/assets/logoalmia.svg"
@@ -66,7 +62,6 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Título */}
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-admin-text-primary mb-2">
               Admin Panel
@@ -76,14 +71,12 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Error Alert */}
           {error && (
             <Alert variant="error" className="mb-6">
               {error}
             </Alert>
           )}
 
-          {/* Formulario */}
           <form onSubmit={handleSubmit} className="space-y-6">
             <Input
               type="email"
@@ -117,7 +110,6 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          {/* Footer */}
           <div className="mt-8 pt-6 border-t border-gray-200 text-center">
             <p className="text-xs text-admin-text-secondary">
               © 2025 Almia Consulting SAS

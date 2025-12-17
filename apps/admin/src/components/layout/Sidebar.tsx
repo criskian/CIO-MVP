@@ -37,7 +37,6 @@ export default function Sidebar() {
 
   return (
     <aside className="w-64 bg-admin-bg-sidebar min-h-screen flex flex-col">
-      {/* Logo */}
       <div className="p-6 border-b border-almia-purple">
         <div className="flex items-center gap-3">
           <Image
@@ -51,7 +50,6 @@ export default function Sidebar() {
         <p className="text-white/60 text-xs mt-2">Admin Panel</p>
       </div>
 
-      {/* Menu */}
       <nav className="flex-1 p-4">
         <ul className="space-y-2">
           {menuItems.map((item) => {
@@ -77,7 +75,6 @@ export default function Sidebar() {
         </ul>
       </nav>
 
-      {/* User info & Logout */}
       <div className="p-4 border-t border-almia-purple">
         {user && (
           <div className="mb-3 px-4">

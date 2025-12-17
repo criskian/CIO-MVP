@@ -17,7 +17,6 @@ const api: AxiosInstance = axios.create({
   },
 });
 
-// Interceptor para agregar el token a cada request
 api.interceptors.request.use(
   (config) => {
     const token = getAuthToken();
@@ -29,19 +28,28 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Interceptor para manejar errores de autenticación
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
-      // Token expirado o inválido, cerrar sesión
       logout();
     }
-    return Promise.reject(error);
+    
+    const errorMessage = error.response?.data || {};
+    const safeError = {
+      ...error,
+      response: {
+        ...error.response,
+        data: {
+          message: (errorMessage as any)?.message || 'Error en la petición',
+          statusCode: error.response?.status,
+        },
+      },
+    };
+    
+    return Promise.reject(safeError);
   }
 );
-
-//AUTENTICACIÓN
 
 export async function login(credentials: LoginCredentials): Promise<AuthResponse> {
   const { data } = await api.post<AuthResponse>('/api/admin/auth/login', credentials);
@@ -109,7 +117,6 @@ export async function deleteUserByPhone(phone: string): Promise<void> {
   await api.delete(`/api/admin/users/phone/${phone}`);
 }
 
-// SUSCRIPCIONES
 
 export async function getSubscription(userId: string): Promise<Subscription> {
   const { data } = await api.get<Subscription>(`/api/admin/subscriptions/${userId}`);
@@ -159,7 +166,6 @@ export async function addUses(
   return data;
 }
 
-// SESIONES
 
 export async function getUserSessions(userId: string): Promise<Session[]> {
   const { data } = await api.get<Session[]>(`/api/admin/sessions/${userId}`);
@@ -170,7 +176,6 @@ export async function deleteUserSessions(userId: string): Promise<void> {
   await api.delete(`/api/admin/sessions/${userId}`);
 }
 
-// ESTADÍSTICAS
 
 export async function getStats(): Promise<Stats> {
   const { data } = await api.get<Stats>('/api/admin/stats');

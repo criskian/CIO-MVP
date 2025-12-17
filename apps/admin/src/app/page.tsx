@@ -8,7 +8,6 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirigir según estado de autenticación
     if (isAuthenticated()) {
       router.push('/dashboard');
     } else {

@@ -13,13 +13,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter();
 
   useEffect(() => {
-    // Verificar autenticación
     if (!isAuthenticated()) {
       router.push('/login');
     }
   }, [router]);
 
-  // Si no está autenticado, no mostrar nada (evitar flash)
   if (!isAuthenticated()) {
     return null;
   }

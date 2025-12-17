@@ -1,7 +1,3 @@
-/**
- * Funciones de autenticación para el Admin Panel
- */
-
 import { AuthResponse, AdminUser } from '@/types';
 
 const TOKEN_KEY = 'cio_admin_token';

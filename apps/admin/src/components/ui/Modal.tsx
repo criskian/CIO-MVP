@@ -45,20 +45,18 @@ export default function Modal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Modal */}
+
       <div
         className={cn(
           'relative bg-white rounded-lg shadow-xl w-full mx-4',
-          sizes[size]
-        )}
-      >
-        {/* Header */}
+        sizes[size]
+      )}
+    >
         {(title || showCloseButton) && (
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             {title && (
@@ -77,7 +75,6 @@ export default function Modal({
           </div>
         )}
 
-        {/* Content */}
         <div className="p-6">{children}</div>
       </div>
     </div>

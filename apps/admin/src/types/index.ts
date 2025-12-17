@@ -1,4 +1,3 @@
-// ==================== USUARIOS ====================
 
 export interface User {
   id: string;
@@ -27,7 +26,6 @@ export interface UserProfile {
   updatedAt: string;
 }
 
-// ==================== SUSCRIPCIONES ====================
 
 export type PlanType = 'FREEMIUM' | 'PREMIUM';
 export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
@@ -53,7 +51,6 @@ export interface Subscription {
   };
 }
 
-// ==================== SESIONES ====================
 
 export interface Session {
   id: string;
@@ -74,7 +71,6 @@ export interface AlertPreference {
   updatedAt: string;
 }
 
-// ==================== ESTADÍSTICAS ====================
 
 export interface Stats {
   totalUsers: number;
@@ -85,7 +81,6 @@ export interface Stats {
   timestamp: string;
 }
 
-// ==================== PAGINACIÓN ====================
 
 export interface Pagination {
   page: number;
@@ -100,7 +95,6 @@ export interface PaginatedResponse<T> {
   pagination: Pagination;
 }
 
-// ==================== AUTH ====================
 
 export interface LoginCredentials {
   email: string;

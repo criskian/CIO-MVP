@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { DatabaseModule } from './modules/database/database.module';
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { ConversationModule } from './modules/conversation/conversation.module';
@@ -18,6 +20,12 @@ import { AuthModule } from './modules/auth/auth.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 300,
+      },
+    ]),
     DatabaseModule,
     WhatsappModule,
     ConversationModule,
@@ -25,10 +33,16 @@ import { AuthModule } from './modules/auth/auth.module';
     SchedulerModule,
     LlmModule,
     CvModule,
-    RegistrationModule, // Módulo para registro desde landing page
-    AdminModule, // Módulo de administración de usuarios
-    PaymentModule, // Módulo para webhooks de Wompi
-    AuthModule, // Módulo de autenticación (Admin)
+    RegistrationModule,
+    AdminModule,
+    PaymentModule,
+    AuthModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule { }
