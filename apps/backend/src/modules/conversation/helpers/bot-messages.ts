@@ -3,8 +3,8 @@
  */
 
 // CONFIGURACIÓN DE LINKS
-const WOMPI_CHECKOUT_LINK = process.env.WOMPI_CHECKOUT_LINK || 'https://cioalmia.vercel.app';
-const LANDING_URL = 'https://cioalmia.vercel.app';
+const WOMPI_CHECKOUT_LINK = process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ';
+const LANDING_URL = 'https://cio-stg.almia.com.co';
 
 export const BotMessages = {
   // BIENVENIDA Y NOMBRE
@@ -56,7 +56,7 @@ Esto me ayuda a mostrarte las opciones de la mejor manera.`,
 • Si eliges compartir tu hoja de vida, lo almacenaré de forma segura.
 • Buscaré ofertas de empleo públicas.
 
-Ver política de privacidad: https://cioalmia.vercel.app/privacy-policy
+Ver política de privacidad: https://cio-stg.almia.com.co/privacy-policy
 
 ¿Aceptas estos términos? (Responde "Sí" o "No")`,
 

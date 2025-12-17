@@ -15,7 +15,6 @@ async function bootstrap() {
   const corsOrigins: string[] = [
     'http://localhost:3000', // Landing en desarrollo
     'http://localhost:3001', // Backend local (para testing)
-    'https://cioalmia.vercel.app', // Landing en producción
     'https://cio-stg.almia.com.co', // Landing en producción
   ];
 
