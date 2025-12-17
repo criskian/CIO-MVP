@@ -1533,9 +1533,59 @@ Selecciona qué quieres editar:`,
   // ========================================
 
   /**
+   * Verifica si el usuario tiene usos disponibles (por si un admin los añadió)
+   * @returns true si el usuario puede usar el servicio, false si no tiene usos
+   */
+  private async checkIfUserHasUsesAvailable(userId: string): Promise<boolean> {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+    });
+
+    if (!subscription) return false;
+
+    if (subscription.plan === 'PREMIUM' && subscription.status === 'ACTIVE') {
+      // Premium activo: verificar si tiene usos o es nueva semana
+      const weekStart = subscription.premiumWeekStart;
+      const now = new Date();
+      if (!weekStart || this.isNewWeek(weekStart, now)) {
+        return true; // Nueva semana = nuevos usos
+      }
+      return subscription.premiumUsesLeft > 0;
+    }
+
+    // Freemium: verificar usos disponibles y que no haya expirado por tiempo
+    const daysSinceStart = Math.floor(
+      (Date.now() - subscription.freemiumStartDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    // Si tiene usos Y no han pasado 3 días, puede usar
+    return subscription.freemiumUsesLeft > 0 && daysSinceStart < 3;
+  }
+
+  /**
    * Estado FREEMIUM_EXPIRED: El usuario agotó su freemium
    */
   private async handleFreemiumExpiredState(userId: string, text: string): Promise<BotReply> {
+    // Verificar si el admin añadió usos mientras estaba en este estado
+    if (await this.checkIfUserHasUsesAvailable(userId)) {
+      this.logger.log(`🔄 Usuario ${userId} recuperó usos, volviendo a READY`);
+      await this.updateSessionState(userId, ConversationState.READY);
+      const user = await this.prisma.user.findUnique({ 
+        where: { id: userId },
+        include: { subscription: true }
+      });
+      return { 
+        text: `🎉 ¡Buenas noticias, ${user?.name || 'usuario'}! Tienes búsquedas disponibles nuevamente.
+
+¿Qué te gustaría hacer?
+
+🔍 *"Buscar"* - Encontrar ofertas de empleo
+✏️ *"Editar perfil"* - Modificar tus preferencias
+🔄 *"Reiniciar"* - Comenzar de nuevo
+❌ *"Cancelar servicio"* - Darte de baja`
+      };
+    }
+
     // Transición directa a pedir email
     await this.updateSessionState(userId, ConversationState.ASK_EMAIL);
     return { text: BotMessages.FREEMIUM_EXPIRED_ASK_EMAIL };
@@ -1545,6 +1595,26 @@ Selecciona qué quieres editar:`,
    * Estado ASK_EMAIL: Pedir email para vincular pago
    */
   private async handleAskEmailState(userId: string, text: string): Promise<BotReply> {
+    // Verificar si el admin añadió usos mientras estaba en este estado
+    if (await this.checkIfUserHasUsesAvailable(userId)) {
+      this.logger.log(`🔄 Usuario ${userId} recuperó usos, volviendo a READY`);
+      await this.updateSessionState(userId, ConversationState.READY);
+      const user = await this.prisma.user.findUnique({ 
+        where: { id: userId },
+        include: { subscription: true }
+      });
+      return { 
+        text: `🎉 ¡Buenas noticias, ${user?.name || 'usuario'}! Tienes búsquedas disponibles nuevamente.
+
+¿Qué te gustaría hacer?
+
+🔍 *"Buscar"* - Encontrar ofertas de empleo
+✏️ *"Editar perfil"* - Modificar tus preferencias
+🔄 *"Reiniciar"* - Comenzar de nuevo
+❌ *"Cancelar servicio"* - Darte de baja`
+      };
+    }
+
     const email = text.trim().toLowerCase();
 
     // Validar formato de email
@@ -1592,6 +1662,26 @@ Selecciona qué quieres editar:`,
    * Estado WAITING_PAYMENT: Usuario esperando confirmación de pago
    */
   private async handleWaitingPaymentState(userId: string, text: string): Promise<BotReply> {
+    // Verificar si el admin añadió usos mientras estaba en este estado
+    if (await this.checkIfUserHasUsesAvailable(userId)) {
+      this.logger.log(`🔄 Usuario ${userId} recuperó usos, volviendo a READY`);
+      await this.updateSessionState(userId, ConversationState.READY);
+      const user = await this.prisma.user.findUnique({ 
+        where: { id: userId },
+        include: { subscription: true }
+      });
+      return { 
+        text: `🎉 ¡Buenas noticias, ${user?.name || 'usuario'}! Tienes búsquedas disponibles nuevamente.
+
+¿Qué te gustaría hacer?
+
+🔍 *"Buscar"* - Encontrar ofertas de empleo
+✏️ *"Editar perfil"* - Modificar tus preferencias
+🔄 *"Reiniciar"* - Comenzar de nuevo
+❌ *"Cancelar servicio"* - Darte de baja`
+      };
+    }
+
     const lower = text.toLowerCase().trim();
 
     // Si escribe "verificar", "comprobar" o similar, re-verificar pago

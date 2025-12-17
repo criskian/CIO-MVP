@@ -1,7 +1,7 @@
 {
     "info": {
         "name": "CIO Admin API",
-        "description": "Colección de endpoints para gestión de usuarios, suscripciones y administración del sistema CIO",
+        "description": "Colección de endpoints para gestión de usuarios, suscripciones y administración del sistema CIO.\n\n⚠️ IMPORTANTE: Primero ejecuta el endpoint de 'Login Admin' para obtener el token JWT. El token se guarda automáticamente y se usa en todos los demás endpoints.",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "variable": [
@@ -9,17 +9,82 @@
             "key": "baseUrl",
             "value": "http://localhost:3001",
             "type": "string"
+        },
+        {
+            "key": "accessToken",
+            "value": "",
+            "type": "string"
         }
     ],
     "item": [
         {
-            "name": "Usuarios",
+            "name": "🔐 Autenticación",
+            "item": [
+                {
+                    "name": "Login Admin",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "// Guardar el token automáticamente",
+                                    "if (pm.response.code === 200) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('accessToken', response.access_token);",
+                                    "    console.log('✅ Token guardado:', response.access_token);",
+                                    "    console.log('👤 Usuario:', response.user.name);",
+                                    "} else {",
+                                    "    console.error('❌ Error en login');",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"admin@almia.com.co\",\n  \"password\": \"tu_password_aqui\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/auth/login",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "auth",
+                                "login"
+                            ]
+                        },
+                        "description": "Login para administradores. El token JWT se guarda automáticamente en la variable `accessToken` para usarse en todos los demás endpoints."
+                    }
+                }
+            ],
+            "description": "Endpoints de autenticación. ⚠️ Debes hacer login antes de usar cualquier otro endpoint."
+        },
+        {
+            "name": "👥 Usuarios",
             "item": [
                 {
                     "name": "Listar usuarios",
                     "request": {
                         "method": "GET",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}",
+                                "type": "text"
+                            }
+                        ],
                         "url": {
                             "raw": "{{baseUrl}}/api/admin/users?page=1&limit=20&search=",
                             "host": [
@@ -52,7 +117,13 @@
                     "name": "Obtener usuario por ID",
                     "request": {
                         "method": "GET",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}",
+                                "type": "text"
+                            }
+                        ],
                         "url": {
                             "raw": "{{baseUrl}}/api/admin/users/:id",
                             "host": [
@@ -77,7 +148,13 @@
                     "name": "Obtener usuario por teléfono",
                     "request": {
                         "method": "GET",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}",
+                                "type": "text"
+                            }
+                        ],
                         "url": {
                             "raw": "{{baseUrl}}/api/admin/users/phone/:phone",
                             "host": [
@@ -107,6 +184,11 @@
                             {
                                 "key": "Content-Type",
                                 "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}",
+                                "type": "text"
                             }
                         ],
                         "body": {
@@ -134,6 +216,11 @@
                             {
                                 "key": "Content-Type",
                                 "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}",
+                                "type": "text"
                             }
                         ],
                         "body": {
@@ -164,7 +251,13 @@
                     "name": "Eliminar usuario por ID",
                     "request": {
                         "method": "DELETE",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}",
+                                "type": "text"
+                            }
+                        ],
                         "url": {
                             "raw": "{{baseUrl}}/api/admin/users/:id",
                             "host": [
@@ -189,7 +282,13 @@
                     "name": "Eliminar usuario por teléfono",
                     "request": {
                         "method": "DELETE",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}",
+                                "type": "text"
+                            }
+                        ],
                         "url": {
                             "raw": "{{baseUrl}}/api/admin/users/phone/:phone",
                             "host": [
@@ -214,13 +313,19 @@
             ]
         },
         {
-            "name": "Suscripciones",
+            "name": "💳 Suscripciones",
             "item": [
                 {
                     "name": "Obtener suscripción de usuario",
                     "request": {
                         "method": "GET",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}",
+                                "type": "text"
+                            }
+                        ],
                         "url": {
                             "raw": "{{baseUrl}}/api/admin/subscriptions/:userId",
                             "host": [
@@ -249,6 +354,11 @@
                             {
                                 "key": "Content-Type",
                                 "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}",
+                                "type": "text"
                             }
                         ],
                         "body": {
@@ -276,10 +386,65 @@
                     }
                 },
                 {
+                    "name": "Agregar usos manualmente",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"uses\": 5,\n  \"planType\": \"PREMIUM\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/subscriptions/:userId/add-uses",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "subscriptions",
+                                ":userId",
+                                "add-uses"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "userId",
+                                    "value": "user-id-aqui"
+                                }
+                            ]
+                        },
+                        "description": "Agrega usos manualmente a un usuario. Útil para testing o para dar acceso a empresas."
+                    }
+                },
+                {
                     "name": "Activar Premium manualmente",
                     "request": {
                         "method": "POST",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"durationDays\": 30\n}"
+                        },
                         "url": {
                             "raw": "{{baseUrl}}/api/admin/subscriptions/:userId/activate-premium",
                             "host": [
@@ -298,14 +463,21 @@
                                     "value": "user-id-aqui"
                                 }
                             ]
-                        }
+                        },
+                        "description": "Activa el plan premium para un usuario por X días."
                     }
                 },
                 {
                     "name": "Reiniciar Freemium",
                     "request": {
                         "method": "POST",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}",
+                                "type": "text"
+                            }
+                        ],
                         "url": {
                             "raw": "{{baseUrl}}/api/admin/subscriptions/:userId/reset-freemium",
                             "host": [
@@ -324,19 +496,26 @@
                                     "value": "user-id-aqui"
                                 }
                             ]
-                        }
+                        },
+                        "description": "Reinicia el periodo freemium (3 usos y 3 días). Útil para testing."
                     }
                 }
             ]
         },
         {
-            "name": "Sesiones",
+            "name": "💬 Sesiones",
             "item": [
                 {
                     "name": "Obtener sesiones de usuario",
                     "request": {
                         "method": "GET",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}",
+                                "type": "text"
+                            }
+                        ],
                         "url": {
                             "raw": "{{baseUrl}}/api/admin/sessions/:userId",
                             "host": [
@@ -361,7 +540,13 @@
                     "name": "Eliminar sesiones (reiniciar estado)",
                     "request": {
                         "method": "DELETE",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}",
+                                "type": "text"
+                            }
+                        ],
                         "url": {
                             "raw": "{{baseUrl}}/api/admin/sessions/:userId",
                             "host": [
@@ -379,19 +564,26 @@
                                     "value": "user-id-aqui"
                                 }
                             ]
-                        }
+                        },
+                        "description": "Elimina las sesiones del usuario para reiniciar su estado conversacional."
                     }
                 }
             ]
         },
         {
-            "name": "Estadísticas",
+            "name": "📊 Estadísticas",
             "item": [
                 {
                     "name": "Obtener estadísticas generales",
                     "request": {
                         "method": "GET",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{accessToken}}",
+                                "type": "text"
+                            }
+                        ],
                         "url": {
                             "raw": "{{baseUrl}}/api/admin/stats",
                             "host": [
@@ -408,7 +600,7 @@
             ]
         },
         {
-            "name": "Registro (Landing)",
+            "name": "📝 Registro (Landing - Sin Auth)",
             "item": [
                 {
                     "name": "Registrar usuario freemium",
@@ -434,7 +626,8 @@
                                 "registration",
                                 "freemium"
                             ]
-                        }
+                        },
+                        "description": "Registro público desde la landing page. No requiere autenticación."
                     }
                 },
                 {
@@ -512,7 +705,8 @@
                         }
                     }
                 }
-            ]
+            ],
+            "description": "Endpoints públicos de la landing page. No requieren autenticación."
         }
     ]
 }

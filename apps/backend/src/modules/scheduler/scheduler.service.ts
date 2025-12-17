@@ -398,7 +398,7 @@ Tu período de prueba gratuita ha terminado y no puedo seguir enviándote alerta
 
 ✨ Para continuar recibiendo ofertas personalizadas, activa el *Plan Premium*:
 
-🔗 *Enlace de pago:* ${process.env.WOMPI_CHECKOUT_LINK || 'https://cioalmia.vercel.app'}
+🔗 *Enlace de pago:* ${process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ'}
 
 Una vez realices el pago, escríbeme por este chat para activar tu cuenta.`;
 
