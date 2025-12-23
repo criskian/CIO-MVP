@@ -460,7 +460,7 @@ export default function Hero({ whatsappLink }: HeroProps) {
               style={{ lineHeight: '1.5' }}
             >
               EL CAZADOR DE{' '}
-              <span className="font-bold text-[#9054C6]">OFERTAS DE EMPLEO</span> MÁS GRANDE DE COLOMBIA.
+              <span className="font-bold text-[#9054C6]">OFERTAS DE EMPLEO</span> MÁS GRANDE DE LATAM.
             </h1>
 
             {/* Empieza aquí */}
