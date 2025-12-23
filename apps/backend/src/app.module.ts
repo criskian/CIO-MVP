@@ -13,8 +13,10 @@ import { RegistrationModule } from './modules/registration/registration.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { AppController } from './app.controller';
 
 @Module({
+  controllers: [AppController],
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
@@ -45,5 +47,4 @@ import { AuthModule } from './modules/auth/auth.module';
     },
   ],
 })
-export class AppModule { }
-
+export class AppModule {}

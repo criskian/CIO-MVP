@@ -7,6 +7,30 @@ interface RegistrationFormProps {
     onClose?: () => void;
 }
 
+const COUNTRIES = [
+    { code: '54', name: 'Argentina 🇦🇷', digits: 10 },
+    { code: '591', name: 'Bolivia 🇧🇴', digits: 8 },
+    { code: '1', name: 'Canadá 🇨🇦', digits: 10 },
+    { code: '56', name: 'Chile 🇨🇱', digits: 9 },
+    { code: '57', name: 'Colombia 🇨🇴', digits: 10 },
+    { code: '506', name: 'Costa Rica 🇨🇷', digits: 8 },
+    { code: '53', name: 'Cuba 🇨🇺', digits: 8 },
+    { code: '593', name: 'Ecuador 🇪🇨', digits: 9 },
+    { code: '503', name: 'El Salvador 🇸🇻', digits: 8 },
+    { code: '34', name: 'España 🇪🇸', digits: 9 },
+    { code: '1', name: 'Estados Unidos 🇺🇸', digits: 10 },
+    { code: '502', name: 'Guatemala 🇬🇹', digits: 8 },
+    { code: '240', name: 'Guinea Ecuatorial 🇬🇶', digits: 9 },
+    { code: '504', name: 'Honduras 🇭🇳', digits: 8 },
+    { code: '52', name: 'México 🇲🇽', digits: 10 },
+    { code: '505', name: 'Nicaragua 🇳🇮', digits: 8 },
+    { code: '507', name: 'Panamá 🇵🇦', digits: 8 },
+    { code: '595', name: 'Paraguay 🇵🇾', digits: 9 },
+    { code: '51', name: 'Perú 🇵🇪', digits: 9 },
+    { code: '598', name: 'Uruguay 🇺🇾', digits: 8 },
+    { code: '58', name: 'Venezuela 🇻🇪', digits: 10 },
+];
+
 export default function RegistrationForm({ onSuccess, onClose }: RegistrationFormProps) {
     const [formData, setFormData] = useState({
         name: '',
@@ -14,6 +38,7 @@ export default function RegistrationForm({ onSuccess, onClose }: RegistrationFor
         phone: '',
         acceptedTerms: false,
     });
+    const [countryCode, setCountryCode] = useState('57');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
@@ -21,15 +46,16 @@ export default function RegistrationForm({ onSuccess, onClose }: RegistrationFor
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '573226906461';
 
+    const selectedCountry = COUNTRIES.find(c => c.code === countryCode) || COUNTRIES[0];
+
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
 
-        // Formatear teléfono (agregar 57 si no lo tiene)
         let phone = formData.phone.replace(/\D/g, '');
-        if (!phone.startsWith('57')) {
-            phone = '57' + phone;
+        if (!phone.startsWith(countryCode)) {
+            phone = countryCode + phone;
         }
 
         try {
@@ -138,22 +164,35 @@ export default function RegistrationForm({ onSuccess, onClose }: RegistrationFor
                     <label htmlFor="phone" className="font-poppins block text-sm font-medium text-white mb-2">
                         Número de WhatsApp
                     </label>
-                    <div className="flex">
-                        <span className="font-poppins inline-flex items-center px-4 border-2 border-r-0 border-white/30 bg-white/10 text-white rounded-l-lg font-medium">
-                            +57
-                        </span>
+                    <div className="flex gap-2 w-full">
+                        <select
+                            value={countryCode}
+                            onChange={(e) => {
+                                setCountryCode(e.target.value);
+                                setFormData({ ...formData, phone: '' });
+                            }}
+                            className="font-poppins w-24 px-2 py-3 border-2 border-white/30 bg-white/10 text-white rounded-lg focus:ring-2 focus:ring-white focus:border-white outline-none transition-all cursor-pointer appearance-none text-center"
+                        >
+                            {COUNTRIES.map((country) => (
+                                <option key={country.code} value={country.code} className="bg-[#7c3aac] text-white">
+                                    +{country.code}
+                                </option>
+                            ))}
+                        </select>
                         <input
                             type="tel"
                             id="phone"
                             required
-                            pattern="[0-9]{10}"
-                            className="font-poppins flex-1 px-4 py-3 border-2 border-white/30 bg-white/10 text-white placeholder-white/60 rounded-r-lg focus:ring-2 focus:ring-white focus:border-white outline-none transition-all"
-                            placeholder="3001234567"
+                            pattern={`[0-9]{${selectedCountry.digits}}`}
+                            className="font-poppins flex-1 px-4 py-3 border-2 border-white/30 bg-white/10 text-white placeholder-white/60 rounded-lg focus:ring-2 focus:ring-white focus:border-white outline-none transition-all min-w-0"
+                            placeholder={`${'0'.repeat(selectedCountry.digits)}`}
                             value={formData.phone}
-                            onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                            onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '').slice(0, selectedCountry.digits) })}
                         />
                     </div>
-                    <p className="font-poppins text-xs text-white/70 mt-1">Ingresa tu número de 10 dígitos</p>
+                    <p className="font-poppins text-xs text-white/70 mt-1">
+                        {selectedCountry.name} - {selectedCountry.digits} dígitos
+                    </p>
                 </div>
 
                 {/* Términos */}
