@@ -53,7 +53,15 @@ export default function RegistrationForm({ onSuccess, onClose }: RegistrationFor
         setLoading(true);
         setError(null);
 
-        let phone = formData.phone.replace(/\D/g, '');
+        // Validar que el teléfono tenga la cantidad correcta de dígitos
+        const phoneDigits = formData.phone.replace(/\D/g, '');
+        if (phoneDigits.length !== selectedCountry.digits) {
+            setError(`El número debe tener ${selectedCountry.digits} dígitos para ${selectedCountry.name.split(' ')[0]}`);
+            setLoading(false);
+            return;
+        }
+
+        let phone = phoneDigits;
         if (!phone.startsWith(countryCode)) {
             phone = countryCode + phone;
         }
@@ -183,7 +191,6 @@ export default function RegistrationForm({ onSuccess, onClose }: RegistrationFor
                             type="tel"
                             id="phone"
                             required
-                            pattern={`[0-9]{${selectedCountry.digits}}`}
                             className="font-poppins flex-1 px-4 py-3 border-2 border-white/30 bg-white/10 text-white placeholder-white/60 rounded-lg focus:ring-2 focus:ring-white focus:border-white outline-none transition-all min-w-0"
                             placeholder={`${'0'.repeat(selectedCountry.digits)}`}
                             value={formData.phone}

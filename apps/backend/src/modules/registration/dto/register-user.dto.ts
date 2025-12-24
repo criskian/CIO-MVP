@@ -28,8 +28,8 @@ export class RegisterUserDto {
 
   @IsString({ message: 'El teléfono debe ser texto' })
   @IsNotEmpty({ message: 'El número de WhatsApp es requerido' })
-  @Matches(/^57\d{10}$/, {
-    message: 'El número debe tener formato colombiano: 57 + 10 dígitos (ej: 573001234567)',
+  @Matches(/^\d{1,4}\d{7,15}$/, {
+    message: 'El número debe incluir el código de país seguido de tu número (ej: 573001234567)',
   })
   phone!: string;
 
