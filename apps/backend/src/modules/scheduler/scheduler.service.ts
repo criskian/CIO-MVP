@@ -113,6 +113,9 @@ export class SchedulerService implements OnModuleInit {
         currentMinute < targetMinute + 5;
 
       if (!isWithinTimeWindow) {
+        this.logger.debug(
+          `⏰ Usuario ${userId}: Fuera de ventana horaria (actual: ${currentHour}:${currentMinute}, objetivo: ${targetHour}:${targetMinute}) → NO ENVIAR`,
+        );
         return false;
       }
 
@@ -127,35 +130,35 @@ export class SchedulerService implements OnModuleInit {
         alertPref.timezone || 'America/Bogota',
       );
 
-      // Usar diferencia en DÍAS para mayor precisión
+      // [FIX] Usar diferencia en DÍAS para mayor precisión
       const daysSinceLastAlert = now.diff(lastNotif, 'day', true); // true = con decimales
       const hoursSinceLastAlert = now.diff(lastNotif, 'hour');
 
+      this.logger.debug(
+        `⏰ Usuario ${userId}: Última alerta hace ${daysSinceLastAlert.toFixed(2)} días (${hoursSinceLastAlert} horas)`,
+      );
+
       // Verificar según frecuencia configurada
       let shouldSend = false;
-      let requiredDays = 0;
 
       switch (alertPref.alertFrequency) {
         case 'daily':
-          requiredDays = 1;
-          // Enviar si pasó al menos 20 horas (para evitar dobles del mismo día)
-          shouldSend = hoursSinceLastAlert >= 20;
+          // [FIX] Enviar si pasaron al menos 23 horas (casi un día completo)
+          // Esto evita enviar 2 veces el mismo día pero asegura que se envíe diariamente
+          shouldSend = hoursSinceLastAlert >= 23;
           break;
 
         case 'every_3_days':
-          requiredDays = 3;
-          // Enviar si pasaron al menos 2.8 días (~67 horas)
-          shouldSend = daysSinceLastAlert >= 2.8;
+          // Enviar si pasaron al menos 2.9 días (~70 horas)
+          shouldSend = daysSinceLastAlert >= 2.9;
           break;
 
         case 'weekly':
-          requiredDays = 7;
-          // Enviar si pasaron al menos 6.8 días (~163 horas)
-          shouldSend = daysSinceLastAlert >= 6.8;
+          // Enviar si pasaron al menos 6.9 días (~166 horas)
+          shouldSend = daysSinceLastAlert >= 6.9;
           break;
 
         case 'monthly':
-          requiredDays = 30;
           // Enviar si pasaron al menos 29 días
           shouldSend = daysSinceLastAlert >= 29;
           break;
@@ -163,17 +166,17 @@ export class SchedulerService implements OnModuleInit {
         default:
           // Si frecuencia no reconocida, loguear y usar diario
           this.logger.warn(`⚠️ Usuario ${userId}: Frecuencia desconocida "${alertPref.alertFrequency}", usando diario`);
-          shouldSend = hoursSinceLastAlert >= 20;
+          shouldSend = hoursSinceLastAlert >= 23;
       }
 
       // Loguear decisión para debug
       if (shouldSend) {
         this.logger.log(
-          `✅ Usuario ${userId}: Frecuencia=${alertPref.alertFrequency}, última alerta hace ${daysSinceLastAlert.toFixed(1)} días (requiere ${requiredDays}) → ENVIAR`,
+          `✅ Usuario ${userId}: Frecuencia=${alertPref.alertFrequency}, última alerta hace ${daysSinceLastAlert.toFixed(1)} días (${hoursSinceLastAlert}h) → ENVIAR`,
         );
       } else {
         this.logger.debug(
-          `⏳ Usuario ${userId}: Frecuencia=${alertPref.alertFrequency}, última alerta hace ${daysSinceLastAlert.toFixed(1)} días (requiere ${requiredDays}) → NO ENVIAR AÚN`,
+          `⏳ Usuario ${userId}: Frecuencia=${alertPref.alertFrequency}, última alerta hace ${daysSinceLastAlert.toFixed(1)} días (${hoursSinceLastAlert}h) → NO ENVIAR AÚN`,
         );
       }
 

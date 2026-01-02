@@ -156,6 +156,16 @@ export class ConversationService {
       case ConversationState.READY:
         return await this.handleReadyState(userId, text, intent);
 
+      // [NUEVO] Estado para ofrecer alertas después de primera búsqueda
+      case ConversationState.OFFER_ALERTS:
+        return await this.handleOfferAlertsState(userId, text);
+
+      case ConversationState.ASK_ALERT_FREQUENCY:
+        return await this.handleAskAlertFrequencyState(userId, text);
+
+      case ConversationState.ASK_ALERT_TIME:
+        return await this.handleAskAlertTimeState(userId, text);
+
       case ConversationState.CONFIRM_RESTART:
         return await this.handleConfirmRestartState(userId, text);
 
@@ -611,33 +621,23 @@ export class ConversationService {
     // Guardar en UserProfile
     await this.updateUserProfile(userId, { minSalary });
 
-    // Transición: ASK_MIN_SALARY → ASK_ALERT_FREQUENCY
-    await this.updateSessionState(userId, ConversationState.ASK_ALERT_FREQUENCY);
+    // [ACTUALIZADO] Transición: ASK_MIN_SALARY → READY (ya no pasa por alertas en onboarding)
+    await this.updateSessionState(userId, ConversationState.READY);
 
-    // Obtener tipo de dispositivo para mostrar lista en móvil
-    const deviceType = await this.getDeviceType(userId);
+    // Obtener usuario para mostrar mensaje de bienvenida
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
 
-    if (deviceType === 'MOBILE') {
-      return {
-        text: BotMessages.ASK_ALERT_FREQUENCY,
-        listTitle: 'Seleccionar',
-        listSections: [
-          {
-            title: 'Frecuencia',
-            rows: [
-              { id: 'freq_daily', title: '☀️ Diariamente' },
-              { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
-              { id: 'freq_weekly', title: '📆 Semanalmente' },
-              { id: 'freq_monthly', title: '🗓️ Mensualmente' },
-            ],
-          },
-        ],
-      };
-    }
-
-    return { text: BotMessages.ASK_ALERT_FREQUENCY };
+    // Mostrar mensaje de onboarding completo con resumen
+    return await this.returnToMainMenu(
+      userId,
+      BotMessages.ONBOARDING_COMPLETE(user?.name || 'usuario'),
+    );
   }
 
+  // [ACTUALIZADO] Estado ASK_ALERT_FREQUENCY: Ahora se accede después de primera búsqueda
   /**
    * Estado ASK_ALERT_FREQUENCY: Esperando frecuencia de alertas
    */
@@ -718,16 +718,21 @@ export class ConversationService {
     // Guardar en AlertPreference
     await this.upsertAlertPreference(userId, alertTime, alertFrequency);
 
-    // Obtener datos del perfil para el mensaje de confirmación
-    const profile = await this.prisma.userProfile.findUnique({ where: { userId } });
+    // Obtener datos del usuario para el mensaje de confirmación
+    const user = await this.prisma.user.findUnique({ 
+      where: { id: userId },
+      select: { name: true },
+    });
 
     // Transición: ASK_ALERT_TIME → READY
     await this.updateSessionState(userId, ConversationState.READY);
 
-    const confirmationMessage = BotMessages.ONBOARDING_COMPLETE(
-      profile?.role || 'tu cargo',
-      profile?.location || 'tu ubicación',
-    );
+    const confirmationMessage = `¡Perfecto! ✅ Tus alertas están configuradas.
+
+🔔 *Frecuencia:* ${alertFrequencyToText(alertFrequency)}
+⏰ *Hora:* ${alertTime}
+
+Te enviaré ofertas nuevas directamente a este chat según tu configuración.`;
 
     // Obtener tipo de dispositivo
     const deviceType = await this.getDeviceType(userId);
@@ -927,7 +932,27 @@ Intenta de nuevo más tarde o escribe "reiniciar" para ajustar tus preferencias.
 • Escribir *"editar"* para ajustar tus preferencias y encontrar más opciones`;
       }
 
-      // Agregar menú de opciones al final
+      // [NUEVO] Verificar si es la primera búsqueda y no tiene alertas configuradas
+      const alertPreference = await this.prisma.alertPreference.findUnique({
+        where: { userId },
+      });
+
+      // Si NO tiene alertas configuradas, ofrecer configurarlas después de mostrar resultados
+      if (!alertPreference) {
+        // Cambiar estado a OFFER_ALERTS para preguntar si desea alertas
+        await this.updateSessionState(userId, ConversationState.OFFER_ALERTS);
+
+        // Retornar ofertas + pregunta de alertas en el MISMO mensaje
+        return { 
+          text: formattedJobs + exhaustedMessage + `
+
+---
+
+${BotMessages.OFFER_ALERTS}`
+        };
+      }
+
+      // Si ya tiene alertas configuradas, mostrar menú normal
       const menuText = `
 
 ---
@@ -950,6 +975,63 @@ Intenta de nuevo más tarde o escribe "reiniciar" para ajustar tus preferencias.
 Por favor intenta de nuevo en unos minutos.`,
       };
     }
+  }
+
+  /**
+   * [NUEVO] Estado OFFER_ALERTS: Pregunta si desea recibir alertas después de primera búsqueda
+   */
+  private async handleOfferAlertsState(userId: string, text: string): Promise<BotReply> {
+    // Verificar si acepta alertas
+    if (isAcceptance(text) || text.toLowerCase().includes('activar')) {
+      // Usuario quiere activar alertas → Preguntar frecuencia
+      await this.updateSessionState(userId, ConversationState.ASK_ALERT_FREQUENCY);
+
+      const deviceType = await this.getDeviceType(userId);
+
+      if (deviceType === 'MOBILE') {
+        return {
+          text: BotMessages.ASK_ALERT_FREQUENCY,
+          listTitle: 'Seleccionar',
+          listSections: [
+            {
+              title: 'Frecuencia',
+              rows: [
+                { id: 'freq_daily', title: '☀️ Diariamente' },
+                { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
+                { id: 'freq_weekly', title: '📆 Semanalmente' },
+                { id: 'freq_monthly', title: '🗓️ Mensualmente' },
+              ],
+            },
+          ],
+        };
+      }
+
+      return { text: BotMessages.ASK_ALERT_FREQUENCY };
+    }
+
+    // Verificar si rechaza alertas
+    if (isRejection(text) || text.toLowerCase().includes('sin alertas') || text.toLowerCase().includes('no quiero')) {
+      // Usuario NO quiere alertas → Crear AlertPreference con enabled=false
+      await this.prisma.alertPreference.create({
+        data: {
+          userId,
+          alertFrequency: 'daily', // Valor por defecto (no se usará)
+          alertTimeLocal: '09:00', // Valor por defecto (no se usará)
+          timezone: 'America/Bogota',
+          enabled: false, // ⚠️ DESACTIVADO
+        },
+      });
+
+      // Volver a READY
+      await this.updateSessionState(userId, ConversationState.READY);
+
+      return await this.returnToMainMenu(userId, BotMessages.ALERTS_DISABLED);
+    }
+
+    // No entendió la respuesta
+    return {
+      text: `${BotMessages.OFFER_ALERTS}\n\n_Por favor, responde "Sí" o "No":_`,
+    };
   }
 
   /**

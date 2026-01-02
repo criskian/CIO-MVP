@@ -1,6 +1,7 @@
 /**
  * Estados de la máquina de conversación
- * Flujo actualizado: NEW → ASK_NAME → ASK_DEVICE → ASK_TERMS → ASK_ROLE → ASK_EXPERIENCE → ASK_LOCATION → ASK_JOB_TYPE → ASK_MIN_SALARY → ASK_ALERT_FREQUENCY → ASK_ALERT_TIME → READY
+ * Flujo actualizado: NEW → ASK_NAME → ASK_DEVICE → ASK_TERMS → ASK_ROLE → ASK_EXPERIENCE → ASK_LOCATION → ASK_JOB_TYPE → ASK_MIN_SALARY → READY
+ * Después de primera búsqueda: OFFER_ALERTS → (Si acepta) → ASK_ALERT_FREQUENCY → ASK_ALERT_TIME → READY
  * NOTA: ASK_WORK_MODE fue removido del flujo principal (se puede reimplementar en el futuro)
  */
 export enum ConversationState {
@@ -14,9 +15,12 @@ export enum ConversationState {
   // ASK_WORK_MODE = 'ASK_WORK_MODE', // [DESACTIVADO] Pregunta si quiere remoto o presencial - Puede reactivarse en futuro
   ASK_JOB_TYPE = 'ASK_JOB_TYPE',
   ASK_MIN_SALARY = 'ASK_MIN_SALARY',
+  READY = 'READY',
+  
+  // Estados de configuración de alertas (después de primera búsqueda)
+  OFFER_ALERTS = 'OFFER_ALERTS', // Pregunta si desea recibir alertas después de la primera búsqueda
   ASK_ALERT_FREQUENCY = 'ASK_ALERT_FREQUENCY', // Pregunta con qué frecuencia desea alertas
   ASK_ALERT_TIME = 'ASK_ALERT_TIME', // Pregunta a qué hora desea alertas
-  READY = 'READY',
   
   // Estados adicionales para flujos especiales
   WAITING_CV = 'WAITING_CV', // Usuario quiere enviar CV

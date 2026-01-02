@@ -37,6 +37,18 @@ Estás usando la *versión Free*: Estoy aquí para ayudarte a encontrar las *mej
 • Válido por 3 días desde tu registro
 • Alertas de empleo según tus preferencias`,
 
+  // Mensaje cuando completa el onboarding
+  ONBOARDING_COMPLETE: (name: string) => `¡Perfecto, *${name}*! ✅ Tu perfil está listo.
+
+🎯 *Ya puedes empezar a buscar ofertas!*
+
+Escribe *"buscar"* cuando estés listo y te mostraré las mejores ofertas que encontré para ti.
+
+📋 *Otros comandos disponibles:*
+✏️ *editar* - Cambiar tus preferencias
+🔄 *reiniciar* - Reconfigurar tu perfil
+❌ *cancelar* - Dejar de usar el servicio`,
+
   // DISPOSITIVO
 
   // Pregunta sobre dispositivo
@@ -136,20 +148,6 @@ Ejemplo: "9:00", "18:30", "10:00 AM", etc.`,
 Selecciona la hora en que quieres recibir las alertas:
 
 _Si prefieres otra hora, escríbela (ej: "20:00", "7:30 AM")_`,
-
-  // Confirmación y estado READY
-  ONBOARDING_COMPLETE: (role: string, location: string) => `¡Listo! 🎉 Tu perfil está configurado.
-
-🔍 Buscarás: *${role}*
-📍 Ubicación: *${location}*
-
-_Comandos disponibles:_
-• Escribe *"buscar"* para encontrar ofertas de empleo ahora
-• Escribe *"editar"* para cambiar alguna preferencia
-• Escribe *"reiniciar"* para volver a configurar tu perfil desde cero
-• Escribe *"cancelar"* si deseas dejar de usar el servicio
-
-¿Qué te gustaría hacer?`,
 
   // Errores de validación
   ERROR_ROLE_INVALID: `Por favor, ingresa un cargo válido (al menos 2 caracteres).
@@ -323,6 +321,27 @@ Tu perfil está listo. Puedes:
 ❌ *cancelar* - Dejar de usar el servicio
 
 Escribe el comando que desees.`,
+
+  // Ofrecer alertas después de primera búsqueda
+  OFFER_ALERTS: `¿Te gustaría recibir *alertas automáticas* de empleo? 🔔
+
+Si activas las alertas, te enviaré ofertas nuevas directamente a este chat según tus preferencias.
+
+📬 *Beneficios:*
+• No tienes que acordarte de buscar
+• Recibes ofertas frescas automáticamente
+• Puedes elegir la frecuencia (diario, semanal, etc.)
+
+Responde:
+• *"Sí"* o *"Activar"* para configurar alertas
+• *"No"* o *"Sin alertas"* si prefieres buscar manualmente`,
+
+  // Confirmación de rechazo de alertas
+  ALERTS_DISABLED: `Perfecto, *no activaré las alertas automáticas*. ✅
+
+Puedes buscar ofertas cuando quieras escribiendo *"buscar"*.
+
+_(Si cambias de opinión más adelante, puedes activar las alertas desde el menú de *"editar"*)_`,
 
   // Versiones DESKTOP de mensajes (sin botones/listas)
   ASK_TERMS_DESKTOP: `Antes de comenzar, necesito que aceptes los términos de uso:
