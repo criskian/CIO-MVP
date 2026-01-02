@@ -108,7 +108,7 @@ export class JobSearchService {
         location: profile.location || undefined,
         jobType: profile.jobType || undefined,
         minSalary: profile.minSalary || undefined,
-        workMode: profile.workMode || undefined,
+        // workMode: profile.workMode || undefined, // [DESACTIVADO] Puede reactivarse
         experienceKeywords,
       };
 
@@ -208,13 +208,14 @@ export class JobSearchService {
 
   /**
    * Genera un hash único del perfil para detectar cambios
+   * [NOTA] workMode está comentado ya que la pregunta fue removida
    */
   private generateProfileHash(profile: any): string {
     const parts = [
       profile.role || '',
       profile.location || '',
       profile.experienceLevel || '',
-      profile.workMode || '',
+      // profile.workMode || '', // [DESACTIVADO] Puede reactivarse
       profile.jobType || '',
       profile.minSalary?.toString() || '',
     ];
@@ -746,23 +747,25 @@ export class JobSearchService {
       }
     }
 
-    // +8 puntos si la modalidad de trabajo coincide con la preferencia del usuario
-    if (query.workMode && query.workMode !== 'sin_preferencia') {
-      const workModeKeywords: Record<string, string[]> = {
-        remoto: ['remoto', 'remote', 'trabajo desde casa', 'home office', 'teletrabajo', 'work from home'],
-        presencial: ['presencial', 'on-site', 'oficina', 'sede', 'in-office'],
-        hibrido: ['híbrido', 'hibrido', 'hybrid', 'mixto'],
-      };
-
-      const keywords = workModeKeywords[query.workMode] || [];
-      const hasModalityMatch = keywords.some(
-        (keyword) => titleLower.includes(keyword) || snippetLower.includes(keyword),
-      );
-
-      if (hasModalityMatch) {
-        score += 8;
-      }
-    }
+    // [DESACTIVADO] Scoring basado en modalidad de trabajo (workMode)
+    // Esta sección puede reactivarse en el futuro si se vuelve a implementar la pregunta de modalidad
+    // // +8 puntos si la modalidad de trabajo coincide con la preferencia del usuario
+    // if (query.workMode && query.workMode !== 'sin_preferencia') {
+    //   const workModeKeywords: Record<string, string[]> = {
+    //     remoto: ['remoto', 'remote', 'trabajo desde casa', 'home office', 'teletrabajo', 'work from home'],
+    //     presencial: ['presencial', 'on-site', 'oficina', 'sede', 'in-office'],
+    //     hibrido: ['híbrido', 'hibrido', 'hybrid', 'mixto'],
+    //   };
+    //
+    //   const keywords = workModeKeywords[query.workMode] || [];
+    //   const hasModalityMatch = keywords.some(
+    //     (keyword) => titleLower.includes(keyword) || snippetLower.includes(keyword),
+    //   );
+    //
+    //   if (hasModalityMatch) {
+    //     score += 8;
+    //   }
+    // }
 
     // +7 puntos si el nivel de experiencia coincide (prioriza, pero no filtra)
     if (query.experienceKeywords && query.experienceKeywords.length > 0) {

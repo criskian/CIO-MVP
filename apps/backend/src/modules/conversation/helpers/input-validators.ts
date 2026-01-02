@@ -194,14 +194,14 @@ export function isEditIntent(text: string): boolean {
   return editPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
-//Detecta qué campo del perfil el usuario quiere editar
+// Detecta qué campo del perfil el usuario quiere editar
 export function detectEditField(
   text: string,
 ):
   | 'rol'
   | 'experiencia'
   | 'ubicacion'
-  | 'modalidad'
+  // | 'modalidad' // [DESACTIVADO] Puede reactivarse en el futuro
   | 'tipo'
   | 'salario'
   | 'frecuencia'
@@ -243,19 +243,20 @@ export function detectEditField(
     return 'ubicacion';
   }
 
-  // Detectar campo "modalidad" (remoto/presencial)
-  const workModePatterns = [
-    'modalidad',
-    'remoto',
-    'presencial',
-    'trabajo remoto',
-    'trabajo presencial',
-    'oficina',
-    'casa',
-  ];
-  if (workModePatterns.some((pattern) => normalizedText.includes(pattern))) {
-    return 'modalidad';
-  }
+  // [DESACTIVADO] Detectar campo "modalidad" (remoto/presencial)
+  // Puede reactivarse en el futuro si se requiere
+  // const workModePatterns = [
+  //   'modalidad',
+  //   'remoto',
+  //   'presencial',
+  //   'trabajo remoto',
+  //   'trabajo presencial',
+  //   'oficina',
+  //   'casa',
+  // ];
+  // if (workModePatterns.some((pattern) => normalizedText.includes(pattern))) {
+  //   return 'modalidad';
+  // }
 
 
   // Detectar campo "tipo de empleo/jornada"
@@ -591,80 +592,81 @@ export function normalizeLocation(text: string): string | null {
   return null;
 }
 
-//Normaliza la modalidad de trabajo
-export function normalizeWorkMode(
-  text: string,
-): 'remoto' | 'presencial' | 'hibrido' | 'sin_preferencia' | null {
-  const normalizedText = text.toLowerCase().trim();
-
-  // Detectar "sin preferencia"
-  const noPreferencePatterns = [
-    'sin preferencia',
-    'cualquiera',
-    'todas',
-    'todos',
-    'no importa',
-    'da igual',
-    'me da igual',
-    'cualquier modalidad',
-    '4', // Por si usamos lista numerada
-  ];
-
-  if (noPreferencePatterns.some((pattern) => normalizedText.includes(pattern))) {
-    return 'sin_preferencia';
-  }
-
-  // Detectar "híbrido"
-  const hybridPatterns = [
-    'hibrido',
-    'híbrido',
-    'hybrid',
-    'mixto',
-    'mix',
-    'combinado',
-    'remoto y presencial',
-    '3', // Por si usamos lista numerada
-  ];
-
-  if (hybridPatterns.some((pattern) => normalizedText.includes(pattern))) {
-    return 'hibrido';
-  }
-
-  // Detectar "remoto"
-  const remotePatterns = [
-    'remoto',
-    'remote',
-    'remota',
-    'desde casa',
-    'casa',
-    'home',
-    'home office',
-    'teletrabajo',
-    '1', // Por si usamos lista numerada
-  ];
-
-  if (remotePatterns.some((pattern) => normalizedText.includes(pattern))) {
-    return 'remoto';
-  }
-
-  // Detectar "presencial"
-  const presencialPatterns = [
-    'presencial',
-    'oficina',
-    'office',
-    'in-office',
-    'in office',
-    'sitio',
-    'lugar',
-    '2', // Por si usamos lista numerada
-  ];
-
-  if (presencialPatterns.some((pattern) => normalizedText.includes(pattern))) {
-    return 'presencial';
-  }
-
-  return null;
-}
+// [DESACTIVADO] Normaliza la modalidad de trabajo
+// Puede reactivarse en el futuro si se requiere
+// export function normalizeWorkMode(
+//   text: string,
+// ): 'remoto' | 'presencial' | 'hibrido' | 'sin_preferencia' | null {
+//   const normalizedText = text.toLowerCase().trim();
+//
+//   // Detectar "sin preferencia"
+//   const noPreferencePatterns = [
+//     'sin preferencia',
+//     'cualquiera',
+//     'todas',
+//     'todos',
+//     'no importa',
+//     'da igual',
+//     'me da igual',
+//     'cualquier modalidad',
+//     '4', // Por si usamos lista numerada
+//   ];
+//
+//   if (noPreferencePatterns.some((pattern) => normalizedText.includes(pattern))) {
+//     return 'sin_preferencia';
+//   }
+//
+//   // Detectar "híbrido"
+//   const hybridPatterns = [
+//     'hibrido',
+//     'híbrido',
+//     'hybrid',
+//     'mixto',
+//     'mix',
+//     'combinado',
+//     'remoto y presencial',
+//     '3', // Por si usamos lista numerada
+//   ];
+//
+//   if (hybridPatterns.some((pattern) => normalizedText.includes(pattern))) {
+//     return 'hibrido';
+//   }
+//
+//   // Detectar "remoto"
+//   const remotePatterns = [
+//     'remoto',
+//     'remote',
+//     'remota',
+//     'desde casa',
+//     'casa',
+//     'home',
+//     'home office',
+//     'teletrabajo',
+//     '1', // Por si usamos lista numerada
+//   ];
+//
+//   if (remotePatterns.some((pattern) => normalizedText.includes(pattern))) {
+//     return 'remoto';
+//   }
+//
+//   // Detectar "presencial"
+//   const presencialPatterns = [
+//     'presencial',
+//     'oficina',
+//     'office',
+//     'in-office',
+//     'in office',
+//     'sitio',
+//     'lugar',
+//     '2', // Por si usamos lista numerada
+//   ];
+//
+//   if (presencialPatterns.some((pattern) => normalizedText.includes(pattern))) {
+//     return 'presencial';
+//   }
+//
+//   return null;
+// }
 
 //Valida que un texto sea un rol válido (por ahora, cualquier texto > 2 caracteres)
 export function normalizeRole(text: string): string | null {

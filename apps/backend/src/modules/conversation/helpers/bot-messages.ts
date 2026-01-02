@@ -88,14 +88,16 @@ Responde con el número o el nombre.`,
 
 Ejemplo: "Bogotá", "Medellín", "Cali", etc.`,
 
-  ASK_WORK_MODE: `Perfecto. ¿Qué modalidad de trabajo prefieres?
-
-🏠 *Remoto* - Trabajar desde casa
-🏢 *Presencial* - Ir a la oficina
-🔄 *Híbrido* - Mixto (remoto + presencial)
-✨ *Sin preferencia* - Cualquier modalidad
-
-Selecciona una opción.`,
+  // [DESACTIVADO] Pregunta de modalidad de trabajo (remoto/presencial/híbrido)
+  // Puede reactivarse en el futuro si se requiere
+  // ASK_WORK_MODE: `Perfecto. ¿Qué modalidad de trabajo prefieres?
+  //
+  // 🏠 *Remoto* - Trabajar desde casa
+  // 🏢 *Presencial* - Ir a la oficina
+  // 🔄 *Híbrido* - Mixto (remoto + presencial)
+  // ✨ *Sin preferencia* - Cualquier modalidad
+  //
+  // Selecciona una opción.`,
 
   ASK_JOB_TYPE: `¿Qué tipo de jornada prefieres?
 
@@ -166,12 +168,14 @@ Ejemplo: "Desarrollador", "Contador", "Asistente", etc.`,
 
 Ejemplo: "Bogotá", "Medellín", "Cali", etc.`,
 
-  ERROR_WORK_MODE_INVALID: `No entendí tu respuesta. Por favor elige una opción:
-
-🏠 *"Remoto"* - Trabajar desde casa
-🏢 *"Presencial"* - Ir a la oficina
-🔄 *"Híbrido"* - Mixto (remoto + presencial)
-✨ *"Sin preferencia"* - Cualquier modalidad`,
+  // [DESACTIVADO] Mensajes de error para modalidad de trabajo
+  // Puede reactivarse en el futuro si se requiere
+  // ERROR_WORK_MODE_INVALID: `No entendí tu respuesta. Por favor elige una opción:
+  //
+  // 🏠 *"Remoto"* - Trabajar desde casa
+  // 🏢 *"Presencial"* - Ir a la oficina
+  // 🔄 *"Híbrido"* - Mixto (remoto + presencial)
+  // ✨ *"Sin preferencia"* - Cualquier modalidad`,
 
   ERROR_JOB_TYPE_INVALID: `No entendí tu respuesta. Por favor responde con:
 
@@ -344,13 +348,15 @@ Escribe el *número* o el *nombre* de tu opción:
 *3* - Pasantía
 *4* - Freelance`,
 
-  ASK_WORK_MODE_DESKTOP: `¿Qué modalidad de trabajo prefieres?
-
-Escribe una de estas opciones:
-• *"Remoto"* - Para trabajar desde casa 🏠
-• *"Presencial"* - Para ir a la oficina 🏢
-• *"Híbrido"* - Para trabajar mixto (remoto + presencial) 🔄
-• *"Sin preferencia"* - Para cualquier modalidad ✨`,
+  // [DESACTIVADO] Mensajes de modalidad de trabajo para versión desktop
+  // Puede reactivarse en el futuro si se requiere
+  // ASK_WORK_MODE_DESKTOP: `¿Qué modalidad de trabajo prefieres?
+  //
+  // Escribe una de estas opciones:
+  // • *"Remoto"* - Para trabajar desde casa 🏠
+  // • *"Presencial"* - Para ir a la oficina 🏢
+  // • *"Híbrido"* - Para trabajar mixto (remoto + presencial) 🔄
+  // • *"Sin preferencia"* - Para cualquier modalidad ✨`,
 
   CONFIRM_RESTART_DESKTOP: `⚠️ ¿Estás seguro de que quieres *reiniciar tu perfil*?
 
@@ -372,7 +378,7 @@ Escribe:
     role: string;
     experience: string;
     location: string;
-    workMode: string;
+    // workMode: string; // [DESACTIVADO] Puede reactivarse
     jobType: string;
     minSalary: string;
     alertFrequency: string;
@@ -382,7 +388,6 @@ Escribe:
 🔹 *Rol:* ${profile.role}
 💡 *Experiencia:* ${profile.experience}
 📍 *Ubicación:* ${profile.location}
-🏠 *Modalidad:* ${profile.workMode}
 💼 *Tipo de empleo:* ${profile.jobType}
 💰 *Salario mínimo:* ${profile.minSalary}
 🔔 *Frecuencia:* ${profile.alertFrequency}
