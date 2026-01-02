@@ -580,7 +580,7 @@ export function normalizeSalary(text: string): number | null {
   return null;
 }
 
-//Valida que un texto sea una ciudad válida (por ahora, cualquier texto > 2 caracteres)
+//Valida que un texto sea una ubicación válida (ciudad o país, cualquier texto > 2 caracteres)
 export function normalizeLocation(text: string): string | null {
   const normalizedText = text.trim();
 

@@ -96,9 +96,11 @@ Responde con el número o el nombre.`,
 
   ASK_LOCATION: `Excelente. Ahora dime:
 
-¿En qué ciudad vives o te encuentras actualmente?
+¿En qué ciudad estás buscando empleo?
 
-Ejemplo: "Bogotá", "Medellín", "Cali", etc.`,
+_(Si no tienes una ciudad específica, dinos al menos el país de preferencia, es necesario para la búsqueda)_
+
+Ejemplo: "Bogotá", "Lima", "Colombia", "Argentina", etc.`,
 
   // [DESACTIVADO] Pregunta de modalidad de trabajo (remoto/presencial/híbrido)
   // Puede reactivarse en el futuro si se requiere
@@ -162,9 +164,9 @@ Ejemplo: "Desarrollador", "Contador", "Asistente", etc.`,
 4️⃣ Senior (5+ años)
 5️⃣ Lead/Expert (7+ años)`,
 
-  ERROR_LOCATION_INVALID: `Por favor, ingresa una ciudad válida.
+  ERROR_LOCATION_INVALID: `Por favor, ingresa una ciudad o país válido.
 
-Ejemplo: "Bogotá", "Medellín", "Cali", etc.`,
+Ejemplo: "Bogotá", "Lima", "México", "Colombia", "Perú", etc.`,
 
   // [DESACTIVADO] Mensajes de error para modalidad de trabajo
   // Puede reactivarse en el futuro si se requiere
@@ -418,7 +420,7 @@ Escribe el *número* o *nombre* del campo que quieres editar:
 
 *1* - *Rol* - Cambiar tu cargo deseado
 *2* - *Experiencia* - Cambiar tu nivel de experiencia
-*3* - *Ubicación* - Cambiar la ciudad
+*3* - *Ubicación* - Cambiar ciudad o país de búsqueda
 *4* - *Modalidad* - Cambiar entre remoto o presencial
 *5* - *Tipo* - Cambiar el tipo de empleo
 *6* - *Salario* - Cambiar el salario mínimo
