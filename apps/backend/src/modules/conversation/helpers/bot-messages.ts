@@ -78,9 +78,19 @@ Ver política de privacidad: https://cio-stg.almia.com.co/privacy-policy
   // Preguntas del onboarding
   ASK_ROLE: `¡Perfecto! Comencemos 🎯
 
-¿Qué cargo o rol estás buscando?
+*¿Cuál es el cargo o rol PRINCIPAL en el que te gustaría trabajar ahora?*
 
-Ejemplo: "Desarrollador Full Stack", "Contador", "Asistente Administrativo", etc.`,
+Escribe el más importante para ti en este momento.
+
+*Ejemplos:*
+• "Vendedor"
+• "Marketing"
+• "Analista de datos"
+• "Asistente administrativo"
+• "Diseñador UX"
+• "Ingeniero industrial"
+
+_Luego podrás agregar otros roles o ajustarlo editando tu perfil._`,
 
   ASK_EXPERIENCE: `Genial. Ahora dime:
 
@@ -122,11 +132,13 @@ Ejemplo: "Bogotá", "Lima", "Colombia", "Argentina", etc.`,
 
 Responde con el número o el nombre.`,
 
-  ASK_MIN_SALARY: `¿Cuál es el salario mínimo que te gustaría ganar? (en pesos colombianos)
+  ASK_MIN_SALARY: `¿Cuál es tu salario ideal? (en pesos colombianos)
+
+_(Esto nos ayuda a priorizar ofertas que coincidan con tus expectativas, pero también te mostraremos otras opciones)_
 
 Ejemplo: "2000000", "2.5 millones", etc.
 
-_(Puedes escribir "0" si prefieres ver todas las ofertas sin filtro de salario)_`,
+_Si no tienes una preferencia específica, escribe "0"_`,
 
   ASK_ALERT_FREQUENCY: `¡Ya casi terminamos! 🔔
 
@@ -152,9 +164,9 @@ Selecciona la hora en que quieres recibir las alertas:
 _Si prefieres otra hora, escríbela (ej: "20:00", "7:30 AM")_`,
 
   // Errores de validación
-  ERROR_ROLE_INVALID: `Por favor, ingresa un cargo válido (al menos 2 caracteres).
+  ERROR_ROLE_INVALID: `Por favor, ingresa un cargo o rol válido (al menos 2 caracteres).
 
-Ejemplo: "Desarrollador", "Contador", "Asistente", etc.`,
+Ejemplo: "Vendedor", "Marketing", "Analista", "Diseñador", etc.`,
 
   ERROR_EXPERIENCE_INVALID: `No entendí tu respuesta. Por favor responde con:
 
@@ -184,7 +196,7 @@ Ejemplo: "Bogotá", "Lima", "México", "Colombia", "Perú", etc.`,
 3️⃣ Pasantía
 4️⃣ Freelance`,
 
-  ERROR_SALARY_INVALID: `Por favor ingresa un salario válido en pesos colombianos (entre 500,000 y 50,000,000) o escribe "0" para no filtrar por salario.
+  ERROR_SALARY_INVALID: `Por favor ingresa un salario válido en pesos colombianos (entre 500,000 y 50,000,000) o escribe "0" si no tienes preferencia.
 
 Ejemplo: "2000000", "2.5 millones", "0"`,
 
@@ -272,7 +284,7 @@ Tu cuenta permanece registrada. Si cambias de opinión en el futuro, puedes escr
 🔹 *Rol:* ${profile.role}
 🔹 *Ubicación:* ${profile.location}
 🔹 *Tipo de empleo:* ${profile.jobType}
-🔹 *Salario mínimo:* ${profile.minSalary}
+🔹 *Salario ideal:* ${profile.minSalary}
 🔹 *Frecuencia de alertas:* ${profile.alertFrequency}
 🔹 *Horario de alertas:* ${profile.alertTime}
 
@@ -284,7 +296,7 @@ Para editar una preferencia, escribe el *nombre del campo* que quieres cambiar.
 • Escribe *"rol"* para cambiar tu cargo deseado
 • Escribe *"ubicación"* para cambiar la ciudad
 • Escribe *"tipo"* para cambiar el tipo de empleo
-• Escribe *"salario"* para cambiar el salario mínimo
+• Escribe *"salario"* para cambiar tu salario ideal
 • Escribe *"frecuencia"* para cambiar la frecuencia de alertas
 • Escribe *"horario"* para cambiar la hora de alertas
 
@@ -410,7 +422,7 @@ Escribe:
 💡 *Experiencia:* ${profile.experience}
 📍 *Ubicación:* ${profile.location}
 💼 *Tipo de empleo:* ${profile.jobType}
-💰 *Salario mínimo:* ${profile.minSalary}
+💰 *Salario ideal:* ${profile.minSalary}
 🔔 *Frecuencia:* ${profile.alertFrequency}
 ⏰ *Horario de alertas:* ${profile.alertTime}
 
@@ -423,7 +435,7 @@ Escribe el *número* o *nombre* del campo que quieres editar:
 *3* - *Ubicación* - Cambiar ciudad o país de búsqueda
 *4* - *Modalidad* - Cambiar entre remoto o presencial
 *5* - *Tipo* - Cambiar el tipo de empleo
-*6* - *Salario* - Cambiar el salario mínimo
+*6* - *Salario* - Cambiar tu salario ideal
 *7* - *Frecuencia* - Cambiar la frecuencia de alertas
 *8* - *Horario* - Cambiar la hora de alertas
 

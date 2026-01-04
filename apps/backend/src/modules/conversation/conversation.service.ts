@@ -1189,7 +1189,7 @@ Selecciona qué quieres editar:`,
               },
               {
                 id: 'edit_salario',
-                title: '💰 Salario mínimo',
+                title: '💰 Salario ideal',
                 description: `Actual: ${formattedProfile.minSalary}`,
               },
               {

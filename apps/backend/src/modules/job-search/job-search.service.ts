@@ -524,7 +524,7 @@ export class JobSearchService {
 
   /**
    * Filtra ofertas no deseadas
-   * NOTA: El salario ya NO es un filtro restrictivo - se usa solo para scoring
+   * NOTA: El salario ya NO es un filtro restrictivo - se usa solo para scoring/priorización
    */
   private filterJobs(jobs: JobPosting[], query: JobSearchQuery): JobPosting[] {
     return jobs.filter((job) => {
@@ -550,7 +550,7 @@ export class JobSearchService {
         return false;
       }
 
-      // NOTA: El salario mínimo ya NO filtra ofertas
+      // NOTA: El salario ideal ya NO filtra ofertas
       // Las ofertas con salario bajo tendrán menor puntuación, pero no se excluyen
 
       return true;
@@ -779,11 +779,11 @@ export class JobSearchService {
       }
     }
 
-    // +5 puntos si el salario cumple o supera el mínimo esperado (no restrictivo)
+    // +5 puntos si el salario cumple o supera el ideal esperado (no restrictivo)
     if (query.minSalary && job.salaryRaw) {
       const extractedSalary = this.extractSalaryNumber(job.salaryRaw);
       if (extractedSalary && extractedSalary >= query.minSalary) {
-        score += 5; // Salario cumple el mínimo
+        score += 5; // Salario cumple o supera el ideal
       }
       // Si el salario es menor, no suma puntos pero tampoco resta (no es restrictivo)
     }

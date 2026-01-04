@@ -668,7 +668,7 @@ export function normalizeLocation(text: string): string | null {
 //   return null;
 // }
 
-//Valida que un texto sea un rol válido (por ahora, cualquier texto > 2 caracteres)
+//Valida que un texto sea un rol o área válida (acepta roles específicos o áreas generales, mínimo 2 caracteres)
 export function normalizeRole(text: string): string | null {
   const normalizedText = text.trim();
 
