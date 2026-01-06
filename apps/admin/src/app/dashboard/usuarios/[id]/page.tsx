@@ -324,7 +324,7 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
                 {user.profile.minSalary && (
                   <div>
                     <dt className="text-sm font-medium text-admin-text-secondary">
-                      Salario Mínimo
+                      Salario Ideal
                     </dt>
                     <dd className="mt-1 text-sm text-admin-text-primary">
                       {formatCurrency(user.profile.minSalary)}

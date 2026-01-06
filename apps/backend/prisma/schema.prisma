@@ -131,7 +131,7 @@ model UserProfile {
   location        String?
   jobType         String?  // full_time, part_time, internship, freelance
   minSalary       Int?
-  workMode        String?  // presencial, remoto, hibrido, sin_preferencia
+  workMode        String?  // [DESACTIVADO] presencial, remoto, hibrido, sin_preferencia - Campo mantenido por compatibilidad pero no usado actualmente
   experienceLevel String?  // none, junior, mid, senior, lead
   createdFromCV   Boolean  @default(false)
   cvUrl           String?

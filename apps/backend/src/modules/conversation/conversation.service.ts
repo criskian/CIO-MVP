@@ -22,7 +22,7 @@ import {
   normalizeRole,
   normalizeExperienceLevel,
   normalizeLocation,
-  normalizeWorkMode,
+  // normalizeWorkMode, // [DESACTIVADO] Función comentada
   normalizeJobType,
   normalizeSalary,
   normalizeTime,
@@ -137,8 +137,9 @@ export class ConversationService {
       case ConversationState.ASK_LOCATION:
         return await this.handleAskLocationState(userId, text);
 
-      case ConversationState.ASK_WORK_MODE:
-        return await this.handleAskWorkModeState(userId, text);
+      // [DESACTIVADO] Estado ASK_WORK_MODE - Puede reactivarse en el futuro
+      // case ConversationState.ASK_WORK_MODE:
+      //   return await this.handleAskWorkModeState(userId, text);
 
       case ConversationState.ASK_JOB_TYPE:
         return await this.handleAskJobTypeState(userId, text);
@@ -154,6 +155,16 @@ export class ConversationService {
 
       case ConversationState.READY:
         return await this.handleReadyState(userId, text, intent);
+
+      // [NUEVO] Estado para ofrecer alertas después de primera búsqueda
+      case ConversationState.OFFER_ALERTS:
+        return await this.handleOfferAlertsState(userId, text);
+
+      case ConversationState.ASK_ALERT_FREQUENCY:
+        return await this.handleAskAlertFrequencyState(userId, text);
+
+      case ConversationState.ASK_ALERT_TIME:
+        return await this.handleAskAlertTimeState(userId, text);
 
       case ConversationState.CONFIRM_RESTART:
         return await this.handleConfirmRestartState(userId, text);
@@ -173,8 +184,9 @@ export class ConversationService {
       case ConversationState.EDIT_LOCATION:
         return await this.handleEditLocationState(userId, text);
 
-      case ConversationState.EDIT_WORK_MODE:
-        return await this.handleEditWorkModeState(userId, text);
+      // [DESACTIVADO] Estado EDIT_WORK_MODE - Puede reactivarse en el futuro
+      // case ConversationState.EDIT_WORK_MODE:
+      //   return await this.handleEditWorkModeState(userId, text);
 
       case ConversationState.EDIT_JOB_TYPE:
         return await this.handleEditJobTypeState(userId, text);
@@ -433,59 +445,8 @@ export class ConversationService {
     }
 
     await this.updateUserProfile(userId, { location });
-    await this.updateSessionState(userId, ConversationState.ASK_WORK_MODE);
-
-    const deviceType = await this.getDeviceType(userId);
-
-    if (deviceType === 'MOBILE') {
-      return {
-        text: BotMessages.ASK_WORK_MODE,
-        listTitle: 'Elige modalidad',
-        listSections: [
-          {
-            title: 'Modalidad de Trabajo',
-            rows: [
-              { id: 'work_remoto', title: '🏠 Remoto', description: 'Trabajar desde casa' },
-              { id: 'work_presencial', title: '🏢 Presencial', description: 'Ir a la oficina' },
-              { id: 'work_hibrido', title: '🔄 Híbrido', description: 'Mixto (remoto + presencial)' },
-              { id: 'work_sin_preferencia', title: '✨ Sin preferencia', description: 'Cualquier modalidad' },
-            ],
-          },
-        ],
-      };
-    }
-
-    return { text: BotMessages.ASK_WORK_MODE_DESKTOP };
-  }
-
-  private async handleAskWorkModeState(userId: string, text: string): Promise<BotReply> {
-    const workMode = normalizeWorkMode(text);
-
-    if (!workMode) {
-      const deviceType = await this.getDeviceType(userId);
-
-      if (deviceType === 'MOBILE') {
-        return {
-          text: BotMessages.ERROR_WORK_MODE_INVALID,
-          listTitle: 'Elige modalidad',
-          listSections: [
-            {
-              title: 'Modalidad de Trabajo',
-              rows: [
-                { id: 'work_remoto', title: '🏠 Remoto', description: 'Trabajar desde casa' },
-                { id: 'work_presencial', title: '🏢 Presencial', description: 'Ir a la oficina' },
-                { id: 'work_hibrido', title: '🔄 Híbrido', description: 'Mixto (remoto + presencial)' },
-                { id: 'work_sin_preferencia', title: '✨ Sin preferencia', description: 'Cualquier modalidad' },
-              ],
-            },
-          ],
-        };
-      }
-
-      return { text: BotMessages.ERROR_WORK_MODE_INVALID };
-    }
-
-    await this.updateUserProfile(userId, { workMode });
+    
+    // [ACTUALIZADO] Flujo: ASK_LOCATION → ASK_JOB_TYPE (saltando ASK_WORK_MODE)
     await this.updateSessionState(userId, ConversationState.ASK_JOB_TYPE);
 
     const deviceType = await this.getDeviceType(userId);
@@ -510,6 +471,60 @@ export class ConversationService {
 
     return { text: BotMessages.ASK_JOB_TYPE_DESKTOP };
   }
+
+  // [DESACTIVADO] Handler de ASK_WORK_MODE - Puede reactivarse en el futuro
+  // private async handleAskWorkModeState(userId: string, text: string): Promise<BotReply> {
+  //   const workMode = normalizeWorkMode(text);
+  //
+  //   if (!workMode) {
+  //     const deviceType = await this.getDeviceType(userId);
+  //
+  //     if (deviceType === 'MOBILE') {
+  //       return {
+  //         text: BotMessages.ERROR_WORK_MODE_INVALID,
+  //         listTitle: 'Elige modalidad',
+  //         listSections: [
+  //           {
+  //             title: 'Modalidad de Trabajo',
+  //             rows: [
+  //               { id: 'work_remoto', title: '🏠 Remoto', description: 'Trabajar desde casa' },
+  //               { id: 'work_presencial', title: '🏢 Presencial', description: 'Ir a la oficina' },
+  //               { id: 'work_hibrido', title: '🔄 Híbrido', description: 'Mixto (remoto + presencial)' },
+  //               { id: 'work_sin_preferencia', title: '✨ Sin preferencia', description: 'Cualquier modalidad' },
+  //             ],
+  //           },
+  //         ],
+  //       };
+  //     }
+  //
+  //     return { text: BotMessages.ERROR_WORK_MODE_INVALID };
+  //   }
+  //
+  //   await this.updateUserProfile(userId, { workMode });
+  //   await this.updateSessionState(userId, ConversationState.ASK_JOB_TYPE);
+  //
+  //   const deviceType = await this.getDeviceType(userId);
+  //
+  //   if (deviceType === 'MOBILE') {
+  //     return {
+  //       text: BotMessages.ASK_JOB_TYPE,
+  //       listTitle: 'Seleccionar tipo',
+  //       listSections: [
+  //         {
+  //           title: 'Tipo de Empleo',
+  //           rows: [
+  //             { id: 'full_time', title: 'Tiempo completo', description: 'Jornada laboral completa (8 horas)' },
+  //             { id: 'part_time', title: 'Medio tiempo', description: 'Jornada parcial (4-6 horas)' },
+  //             { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
+  //             { id: 'freelance', title: 'Freelance', description: 'Trabajo por proyectos' },
+  //           ],
+  //         },
+  //       },
+  //     };
+  //   }
+  //
+  //   return { text: BotMessages.ASK_JOB_TYPE_DESKTOP };
+  // }
 
   /**
    * Estado ASK_JOB_TYPE: Esperando tipo de jornada
@@ -606,33 +621,23 @@ export class ConversationService {
     // Guardar en UserProfile
     await this.updateUserProfile(userId, { minSalary });
 
-    // Transición: ASK_MIN_SALARY → ASK_ALERT_FREQUENCY
-    await this.updateSessionState(userId, ConversationState.ASK_ALERT_FREQUENCY);
+    // [ACTUALIZADO] Transición: ASK_MIN_SALARY → READY (ya no pasa por alertas en onboarding)
+    await this.updateSessionState(userId, ConversationState.READY);
 
-    // Obtener tipo de dispositivo para mostrar lista en móvil
-    const deviceType = await this.getDeviceType(userId);
+    // Obtener usuario para mostrar mensaje de bienvenida
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
 
-    if (deviceType === 'MOBILE') {
-      return {
-        text: BotMessages.ASK_ALERT_FREQUENCY,
-        listTitle: 'Seleccionar',
-        listSections: [
-          {
-            title: 'Frecuencia',
-            rows: [
-              { id: 'freq_daily', title: '☀️ Diariamente' },
-              { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
-              { id: 'freq_weekly', title: '📆 Semanalmente' },
-              { id: 'freq_monthly', title: '🗓️ Mensualmente' },
-            ],
-          },
-        ],
-      };
-    }
-
-    return { text: BotMessages.ASK_ALERT_FREQUENCY };
+    // Mostrar mensaje de onboarding completo con resumen
+    return await this.returnToMainMenu(
+      userId,
+      BotMessages.ONBOARDING_COMPLETE(user?.name || 'usuario'),
+    );
   }
 
+  // [ACTUALIZADO] Estado ASK_ALERT_FREQUENCY: Ahora se accede después de primera búsqueda
   /**
    * Estado ASK_ALERT_FREQUENCY: Esperando frecuencia de alertas
    */
@@ -713,16 +718,21 @@ export class ConversationService {
     // Guardar en AlertPreference
     await this.upsertAlertPreference(userId, alertTime, alertFrequency);
 
-    // Obtener datos del perfil para el mensaje de confirmación
-    const profile = await this.prisma.userProfile.findUnique({ where: { userId } });
+    // Obtener datos del usuario para el mensaje de confirmación
+    const user = await this.prisma.user.findUnique({ 
+      where: { id: userId },
+      select: { name: true },
+    });
 
     // Transición: ASK_ALERT_TIME → READY
     await this.updateSessionState(userId, ConversationState.READY);
 
-    const confirmationMessage = BotMessages.ONBOARDING_COMPLETE(
-      profile?.role || 'tu cargo',
-      profile?.location || 'tu ubicación',
-    );
+    const confirmationMessage = `¡Perfecto! ✅ Tus alertas están configuradas.
+
+🔔 *Frecuencia:* ${alertFrequencyToText(alertFrequency)}
+⏰ *Hora:* ${alertTime}
+
+Te enviaré ofertas nuevas directamente a este chat según tu configuración.`;
 
     // Obtener tipo de dispositivo
     const deviceType = await this.getDeviceType(userId);
@@ -922,7 +932,27 @@ Intenta de nuevo más tarde o escribe "reiniciar" para ajustar tus preferencias.
 • Escribir *"editar"* para ajustar tus preferencias y encontrar más opciones`;
       }
 
-      // Agregar menú de opciones al final
+      // [NUEVO] Verificar si es la primera búsqueda y no tiene alertas configuradas
+      const alertPreference = await this.prisma.alertPreference.findUnique({
+        where: { userId },
+      });
+
+      // Si NO tiene alertas configuradas, ofrecer configurarlas después de mostrar resultados
+      if (!alertPreference) {
+        // Cambiar estado a OFFER_ALERTS para preguntar si desea alertas
+        await this.updateSessionState(userId, ConversationState.OFFER_ALERTS);
+
+        // Retornar ofertas + pregunta de alertas en el MISMO mensaje
+        return { 
+          text: formattedJobs + exhaustedMessage + `
+
+---
+
+${BotMessages.OFFER_ALERTS}`
+        };
+      }
+
+      // Si ya tiene alertas configuradas, mostrar menú normal
       const menuText = `
 
 ---
@@ -945,6 +975,63 @@ Intenta de nuevo más tarde o escribe "reiniciar" para ajustar tus preferencias.
 Por favor intenta de nuevo en unos minutos.`,
       };
     }
+  }
+
+  /**
+   * [NUEVO] Estado OFFER_ALERTS: Pregunta si desea recibir alertas después de primera búsqueda
+   */
+  private async handleOfferAlertsState(userId: string, text: string): Promise<BotReply> {
+    // Verificar si acepta alertas
+    if (isAcceptance(text) || text.toLowerCase().includes('activar')) {
+      // Usuario quiere activar alertas → Preguntar frecuencia
+      await this.updateSessionState(userId, ConversationState.ASK_ALERT_FREQUENCY);
+
+      const deviceType = await this.getDeviceType(userId);
+
+      if (deviceType === 'MOBILE') {
+        return {
+          text: BotMessages.ASK_ALERT_FREQUENCY,
+          listTitle: 'Seleccionar',
+          listSections: [
+            {
+              title: 'Frecuencia',
+              rows: [
+                { id: 'freq_daily', title: '☀️ Diariamente' },
+                { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
+                { id: 'freq_weekly', title: '📆 Semanalmente' },
+                { id: 'freq_monthly', title: '🗓️ Mensualmente' },
+              ],
+            },
+          ],
+        };
+      }
+
+      return { text: BotMessages.ASK_ALERT_FREQUENCY };
+    }
+
+    // Verificar si rechaza alertas
+    if (isRejection(text) || text.toLowerCase().includes('sin alertas') || text.toLowerCase().includes('no quiero')) {
+      // Usuario NO quiere alertas → Crear AlertPreference con enabled=false
+      await this.prisma.alertPreference.create({
+        data: {
+          userId,
+          alertFrequency: 'daily', // Valor por defecto (no se usará)
+          alertTimeLocal: '09:00', // Valor por defecto (no se usará)
+          timezone: 'America/Bogota',
+          enabled: false, // ⚠️ DESACTIVADO
+        },
+      });
+
+      // Volver a READY
+      await this.updateSessionState(userId, ConversationState.READY);
+
+      return await this.returnToMainMenu(userId, BotMessages.ALERTS_DISABLED);
+    }
+
+    // No entendió la respuesta
+    return {
+      text: `${BotMessages.OFFER_ALERTS}\n\n_Por favor, responde "Sí" o "No":_`,
+    };
   }
 
   /**
@@ -1039,7 +1126,7 @@ Continúa con el proceso manual. 👇`,
       role: profile.role || 'No configurado',
       experience: this.formatExperienceLevel(profile.experienceLevel),
       location: profile.location || 'No configurado',
-      workMode: this.formatWorkMode(profile.workMode),
+      // workMode: this.formatWorkMode(profile.workMode), // [DESACTIVADO] Puede reactivarse
       jobType: this.formatJobType(profile.jobType),
       minSalary: profile.minSalary
         ? `$${profile.minSalary.toLocaleString('es-CO')} COP`
@@ -1063,7 +1150,6 @@ Continúa con el proceso manual. 👇`,
 🔹 *Rol:* ${formattedProfile.role}
 💡 *Experiencia:* ${formattedProfile.experience}
 📍 *Ubicación:* ${formattedProfile.location}
-🏠 *Modalidad:* ${formattedProfile.workMode}
 💼 *Tipo de empleo:* ${formattedProfile.jobType}
 💰 *Salario mínimo:* ${formattedProfile.minSalary}
 🔔 *Frecuencia:* ${formattedProfile.alertFrequency}
@@ -1090,11 +1176,12 @@ Selecciona qué quieres editar:`,
                 title: '📍 Ubicación',
                 description: `Actual: ${formattedProfile.location}`,
               },
-              {
-                id: 'edit_modalidad',
-                title: '🏠 Modalidad',
-                description: `Actual: ${formattedProfile.workMode}`,
-              },
+              // [DESACTIVADO] Opción de editar modalidad - Puede reactivarse
+              // {
+              //   id: 'edit_modalidad',
+              //   title: '🏠 Modalidad',
+              //   description: `Actual: ${formattedProfile.workMode}`,
+              // },
               {
                 id: 'edit_tipo',
                 title: '💼 Tipo de empleo',
@@ -1102,7 +1189,7 @@ Selecciona qué quieres editar:`,
               },
               {
                 id: 'edit_salario',
-                title: '💰 Salario mínimo',
+                title: '💰 Salario ideal',
                 description: `Actual: ${formattedProfile.minSalary}`,
               },
               {
@@ -1200,30 +1287,31 @@ Selecciona qué quieres editar:`,
         await this.updateSessionState(userId, ConversationState.EDIT_LOCATION);
         return { text: BotMessages.ASK_LOCATION };
 
-      case 'modalidad': {
-        await this.updateSessionState(userId, ConversationState.EDIT_WORK_MODE);
-        const deviceType = await this.getDeviceType(userId);
-
-        if (deviceType === 'MOBILE') {
-          return {
-            text: BotMessages.ASK_WORK_MODE,
-            listTitle: 'Elige modalidad',
-            listSections: [
-              {
-                title: 'Modalidad de Trabajo',
-                rows: [
-                  { id: 'work_remoto', title: '🏠 Remoto', description: 'Trabajar desde casa' },
-                  { id: 'work_presencial', title: '🏢 Presencial', description: 'Ir a la oficina' },
-                  { id: 'work_hibrido', title: '🔄 Híbrido', description: 'Mixto (remoto + presencial)' },
-                  { id: 'work_sin_preferencia', title: '✨ Sin preferencia', description: 'Cualquier modalidad' },
-                ],
-              },
-            ],
-          };
-        }
-
-        return { text: BotMessages.ASK_WORK_MODE_DESKTOP };
-      }
+      // [DESACTIVADO] Edición de modalidad - Puede reactivarse en el futuro
+      // case 'modalidad': {
+      //   await this.updateSessionState(userId, ConversationState.EDIT_WORK_MODE);
+      //   const deviceType = await this.getDeviceType(userId);
+      //
+      //   if (deviceType === 'MOBILE') {
+      //     return {
+      //       text: BotMessages.ASK_WORK_MODE,
+      //       listTitle: 'Elige modalidad',
+      //       listSections: [
+      //         {
+      //           title: 'Modalidad de Trabajo',
+      //           rows: [
+      //             { id: 'work_remoto', title: '🏠 Remoto', description: 'Trabajar desde casa' },
+      //             { id: 'work_presencial', title: '🏢 Presencial', description: 'Ir a la oficina' },
+      //             { id: 'work_hibrido', title: '🔄 Híbrido', description: 'Mixto (remoto + presencial)' },
+      //             { id: 'work_sin_preferencia', title: '✨ Sin preferencia', description: 'Cualquier modalidad' },
+      //           ],
+      //         },
+      //       ],
+      //     };
+      //   }
+      //
+      //   return { text: BotMessages.ASK_WORK_MODE_DESKTOP };
+      // }
 
       case 'tipo':
         await this.updateSessionState(userId, ConversationState.EDIT_JOB_TYPE);
@@ -1360,42 +1448,43 @@ Selecciona qué quieres editar:`,
     return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('ubicación', location));
   }
 
-  private async handleEditWorkModeState(userId: string, text: string): Promise<BotReply> {
-    const workMode = normalizeWorkMode(text);
-
-    if (!workMode) {
-      const deviceType = await this.getDeviceType(userId);
-
-      if (deviceType === 'MOBILE') {
-        return {
-          text: BotMessages.ERROR_WORK_MODE_INVALID,
-          listTitle: 'Elige modalidad',
-          listSections: [
-            {
-              title: 'Modalidad de Trabajo',
-              rows: [
-                { id: 'work_remoto', title: '🏠 Remoto', description: 'Trabajar desde casa' },
-                { id: 'work_presencial', title: '🏢 Presencial', description: 'Ir a la oficina' },
-                { id: 'work_hibrido', title: '🔄 Híbrido', description: 'Mixto (remoto + presencial)' },
-                { id: 'work_sin_preferencia', title: '✨ Sin preferencia', description: 'Cualquier modalidad' },
-              ],
-            },
-          ],
-        };
-      }
-
-      return { text: BotMessages.ERROR_WORK_MODE_INVALID };
-    }
-
-    await this.updateUserProfile(userId, { workMode });
-    await this.updateSessionState(userId, ConversationState.READY);
-
-    const displayMode = this.formatWorkMode(workMode);
-    return await this.returnToMainMenu(
-      userId,
-      BotMessages.FIELD_UPDATED('modalidad de trabajo', displayMode),
-    );
-  }
+  // [DESACTIVADO] Handler de EDIT_WORK_MODE - Puede reactivarse en el futuro
+  // private async handleEditWorkModeState(userId: string, text: string): Promise<BotReply> {
+  //   const workMode = normalizeWorkMode(text);
+  //
+  //   if (!workMode) {
+  //     const deviceType = await this.getDeviceType(userId);
+  //
+  //     if (deviceType === 'MOBILE') {
+  //       return {
+  //         text: BotMessages.ERROR_WORK_MODE_INVALID,
+  //         listTitle: 'Elige modalidad',
+  //         listSections: [
+  //           {
+  //             title: 'Modalidad de Trabajo',
+  //             rows: [
+  //               { id: 'work_remoto', title: '🏠 Remoto', description: 'Trabajar desde casa' },
+  //               { id: 'work_presencial', title: '🏢 Presencial', description: 'Ir a la oficina' },
+  //               { id: 'work_hibrido', title: '🔄 Híbrido', description: 'Mixto (remoto + presencial)' },
+  //               { id: 'work_sin_preferencia', title: '✨ Sin preferencia', description: 'Cualquier modalidad' },
+  //             ],
+  //           },
+  //         ],
+  //       };
+  //     }
+  //
+  //     return { text: BotMessages.ERROR_WORK_MODE_INVALID };
+  //   }
+  //
+  //   await this.updateUserProfile(userId, { workMode });
+  //   await this.updateSessionState(userId, ConversationState.READY);
+  //
+  //   const displayMode = this.formatWorkMode(workMode);
+  //   return await this.returnToMainMenu(
+  //     userId,
+  //     BotMessages.FIELD_UPDATED('modalidad de trabajo', displayMode),
+  //   );
+  // }
 
 
   /**
@@ -1913,19 +2002,20 @@ Selecciona qué quieres editar:`,
     return experienceMap[experienceLevel || ''] || 'No configurado';
   }
 
-  /**
-   * Formatea el workMode para mostrar al usuario
-   */
-  private formatWorkMode(workMode: string | null | undefined): string {
-    const workModeMap: Record<string, string> = {
-      remoto: '🏠 Remoto',
-      presencial: '🏢 Presencial',
-      hibrido: '🔄 Híbrido',
-      sin_preferencia: '✨ Sin preferencia',
-    };
-
-    return workModeMap[workMode || ''] || 'No configurado';
-  }
+  // [DESACTIVADO] Formatea el workMode para mostrar al usuario - Puede reactivarse
+  // /**
+  //  * Formatea el workMode para mostrar al usuario
+  //  */
+  // private formatWorkMode(workMode: string | null | undefined): string {
+  //   const workModeMap: Record<string, string> = {
+  //     remoto: '🏠 Remoto',
+  //     presencial: '🏢 Presencial',
+  //     hibrido: '🔄 Híbrido',
+  //     sin_preferencia: '✨ Sin preferencia',
+  //   };
+  //
+  //   return workModeMap[workMode || ''] || 'No configurado';
+  // }
 
   // ========================================
   // Métodos auxiliares de base de datos

@@ -37,6 +37,18 @@ Estás usando la *versión Free*: Estoy aquí para ayudarte a encontrar las *mej
 • Válido por 3 días desde tu registro
 • Alertas de empleo según tus preferencias`,
 
+  // Mensaje cuando completa el onboarding
+  ONBOARDING_COMPLETE: (name: string) => `¡Perfecto, *${name}*! ✅ Tu perfil está listo.
+
+🎯 *Ya puedes empezar a buscar ofertas!*
+
+Escribe *"buscar"* cuando estés listo y te mostraré las mejores ofertas que encontré para ti.
+
+📋 *Otros comandos disponibles:*
+✏️ *editar* - Cambiar tus preferencias
+🔄 *reiniciar* - Reconfigurar tu perfil
+❌ *cancelar* - Dejar de usar el servicio`,
+
   // DISPOSITIVO
 
   // Pregunta sobre dispositivo
@@ -66,9 +78,19 @@ Ver política de privacidad: https://cio-stg.almia.com.co/privacy-policy
   // Preguntas del onboarding
   ASK_ROLE: `¡Perfecto! Comencemos 🎯
 
-¿Qué cargo o rol estás buscando?
+*¿Cuál es el cargo o rol PRINCIPAL en el que te gustaría trabajar ahora?*
 
-Ejemplo: "Desarrollador Full Stack", "Contador", "Asistente Administrativo", etc.`,
+Escribe el más importante para ti en este momento.
+
+*Ejemplos:*
+• "Vendedor"
+• "Marketing"
+• "Analista de datos"
+• "Asistente administrativo"
+• "Diseñador UX"
+• "Ingeniero industrial"
+
+_Luego podrás agregar otros roles o ajustarlo editando tu perfil._`,
 
   ASK_EXPERIENCE: `Genial. Ahora dime:
 
@@ -84,18 +106,22 @@ Responde con el número o el nombre.`,
 
   ASK_LOCATION: `Excelente. Ahora dime:
 
-¿En qué ciudad vives o te encuentras actualmente?
+¿En qué ciudad estás buscando empleo?
 
-Ejemplo: "Bogotá", "Medellín", "Cali", etc.`,
+_(Si no tienes una ciudad específica, dinos al menos el país de preferencia, es necesario para la búsqueda)_
 
-  ASK_WORK_MODE: `Perfecto. ¿Qué modalidad de trabajo prefieres?
+Ejemplo: "Bogotá", "Lima", "Colombia", "Argentina", etc.`,
 
-🏠 *Remoto* - Trabajar desde casa
-🏢 *Presencial* - Ir a la oficina
-🔄 *Híbrido* - Mixto (remoto + presencial)
-✨ *Sin preferencia* - Cualquier modalidad
-
-Selecciona una opción.`,
+  // [DESACTIVADO] Pregunta de modalidad de trabajo (remoto/presencial/híbrido)
+  // Puede reactivarse en el futuro si se requiere
+  // ASK_WORK_MODE: `Perfecto. ¿Qué modalidad de trabajo prefieres?
+  //
+  // 🏠 *Remoto* - Trabajar desde casa
+  // 🏢 *Presencial* - Ir a la oficina
+  // 🔄 *Híbrido* - Mixto (remoto + presencial)
+  // ✨ *Sin preferencia* - Cualquier modalidad
+  //
+  // Selecciona una opción.`,
 
   ASK_JOB_TYPE: `¿Qué tipo de jornada prefieres?
 
@@ -106,11 +132,13 @@ Selecciona una opción.`,
 
 Responde con el número o el nombre.`,
 
-  ASK_MIN_SALARY: `¿Cuál es el salario mínimo que te gustaría ganar? (en pesos colombianos)
+  ASK_MIN_SALARY: `¿Cuál es tu salario ideal? (en pesos colombianos)
+
+_(Esto nos ayuda a priorizar ofertas que coincidan con tus expectativas, pero también te mostraremos otras opciones)_
 
 Ejemplo: "2000000", "2.5 millones", etc.
 
-_(Puedes escribir "0" si prefieres ver todas las ofertas sin filtro de salario)_`,
+_Si no tienes una preferencia específica, escribe "0"_`,
 
   ASK_ALERT_FREQUENCY: `¡Ya casi terminamos! 🔔
 
@@ -135,24 +163,10 @@ Selecciona la hora en que quieres recibir las alertas:
 
 _Si prefieres otra hora, escríbela (ej: "20:00", "7:30 AM")_`,
 
-  // Confirmación y estado READY
-  ONBOARDING_COMPLETE: (role: string, location: string) => `¡Listo! 🎉 Tu perfil está configurado.
-
-🔍 Buscarás: *${role}*
-📍 Ubicación: *${location}*
-
-_Comandos disponibles:_
-• Escribe *"buscar"* para encontrar ofertas de empleo ahora
-• Escribe *"editar"* para cambiar alguna preferencia
-• Escribe *"reiniciar"* para volver a configurar tu perfil desde cero
-• Escribe *"cancelar"* si deseas dejar de usar el servicio
-
-¿Qué te gustaría hacer?`,
-
   // Errores de validación
-  ERROR_ROLE_INVALID: `Por favor, ingresa un cargo válido (al menos 2 caracteres).
+  ERROR_ROLE_INVALID: `Por favor, ingresa un cargo o rol válido (al menos 2 caracteres).
 
-Ejemplo: "Desarrollador", "Contador", "Asistente", etc.`,
+Ejemplo: "Vendedor", "Marketing", "Analista", "Diseñador", etc.`,
 
   ERROR_EXPERIENCE_INVALID: `No entendí tu respuesta. Por favor responde con:
 
@@ -162,16 +176,18 @@ Ejemplo: "Desarrollador", "Contador", "Asistente", etc.`,
 4️⃣ Senior (5+ años)
 5️⃣ Lead/Expert (7+ años)`,
 
-  ERROR_LOCATION_INVALID: `Por favor, ingresa una ciudad válida.
+  ERROR_LOCATION_INVALID: `Por favor, ingresa una ciudad o país válido.
 
-Ejemplo: "Bogotá", "Medellín", "Cali", etc.`,
+Ejemplo: "Bogotá", "Lima", "México", "Colombia", "Perú", etc.`,
 
-  ERROR_WORK_MODE_INVALID: `No entendí tu respuesta. Por favor elige una opción:
-
-🏠 *"Remoto"* - Trabajar desde casa
-🏢 *"Presencial"* - Ir a la oficina
-🔄 *"Híbrido"* - Mixto (remoto + presencial)
-✨ *"Sin preferencia"* - Cualquier modalidad`,
+  // [DESACTIVADO] Mensajes de error para modalidad de trabajo
+  // Puede reactivarse en el futuro si se requiere
+  // ERROR_WORK_MODE_INVALID: `No entendí tu respuesta. Por favor elige una opción:
+  //
+  // 🏠 *"Remoto"* - Trabajar desde casa
+  // 🏢 *"Presencial"* - Ir a la oficina
+  // 🔄 *"Híbrido"* - Mixto (remoto + presencial)
+  // ✨ *"Sin preferencia"* - Cualquier modalidad`,
 
   ERROR_JOB_TYPE_INVALID: `No entendí tu respuesta. Por favor responde con:
 
@@ -180,7 +196,7 @@ Ejemplo: "Bogotá", "Medellín", "Cali", etc.`,
 3️⃣ Pasantía
 4️⃣ Freelance`,
 
-  ERROR_SALARY_INVALID: `Por favor ingresa un salario válido en pesos colombianos (entre 500,000 y 50,000,000) o escribe "0" para no filtrar por salario.
+  ERROR_SALARY_INVALID: `Por favor ingresa un salario válido en pesos colombianos (entre 500,000 y 50,000,000) o escribe "0" si no tienes preferencia.
 
 Ejemplo: "2000000", "2.5 millones", "0"`,
 
@@ -268,7 +284,7 @@ Tu cuenta permanece registrada. Si cambias de opinión en el futuro, puedes escr
 🔹 *Rol:* ${profile.role}
 🔹 *Ubicación:* ${profile.location}
 🔹 *Tipo de empleo:* ${profile.jobType}
-🔹 *Salario mínimo:* ${profile.minSalary}
+🔹 *Salario ideal:* ${profile.minSalary}
 🔹 *Frecuencia de alertas:* ${profile.alertFrequency}
 🔹 *Horario de alertas:* ${profile.alertTime}
 
@@ -280,7 +296,7 @@ Para editar una preferencia, escribe el *nombre del campo* que quieres cambiar.
 • Escribe *"rol"* para cambiar tu cargo deseado
 • Escribe *"ubicación"* para cambiar la ciudad
 • Escribe *"tipo"* para cambiar el tipo de empleo
-• Escribe *"salario"* para cambiar el salario mínimo
+• Escribe *"salario"* para cambiar tu salario ideal
 • Escribe *"frecuencia"* para cambiar la frecuencia de alertas
 • Escribe *"horario"* para cambiar la hora de alertas
 
@@ -320,6 +336,27 @@ Tu perfil está listo. Puedes:
 
 Escribe el comando que desees.`,
 
+  // Ofrecer alertas después de primera búsqueda
+  OFFER_ALERTS: `¿Te gustaría recibir *alertas automáticas* de empleo? 🔔
+
+Si activas las alertas, te enviaré ofertas nuevas directamente a este chat según tus preferencias.
+
+📬 *Beneficios:*
+• No tienes que acordarte de buscar
+• Recibes ofertas frescas automáticamente
+• Puedes elegir la frecuencia (diario, semanal, etc.)
+
+Responde:
+• *"Sí"* o *"Activar"* para configurar alertas
+• *"No"* o *"Sin alertas"* si prefieres buscar manualmente`,
+
+  // Confirmación de rechazo de alertas
+  ALERTS_DISABLED: `Perfecto, *no activaré las alertas automáticas*. ✅
+
+Puedes buscar ofertas cuando quieras escribiendo *"buscar"*.
+
+_(Si cambias de opinión más adelante, puedes activar las alertas desde el menú de *"editar"*)_`,
+
   // Versiones DESKTOP de mensajes (sin botones/listas)
   ASK_TERMS_DESKTOP: `Antes de comenzar, necesito que aceptes los términos de uso:
 
@@ -344,13 +381,15 @@ Escribe el *número* o el *nombre* de tu opción:
 *3* - Pasantía
 *4* - Freelance`,
 
-  ASK_WORK_MODE_DESKTOP: `¿Qué modalidad de trabajo prefieres?
-
-Escribe una de estas opciones:
-• *"Remoto"* - Para trabajar desde casa 🏠
-• *"Presencial"* - Para ir a la oficina 🏢
-• *"Híbrido"* - Para trabajar mixto (remoto + presencial) 🔄
-• *"Sin preferencia"* - Para cualquier modalidad ✨`,
+  // [DESACTIVADO] Mensajes de modalidad de trabajo para versión desktop
+  // Puede reactivarse en el futuro si se requiere
+  // ASK_WORK_MODE_DESKTOP: `¿Qué modalidad de trabajo prefieres?
+  //
+  // Escribe una de estas opciones:
+  // • *"Remoto"* - Para trabajar desde casa 🏠
+  // • *"Presencial"* - Para ir a la oficina 🏢
+  // • *"Híbrido"* - Para trabajar mixto (remoto + presencial) 🔄
+  // • *"Sin preferencia"* - Para cualquier modalidad ✨`,
 
   CONFIRM_RESTART_DESKTOP: `⚠️ ¿Estás seguro de que quieres *reiniciar tu perfil*?
 
@@ -372,7 +411,7 @@ Escribe:
     role: string;
     experience: string;
     location: string;
-    workMode: string;
+    // workMode: string; // [DESACTIVADO] Puede reactivarse
     jobType: string;
     minSalary: string;
     alertFrequency: string;
@@ -382,9 +421,8 @@ Escribe:
 🔹 *Rol:* ${profile.role}
 💡 *Experiencia:* ${profile.experience}
 📍 *Ubicación:* ${profile.location}
-🏠 *Modalidad:* ${profile.workMode}
 💼 *Tipo de empleo:* ${profile.jobType}
-💰 *Salario mínimo:* ${profile.minSalary}
+💰 *Salario ideal:* ${profile.minSalary}
 🔔 *Frecuencia:* ${profile.alertFrequency}
 ⏰ *Horario de alertas:* ${profile.alertTime}
 
@@ -394,10 +432,10 @@ Escribe el *número* o *nombre* del campo que quieres editar:
 
 *1* - *Rol* - Cambiar tu cargo deseado
 *2* - *Experiencia* - Cambiar tu nivel de experiencia
-*3* - *Ubicación* - Cambiar la ciudad
+*3* - *Ubicación* - Cambiar ciudad o país de búsqueda
 *4* - *Modalidad* - Cambiar entre remoto o presencial
 *5* - *Tipo* - Cambiar el tipo de empleo
-*6* - *Salario* - Cambiar el salario mínimo
+*6* - *Salario* - Cambiar tu salario ideal
 *7* - *Frecuencia* - Cambiar la frecuencia de alertas
 *8* - *Horario* - Cambiar la hora de alertas
 

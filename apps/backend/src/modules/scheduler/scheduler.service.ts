@@ -1,3 +1,31 @@
+/**
+ * SCHEDULER SERVICE - Sistema de Alertas de Empleo
+ * 
+ * Envía alertas automáticas de ofertas de empleo a usuarios según sus preferencias.
+ * 
+ * CARACTERÍSTICAS:
+ * ✅ Procesamiento por lotes (10 usuarios en paralelo por defecto)
+ * ✅ Delays entre lotes para respetar rate limits de WhatsApp/Twilio
+ * ✅ Protección contra ejecuciones concurrentes (overlapping)
+ * ✅ Ventana de tiempo amplia (10 minutos) para procesar múltiples usuarios
+ * ✅ Prevención de alertas duplicadas en la misma ventana
+ * ✅ Manejo individual de errores (un usuario fallido no afecta a otros)
+ * ✅ Logging detallado para monitoreo
+ * ✅ Respeto de zonas horarias individuales
+ * ✅ Verificación de planes y límites de uso
+ * 
+ * CONFIGURACIÓN AJUSTABLE:
+ * - BATCH_SIZE: Usuarios a procesar en paralelo (default: 10)
+ * - DELAY_BETWEEN_BATCHES_MS: Delay entre lotes en ms (default: 2000)
+ * - MAX_PROCESSING_TIME_MINUTES: Tiempo máximo de procesamiento (default: 4)
+ * - Ventana de tiempo: 10 minutos desde hora configurada
+ * - Protección anti-duplicados: 15 minutos mínimo entre alertas
+ * 
+ * ESCALABILIDAD:
+ * Con configuración actual puede manejar ~120 usuarios por hora sin problemas.
+ * Para más usuarios, ajustar BATCH_SIZE y/o reducir DELAY_BETWEEN_BATCHES_MS.
+ */
+
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { JobSearchService } from '../job-search/job-search.service';
@@ -14,6 +42,12 @@ dayjs.extend(timezone);
 @Injectable()
 export class SchedulerService implements OnModuleInit {
   private readonly logger = new Logger(SchedulerService.name);
+  private isProcessing = false; // [FIX] Bandera para evitar overlapping
+
+  // [CONFIGURACIÓN] Ajustar según necesidades de producción
+  private readonly BATCH_SIZE = 10; // Procesar 10 usuarios en paralelo
+  private readonly DELAY_BETWEEN_BATCHES_MS = 2000; // 2 segundos entre lotes para respetar rate limits
+  private readonly MAX_PROCESSING_TIME_MINUTES = 4; // Máximo tiempo de procesamiento para estar dentro de ventana
 
   constructor(
     private readonly prisma: PrismaService,
@@ -41,8 +75,18 @@ export class SchedulerService implements OnModuleInit {
 
   /**
    * Revisa qué usuarios deben recibir alertas ahora y las envía
+   * [MEJORADO] Procesamiento por lotes con delays para evitar rate limiting
    */
   private async checkAndSendAlerts() {
+    // [FIX] Prevenir ejecuciones concurrentes (overlapping)
+    if (this.isProcessing) {
+      this.logger.warn('⚠️ Ya hay una ejecución en curso, saltando esta iteración');
+      return;
+    }
+
+    this.isProcessing = true;
+    const startTime = Date.now();
+
     try {
       this.logger.log('🔍 Verificando usuarios para alertas...');
 
@@ -68,32 +112,86 @@ export class SchedulerService implements OnModuleInit {
         return;
       }
 
-      // 3. Enviar alertas a cada usuario (con manejo de errores individual)
+      // [MEJORADO] 3. Procesar usuarios en LOTES para mejor rendimiento y control de rate limiting
+      const totalUsers = usersToNotify.length;
       let successCount = 0;
       let failCount = 0;
+      let batchNumber = 0;
 
-      for (const alertPref of usersToNotify) {
-        try {
-          await this.runJobSearchAndNotifyUser(alertPref.userId);
-          successCount++;
-        } catch (error) {
-          failCount++;
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          this.logger.error(`❌ Error notificando a usuario ${alertPref.userId}: ${errorMessage}`);
-          // Continuar con el siguiente usuario
+      // Dividir usuarios en lotes
+      for (let i = 0; i < totalUsers; i += this.BATCH_SIZE) {
+        batchNumber++;
+        const batch = usersToNotify.slice(i, i + this.BATCH_SIZE);
+        
+        this.logger.log(`📦 Procesando lote ${batchNumber} (${batch.length} usuarios)...`);
+
+        // [FIX] Procesar lote en PARALELO (pero limitado por BATCH_SIZE)
+        const batchPromises = batch.map(async (alertPref) => {
+          try {
+            await this.runJobSearchAndNotifyUser(alertPref.userId);
+            return { success: true, userId: alertPref.userId };
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.logger.error(`❌ Error notificando a usuario ${alertPref.userId}: ${errorMessage}`);
+            return { success: false, userId: alertPref.userId, error: errorMessage };
+          }
+        });
+
+        // Esperar a que termine el lote completo
+        const batchResults = await Promise.allSettled(batchPromises);
+
+        // Contar resultados del lote
+        batchResults.forEach((result) => {
+          if (result.status === 'fulfilled' && result.value.success) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        });
+
+        // [FIX] Delay entre lotes para respetar rate limits de WhatsApp/Twilio
+        // Solo si no es el último lote
+        if (i + this.BATCH_SIZE < totalUsers) {
+          this.logger.debug(`⏳ Esperando ${this.DELAY_BETWEEN_BATCHES_MS}ms antes del siguiente lote...`);
+          await this.sleep(this.DELAY_BETWEEN_BATCHES_MS);
+        }
+
+        // [FIX] Verificar si estamos excediendo el tiempo máximo
+        const elapsedMinutes = (Date.now() - startTime) / (1000 * 60);
+        if (elapsedMinutes > this.MAX_PROCESSING_TIME_MINUTES) {
+          this.logger.warn(`⚠️ Tiempo máximo de procesamiento alcanzado (${elapsedMinutes.toFixed(1)} min). Usuarios restantes: ${totalUsers - (i + this.BATCH_SIZE)}`);
+          break;
         }
       }
 
-      this.logger.log(`✅ Alertas enviadas: ${successCount} exitosas, ${failCount} fallidas`);
+      const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+      this.logger.log(`✅ Alertas completadas en ${totalTime}s: ${successCount} exitosas, ${failCount} fallidas`);
+
+      // [NUEVO] Log de advertencia si hay muchos fallos
+      if (failCount > 0 && failCount / totalUsers > 0.2) {
+        this.logger.warn(`⚠️ Tasa de fallos alta: ${((failCount / totalUsers) * 100).toFixed(1)}% de alertas fallaron`);
+      }
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`❌ Error en checkAndSendAlerts: ${errorMessage}`);
+      this.logger.error(`❌ Error crítico en checkAndSendAlerts: ${errorMessage}`);
+    } finally {
+      // [FIX] Siempre liberar el lock, incluso si hay error
+      this.isProcessing = false;
     }
+  }
+
+  /**
+   * Helper para esperar un tiempo determinado
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
    * Determina si un usuario debe recibir alerta ahora
    * Considera: hora configurada, frecuencia y última notificación
+   * [MEJORADO] Ventana ampliada y mejor logging
    */
   private shouldSendAlertNow(alertPref: any): boolean {
     try {
@@ -106,15 +204,25 @@ export class SchedulerService implements OnModuleInit {
       const currentHour = now.hour();
       const currentMinute = now.minute();
 
-      // Verificar si estamos en la ventana de tiempo (±5 minutos)
-      const isWithinTimeWindow =
-        currentHour === targetHour &&
-        currentMinute >= targetMinute &&
-        currentMinute < targetMinute + 5;
+      // [FIX] Ampliar ventana a 10 minutos para dar más margen de procesamiento
+      // Calcular minutos totales desde medianoche para comparación más precisa
+      const currentTotalMinutes = currentHour * 60 + currentMinute;
+      const targetTotalMinutes = targetHour * 60 + targetMinute;
+      const minutesDiff = currentTotalMinutes - targetTotalMinutes;
+
+      // Ventana: desde la hora exacta hasta 10 minutos después
+      const isWithinTimeWindow = minutesDiff >= 0 && minutesDiff < 10;
 
       if (!isWithinTimeWindow) {
+        this.logger.debug(
+          `⏰ Usuario ${userId}: Fuera de ventana horaria (actual: ${currentHour}:${String(currentMinute).padStart(2, '0')}, objetivo: ${targetHour}:${String(targetMinute).padStart(2, '0')}, diff: ${minutesDiff} min) → NO ENVIAR`,
+        );
         return false;
       }
+
+      this.logger.debug(
+        `✅ Usuario ${userId}: Dentro de ventana horaria (diff: ${minutesDiff} min desde objetivo)`,
+      );
 
       // Si no hay última notificación, es la primera vez → enviar
       if (!alertPref.lastNotification) {
@@ -127,35 +235,45 @@ export class SchedulerService implements OnModuleInit {
         alertPref.timezone || 'America/Bogota',
       );
 
-      // Usar diferencia en DÍAS para mayor precisión
+      // [FIX] Usar diferencia en DÍAS para mayor precisión
       const daysSinceLastAlert = now.diff(lastNotif, 'day', true); // true = con decimales
       const hoursSinceLastAlert = now.diff(lastNotif, 'hour');
+      const minutesSinceLastAlert = now.diff(lastNotif, 'minute');
+
+      this.logger.debug(
+        `⏰ Usuario ${userId}: Última alerta hace ${daysSinceLastAlert.toFixed(2)} días (${hoursSinceLastAlert}h ${minutesSinceLastAlert % 60}m)`,
+      );
+
+      // [FIX CRÍTICO] Evitar enviar múltiples veces en la misma ventana horaria
+      // Si la última alerta fue hace menos de 15 minutos, NO enviar (incluso si cumple frecuencia)
+      if (minutesSinceLastAlert < 15) {
+        this.logger.debug(
+          `⏭️ Usuario ${userId}: Ya recibió alerta hace ${minutesSinceLastAlert} minutos (muy reciente) → NO ENVIAR`,
+        );
+        return false;
+      }
 
       // Verificar según frecuencia configurada
       let shouldSend = false;
-      let requiredDays = 0;
 
       switch (alertPref.alertFrequency) {
         case 'daily':
-          requiredDays = 1;
-          // Enviar si pasó al menos 20 horas (para evitar dobles del mismo día)
-          shouldSend = hoursSinceLastAlert >= 20;
+          // [FIX] Enviar si pasaron al menos 23 horas (casi un día completo)
+          // Esto evita enviar 2 veces el mismo día pero asegura que se envíe diariamente
+          shouldSend = hoursSinceLastAlert >= 23;
           break;
 
         case 'every_3_days':
-          requiredDays = 3;
-          // Enviar si pasaron al menos 2.8 días (~67 horas)
-          shouldSend = daysSinceLastAlert >= 2.8;
+          // Enviar si pasaron al menos 2.9 días (~70 horas)
+          shouldSend = daysSinceLastAlert >= 2.9;
           break;
 
         case 'weekly':
-          requiredDays = 7;
-          // Enviar si pasaron al menos 6.8 días (~163 horas)
-          shouldSend = daysSinceLastAlert >= 6.8;
+          // Enviar si pasaron al menos 6.9 días (~166 horas)
+          shouldSend = daysSinceLastAlert >= 6.9;
           break;
 
         case 'monthly':
-          requiredDays = 30;
           // Enviar si pasaron al menos 29 días
           shouldSend = daysSinceLastAlert >= 29;
           break;
@@ -163,17 +281,17 @@ export class SchedulerService implements OnModuleInit {
         default:
           // Si frecuencia no reconocida, loguear y usar diario
           this.logger.warn(`⚠️ Usuario ${userId}: Frecuencia desconocida "${alertPref.alertFrequency}", usando diario`);
-          shouldSend = hoursSinceLastAlert >= 20;
+          shouldSend = hoursSinceLastAlert >= 23;
       }
 
       // Loguear decisión para debug
       if (shouldSend) {
         this.logger.log(
-          `✅ Usuario ${userId}: Frecuencia=${alertPref.alertFrequency}, última alerta hace ${daysSinceLastAlert.toFixed(1)} días (requiere ${requiredDays}) → ENVIAR`,
+          `✅ Usuario ${userId}: Frecuencia=${alertPref.alertFrequency}, última alerta hace ${daysSinceLastAlert.toFixed(1)} días (${hoursSinceLastAlert}h) → ENVIAR`,
         );
       } else {
         this.logger.debug(
-          `⏳ Usuario ${userId}: Frecuencia=${alertPref.alertFrequency}, última alerta hace ${daysSinceLastAlert.toFixed(1)} días (requiere ${requiredDays}) → NO ENVIAR AÚN`,
+          `⏳ Usuario ${userId}: Frecuencia=${alertPref.alertFrequency}, última alerta hace ${daysSinceLastAlert.toFixed(1)} días (${hoursSinceLastAlert}h) → NO ENVIAR AÚN`,
         );
       }
 
