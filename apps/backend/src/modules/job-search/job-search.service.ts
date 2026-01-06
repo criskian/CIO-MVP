@@ -767,15 +767,126 @@ export class JobSearchService {
     //   }
     // }
 
-    // +7 puntos si el nivel de experiencia coincide (prioriza, pero no filtra)
+    // [MEJORADO] Sistema de scoring basado en nivel de experiencia
     if (query.experienceKeywords && query.experienceKeywords.length > 0) {
-      const hasExperienceMatch = query.experienceKeywords.some(
-        (keyword) =>
-          titleLower.includes(keyword.toLowerCase()) ||
-          snippetLower.includes(keyword.toLowerCase()),
+      const contentText = titleLower + ' ' + snippetLower;
+      
+      // Detectar si el usuario es "sin experiencia" (NONE)
+      const isNoExperience = query.experienceKeywords.some(kw => 
+        ['sin experiencia', 'entry level', 'practicante', 'trainee', 'aprendiz'].includes(kw.toLowerCase())
       );
+
+      // Verificar si hay match con las keywords del nivel del usuario
+      const hasExperienceMatch = query.experienceKeywords.some(
+        (keyword) => contentText.includes(keyword.toLowerCase())
+      );
+
       if (hasExperienceMatch) {
-        score += 7;
+        // +15 puntos si el nivel de experiencia coincide (aumentado para perfiles sin experiencia)
+        score += 15;
+      }
+
+      // [NUEVO] Penalizaciones especiales para perfiles SIN EXPERIENCIA
+      if (isNoExperience) {
+        // Keywords que indican requisitos de experiencia avanzada (PENALIZAR FUERTEMENTE)
+        const seniorKeywords = [
+          'senior', 'sr.', 'sr ', 'semisenior', 'semi senior', 'semi-senior',
+          'lead', 'líder', 'lider', 'principal', 'arquitecto', 'director',
+          'experto', 'especialista', 'expert', 'advanced'
+        ];
+
+        const hasSeniorKeyword = seniorKeywords.some(kw => contentText.includes(kw));
+        if (hasSeniorKeyword) {
+          score -= 30; // Penalización FUERTE para ofertas de senior cuando busca sin experiencia
+          this.logger.debug(`Oferta "${job.title}" penalizada (-30) por keyword senior para perfil sin experiencia`);
+        }
+
+        // Detectar requisitos explícitos de años de experiencia
+        // Patrones: "3 años", "5+ años", "mínimo 2 años", "3-5 años", etc.
+        const yearsExperiencePatterns = [
+          /\d+\s*[-+a-z]*\s*años?\s*(de\s*)?(experiencia|exp)/gi,
+          /\d+\+\s*años/gi,
+          /(mínimo|minimo|al menos)\s*\d+\s*años/gi,
+          /\d+\s*a\s*\d+\s*años/gi,
+        ];
+
+        const requiresYearsOfExperience = yearsExperiencePatterns.some(
+          pattern => pattern.test(contentText)
+        );
+
+        if (requiresYearsOfExperience) {
+          score -= 25; // Penalización fuerte por requisito explícito de años
+          this.logger.debug(`Oferta "${job.title}" penalizada (-25) por requerir años de experiencia`);
+        }
+
+        // Frases que indican experiencia requerida
+        const experienceRequiredPhrases = [
+          'experiencia comprobada',
+          'amplia experiencia',
+          'experiencia demostrable',
+          'experiencia previa',
+          'experiencia profesional',
+          'con experiencia',
+        ];
+
+        const requiresExperience = experienceRequiredPhrases.some(
+          phrase => contentText.includes(phrase)
+        );
+
+        if (requiresExperience) {
+          score -= 15; // Penalización moderada por frase de experiencia requerida
+          this.logger.debug(`Oferta "${job.title}" penalizada (-15) por requerir experiencia previa`);
+        }
+
+        // BONUS: Palabras que indican que NO se requiere experiencia
+        const noExperienceRequiredKeywords = [
+          'sin experiencia necesaria',
+          'no requiere experiencia',
+          'no es necesario experiencia',
+          'primera experiencia',
+          'recién egresado',
+          'recien egresado',
+        ];
+
+        const noExperienceRequired = noExperienceRequiredKeywords.some(
+          phrase => contentText.includes(phrase)
+        );
+
+        if (noExperienceRequired) {
+          score += 20; // BONUS extra para ofertas que explícitamente no requieren experiencia
+          this.logger.debug(`Oferta "${job.title}" bonificada (+20) por no requerir experiencia`);
+        }
+      }
+
+      // [NUEVO] Para otros niveles, también penalizar mismatches significativos
+      else {
+        // Si el usuario es JUNIOR pero la oferta pide SENIOR/LEAD
+        const isJunior = query.experienceKeywords.some(kw => 
+          ['junior', 'jr'].includes(kw.toLowerCase())
+        );
+
+        if (isJunior) {
+          const seniorKeywords = ['senior', 'sr.', 'lead', 'líder', 'principal', 'arquitecto'];
+          const hasSeniorKeyword = seniorKeywords.some(kw => contentText.includes(kw));
+          
+          if (hasSeniorKeyword) {
+            score -= 15; // Penalización moderada para junior buscando senior
+          }
+        }
+
+        // Si el usuario es SENIOR pero la oferta es JUNIOR
+        const isSenior = query.experienceKeywords.some(kw => 
+          ['senior', 'sr', 'experto', 'especialista'].includes(kw.toLowerCase())
+        );
+
+        if (isSenior) {
+          const juniorKeywords = ['junior', 'jr', 'practicante', 'trainee', 'sin experiencia'];
+          const hasJuniorKeyword = juniorKeywords.some(kw => contentText.includes(kw));
+          
+          if (hasJuniorKeyword) {
+            score -= 10; // Penalización leve para senior buscando junior (puede ser intencional)
+          }
+        }
       }
     }
 
