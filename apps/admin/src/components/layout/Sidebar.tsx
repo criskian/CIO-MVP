@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { LayoutDashboard, Users, CreditCard, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, CreditCard, MessageSquare, LogOut } from 'lucide-react';
 import { logout, getAuthUser } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 
@@ -17,6 +17,11 @@ const menuItems = [
     name: 'Usuarios',
     href: '/dashboard/usuarios',
     icon: Users,
+  },
+  {
+    name: 'Conversaciones',
+    href: '/dashboard/conversaciones',
+    icon: MessageSquare,
   },
   {
     name: 'Suscripciones',

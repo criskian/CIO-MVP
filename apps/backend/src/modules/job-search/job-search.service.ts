@@ -223,6 +223,86 @@ export class JobSearchService {
   }
 
   /**
+   * Normaliza nombres de ubicaciones del español al inglés para SerpApi
+   * SerpApi/Google Jobs API espera nombres en inglés o formatos oficiales
+   */
+  private normalizeLocationForSerpApi(location: string | undefined): string {
+    if (!location) return 'Colombia'; // Default
+
+    const locationLower = location.toLowerCase().trim();
+
+    // Caso especial: remoto
+    if (locationLower === 'remoto' || locationLower === 'remote') {
+      return 'Colombia';
+    }
+
+    // Mapa de traducciones: español → inglés (nombres oficiales de Google)
+    const countryTranslations: Record<string, string> = {
+      // Países de habla hispana
+      'estados unidos': 'United States',
+      'eeuu': 'United States',
+      'usa': 'United States',
+      'españa': 'Spain',
+      'méxico': 'Mexico',
+      'mexico': 'Mexico',
+      'argentina': 'Argentina', // Ya correcto
+      'chile': 'Chile', // Ya correcto
+      'perú': 'Peru',
+      'peru': 'Peru',
+      'colombia': 'Colombia', // Ya correcto
+      'venezuela': 'Venezuela', // Ya correcto
+      'ecuador': 'Ecuador', // Ya correcto
+      'bolivia': 'Bolivia', // Ya correcto
+      'paraguay': 'Paraguay', // Ya correcto
+      'uruguay': 'Uruguay', // Ya correcto
+      'costa rica': 'Costa Rica', // Ya correcto
+      'panamá': 'Panama',
+      'panama': 'Panama',
+      'guatemala': 'Guatemala', // Ya correcto
+      'honduras': 'Honduras', // Ya correcto
+      'el salvador': 'El Salvador', // Ya correcto
+      'nicaragua': 'Nicaragua', // Ya correcto
+      'república dominicana': 'Dominican Republic',
+      'republica dominicana': 'Dominican Republic',
+      'puerto rico': 'Puerto Rico', // Ya correcto
+      'cuba': 'Cuba', // Ya correcto
+      
+      // Otros países importantes
+      'canadá': 'Canada',
+      'canada': 'Canada',
+      'brasil': 'Brazil',
+      'brazil': 'Brazil',
+      'alemania': 'Germany',
+      'francia': 'France',
+      'italia': 'Italy',
+      'reino unido': 'United Kingdom',
+      'inglaterra': 'United Kingdom',
+      'portugal': 'Portugal', // Ya correcto
+      
+      // Ciudades que pueden venir en español
+      'nueva york': 'New York',
+      'los ángeles': 'Los Angeles',
+      'los angeles': 'Los Angeles',
+    };
+
+    // Buscar traducción exacta
+    if (countryTranslations[locationLower]) {
+      this.logger.debug(`📍 Ubicación normalizada: "${location}" → "${countryTranslations[locationLower]}"`);
+      return countryTranslations[locationLower];
+    }
+
+    // Si no está en el mapa, capitalizar correctamente y retornar
+    // (para ciudades específicas que ya están bien escritas)
+    const capitalized = location
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+
+    this.logger.debug(`📍 Ubicación sin traducción, usando capitalizada: "${location}" → "${capitalized}"`);
+    return capitalized;
+  }
+
+  /**
    * Ejecuta una ÚNICA búsqueda en SerpApi (1 página = ~10 resultados)
    * Retorna también el next_page_token para paginación posterior
    */
@@ -235,9 +315,8 @@ export class JobSearchService {
 
       this.logger.debug(`🔎 Query SerpApi Google Jobs: "${queryString}"`);
 
-      // Determinar ubicación para SerpApi
-      const normalizedLocation =
-        query.location?.toLowerCase() === 'remoto' ? 'Colombia' : query.location || 'Colombia';
+      // Determinar ubicación para SerpApi (con normalización mejorada)
+      const normalizedLocation = this.normalizeLocationForSerpApi(query.location);
 
       // Construir parámetros
       const params: Record<string, any> = {

@@ -3,6 +3,7 @@ import { PrismaService } from '../database/prisma.service';
 import { JobSearchService } from '../job-search/job-search.service';
 import { LlmService } from '../llm/llm.service';
 import { CvService } from '../cv/cv.service';
+import { ChatHistoryService } from './chat-history.service';
 import {
   NormalizedIncomingMessage,
   BotReply,
@@ -45,6 +46,7 @@ export class ConversationService {
     private readonly jobSearchService: JobSearchService,
     private readonly llmService: LlmService,
     private readonly cvService: CvService,
+    private readonly chatHistoryService: ChatHistoryService,
   ) { }
 
   /**
@@ -75,14 +77,38 @@ export class ConversationService {
       // 4. Obtener o crear sesión activa
       const session = await this.getOrCreateSession(user.id);
 
+      // 💾 GUARDAR MENSAJE ENTRANTE EN HISTORIAL
+      if (text) {
+        await this.chatHistoryService.saveInboundMessage(
+          user.id,
+          text,
+          session.state,
+          undefined, // intent se detecta después
+          message.messageId,
+        );
+      }
+
       // 5. Si hay media (documento/imagen), podría ser un CV
       if (mediaUrl && messageType === 'document') {
-        return await this.handleCVUpload(user.id, mediaUrl);
+        const response = await this.handleCVUpload(user.id, mediaUrl);
+        // Guardar respuesta
+        await this.chatHistoryService.saveOutboundMessage(
+          user.id,
+          response.text || '',
+          session.state,
+        );
+        return response;
       }
 
       // 6. Si no hay texto, no podemos procesar
       if (!text) {
-        return { text: BotMessages.UNKNOWN_INTENT };
+        const response = { text: BotMessages.UNKNOWN_INTENT };
+        await this.chatHistoryService.saveOutboundMessage(
+          user.id,
+          response.text,
+          session.state,
+        );
+        return response;
       }
 
       // 7. Detectar intención general (para comandos especiales)
@@ -90,11 +116,26 @@ export class ConversationService {
 
       // 8. Manejar comandos especiales independientes del estado
       if (intent === UserIntent.HELP) {
-        return { text: BotMessages.HELP_MESSAGE };
+        const response = { text: BotMessages.HELP_MESSAGE };
+        await this.chatHistoryService.saveOutboundMessage(
+          user.id,
+          response.text,
+          session.state,
+        );
+        return response;
       }
 
       // 9. Procesar según el estado actual
       const response = await this.handleStateTransition(user.id, session.state, text, intent);
+
+      // 💾 GUARDAR RESPUESTA DEL BOT EN HISTORIAL
+      if (response.text) {
+        await this.chatHistoryService.saveOutboundMessage(
+          user.id,
+          response.text,
+          session.state,
+        );
+      }
 
       return response;
     } catch (error) {
@@ -103,6 +144,17 @@ export class ConversationService {
         `Error procesando mensaje: ${errorMessage}`,
         error instanceof Error ? error.stack : undefined,
       );
+      
+      // 💾 GUARDAR ERROR EN HISTORIAL
+      const user = await this.findUserByPhone(message.phone);
+      if (user) {
+        await this.chatHistoryService.saveErrorMessage(
+          user.id,
+          BotMessages.ERROR_GENERAL,
+          'ERROR',
+        );
+      }
+      
       return { text: BotMessages.ERROR_GENERAL };
     }
   }
