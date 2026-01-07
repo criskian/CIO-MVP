@@ -46,6 +46,7 @@ model User {
   alert         AlertPreference?
   searchLogs    JobSearchLog[]
   sentJobs      SentJob[]
+  chatMessages  ChatMessage[]
   
   // Nuevas relaciones para sistema de planes
   subscription  Subscription?
@@ -199,6 +200,39 @@ model SentJob {
 
   @@index([userId, url])
   @@map("sent_jobs")
+}
+
+// ==========================================
+// MODELO DE MENSAJES DE CHAT (HISTORIAL)
+// ==========================================
+
+model ChatMessage {
+  id              String   @id @default(cuid())
+  userId          String
+  
+  // Datos del mensaje
+  direction       String   // "inbound" (usuario -> bot) o "outbound" (bot -> usuario)
+  content         String   @db.Text // Contenido del mensaje
+  
+  // Contexto de la conversación
+  conversationState String? // Estado de conversación en ese momento (ASK_NAME, ASK_ROLE, etc.)
+  intent          String?  // Intención detectada (search, edit, cancel, etc.)
+  
+  // Metadata técnica
+  messageId       String?  // ID del mensaje de WhatsApp (si aplica)
+  isError         Boolean  @default(false)
+  errorMessage    String?  @db.Text
+  
+  // Metadata adicional (JSON flexible para futuras extensiones)
+  metadata        Json?    // Puede contener: búsqueda realizada, ofertas enviadas, etc.
+  
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt]) // Para consultas rápidas por usuario y fecha
+  @@index([conversationState])
+  @@map("chat_messages")
 }
 
 // ==========================================
