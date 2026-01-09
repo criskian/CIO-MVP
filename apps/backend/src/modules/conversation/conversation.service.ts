@@ -18,8 +18,8 @@ import {
   isCancelServiceIntent,
   isEditIntent,
   detectEditField,
-  isMobileDevice,
-  isDesktopDevice,
+  // isMobileDevice, // [ELIMINADO] Ya no se usa, todos son tratados como móvil
+  // isDesktopDevice, // [ELIMINADO] Ya no se usa, todos son tratados como móvil
   normalizeRole,
   normalizeExperienceLevel,
   normalizeLocation,
@@ -174,8 +174,9 @@ export class ConversationService {
       case ConversationState.NEW:
         return await this.handleNewState(userId);
 
-      case ConversationState.ASK_DEVICE:
-        return await this.handleAskDeviceState(userId, text);
+      // [ELIMINADO] ASK_DEVICE - Ya no se pregunta por dispositivo, siempre usamos botones interactivos
+      // case ConversationState.ASK_DEVICE:
+      //   return await this.handleAskDeviceState(userId, text);
 
       case ConversationState.ASK_TERMS:
         return await this.handleAskTermsState(userId, text, intent);
@@ -193,11 +194,12 @@ export class ConversationService {
       // case ConversationState.ASK_WORK_MODE:
       //   return await this.handleAskWorkModeState(userId, text);
 
-      case ConversationState.ASK_JOB_TYPE:
-        return await this.handleAskJobTypeState(userId, text);
+      // [DESACTIVADO] Estados ASK_JOB_TYPE y ASK_MIN_SALARY - No aportan valor significativo
+      // case ConversationState.ASK_JOB_TYPE:
+      //   return await this.handleAskJobTypeState(userId, text);
 
-      case ConversationState.ASK_MIN_SALARY:
-        return await this.handleAskMinSalaryState(userId, text);
+      // case ConversationState.ASK_MIN_SALARY:
+      //   return await this.handleAskMinSalaryState(userId, text);
 
       case ConversationState.ASK_ALERT_FREQUENCY:
         return await this.handleAskAlertFrequencyState(userId, text);
@@ -240,11 +242,12 @@ export class ConversationService {
       // case ConversationState.EDIT_WORK_MODE:
       //   return await this.handleEditWorkModeState(userId, text);
 
-      case ConversationState.EDIT_JOB_TYPE:
-        return await this.handleEditJobTypeState(userId, text);
+      // [DESACTIVADO] Estados EDIT_JOB_TYPE y EDIT_MIN_SALARY - No aportan valor significativo
+      // case ConversationState.EDIT_JOB_TYPE:
+      //   return await this.handleEditJobTypeState(userId, text);
 
-      case ConversationState.EDIT_MIN_SALARY:
-        return await this.handleEditMinSalaryState(userId, text);
+      // case ConversationState.EDIT_MIN_SALARY:
+      //   return await this.handleEditMinSalaryState(userId, text);
 
       case ConversationState.EDIT_ALERT_FREQUENCY:
         return await this.handleEditAlertFrequencyState(userId, text);
@@ -273,6 +276,7 @@ export class ConversationService {
   /**
    * Estado NEW: Usuario registrado que inicia el onboarding
    * NOTA: Solo llegan aquí usuarios ya registrados desde la landing
+   * ACTUALIZADO: Ya no se pregunta por dispositivo, siempre se usan botones interactivos
    */
   private async handleNewState(userId: string): Promise<BotReply> {
     this.logger.log(`👤 Procesando estado NEW para usuario: ${userId}`);
@@ -286,9 +290,13 @@ export class ConversationService {
     // CASO 1: Usuario premium activo
     if (user?.subscription?.plan === 'PREMIUM' && user.subscription.status === 'ACTIVE') {
       this.logger.log(`👑 Usuario premium ${userId}`);
-      await this.updateSessionState(userId, ConversationState.ASK_DEVICE);
+      await this.updateSessionState(userId, ConversationState.ASK_TERMS);
       return {
-        text: `${BotMessages.WELCOME_BACK_PREMIUM(user.name)}\n\n${BotMessages.ASK_DEVICE}`,
+        text: `${BotMessages.WELCOME_BACK_PREMIUM(user.name)}\n\n${BotMessages.ASK_TERMS}`,
+        buttons: [
+          { id: 'accept_terms', title: 'Acepto' },
+          { id: 'reject_terms', title: 'No acepto' },
+        ],
       };
     }
 
@@ -313,71 +321,26 @@ export class ConversationService {
       });
     }
 
-    // CASO 4: Usuario freemium activo → dar bienvenida e iniciar onboarding
+    // CASO 4: Usuario freemium activo → dar bienvenida e ir directo a términos
     this.logger.log(`🆕 Usuario ${userId} iniciando onboarding`);
-    await this.updateSessionState(userId, ConversationState.ASK_DEVICE);
+    await this.updateSessionState(userId, ConversationState.ASK_TERMS);
 
     return {
-      text: `${BotMessages.WELCOME_REGISTERED(user?.name || 'usuario')}\n\n${BotMessages.ASK_DEVICE}`,
+      text: `${BotMessages.WELCOME_REGISTERED(user?.name || 'usuario')}\n\n${BotMessages.ASK_TERMS}`,
+      buttons: [
+        { id: 'accept_terms', title: 'Acepto' },
+        { id: 'reject_terms', title: 'No acepto' },
+      ],
     };
   }
 
-  /**
-   * Estado ASK_DEVICE: Detectar si está en móvil o PC
-   */
-  private async handleAskDeviceState(userId: string, text: string): Promise<BotReply> {
-    let deviceType = 'DESKTOP'; // Por defecto, asumimos desktop
-
-    if (isMobileDevice(text)) {
-      deviceType = 'MOBILE';
-      this.logger.log(`📱 Usuario en dispositivo móvil`);
-    } else if (isDesktopDevice(text)) {
-      deviceType = 'DESKTOP';
-      this.logger.log(`💻 Usuario en dispositivo desktop`);
-    } else {
-      // Si no se detecta claramente, pedimos de nuevo
-      return {
-        text: `Por favor, dime si estás en:
-
-📱 *Celular/Móvil/Teléfono*
-💻 *PC/Portátil/Computador*`,
-      };
-    }
-
-    // Guardar deviceType en la sesión activa
-    const session = await this.prisma.session.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (session) {
-      await this.prisma.session.update({
-        where: { id: session.id },
-        data: { deviceType },
-      });
-    }
-
-    // Transición: ASK_DEVICE → ASK_TERMS
-    await this.updateSessionState(userId, ConversationState.ASK_TERMS);
-
-    // Enviar términos según el dispositivo
-    if (deviceType === 'MOBILE') {
-      return {
-        text: BotMessages.ASK_TERMS,
-        buttons: [
-          { id: 'accept_terms', title: 'Sí, acepto' },
-          { id: 'reject_terms', title: 'No acepto' },
-        ],
-      };
-    } else {
-      return {
-        text: BotMessages.ASK_TERMS_DESKTOP,
-      };
-    }
-  }
+  // [ELIMINADO] Estado ASK_DEVICE - Ya no se pregunta por dispositivo
+  // Todos los usuarios ahora reciben botones interactivos automáticamente
+  // private async handleAskDeviceState(userId: string, text: string): Promise<BotReply> { ... }
 
   /**
    * Estado ASK_TERMS: Esperando aceptación de términos
+   * ACTUALIZADO: Siempre usa botones interactivos
    */
   private async handleAskTermsState(
     userId: string,
@@ -396,11 +359,11 @@ export class ConversationService {
       return { text: BotMessages.TERMS_REJECTED };
     }
 
-    // No entendió la respuesta, repetir pregunta
+    // No entendió la respuesta, repetir pregunta con botones
     return {
       text: `${BotMessages.ASK_TERMS}\n\n_Por favor, selecciona una opción:_`,
       buttons: [
-        { id: 'accept_terms', title: 'Sí, acepto' },
+        { id: 'accept_terms', title: 'Acepto' },
         { id: 'reject_terms', title: 'No acepto' },
       ],
     };
@@ -408,6 +371,7 @@ export class ConversationService {
 
   /**
    * Estado ASK_ROLE: Esperando rol/cargo
+   * ACTUALIZADO: Siempre muestra lista interactiva
    */
   private async handleAskRoleState(userId: string, text: string): Promise<BotReply> {
     const role = normalizeRole(text);
@@ -422,12 +386,56 @@ export class ConversationService {
     // Transición: ASK_ROLE → ASK_EXPERIENCE
     await this.updateSessionState(userId, ConversationState.ASK_EXPERIENCE);
 
-    // Obtener tipo de dispositivo para usar lista en móvil
-    const deviceType = await this.getDeviceType(userId);
+    // Siempre mostrar lista interactiva
+    return {
+      text: BotMessages.ASK_EXPERIENCE,
+      listTitle: 'Seleccionar nivel',
+      listSections: [
+        {
+          title: 'Nivel de Experiencia',
+          rows: [
+            {
+              id: 'exp_none',
+              title: 'Sin experiencia',
+              description: 'Recién graduado o sin experiencia laboral',
+            },
+            {
+              id: 'exp_junior',
+              title: 'Junior (1-2 años)',
+              description: 'Experiencia inicial en el campo',
+            },
+            {
+              id: 'exp_mid',
+              title: 'Intermedio (3-5 años)',
+              description: 'Experiencia sólida',
+            },
+            {
+              id: 'exp_senior',
+              title: 'Senior (5+ años)',
+              description: 'Experto en el área',
+            },
+            {
+              id: 'exp_lead',
+              title: 'Lead/Expert (7+ años)',
+              description: 'Liderazgo y expertise avanzado',
+            },
+          ],
+        },
+      ],
+    };
+  }
 
-    if (deviceType === 'MOBILE') {
+  /**
+   * Estado ASK_EXPERIENCE: Esperando nivel de experiencia
+   * ACTUALIZADO: Siempre muestra lista interactiva en errores
+   */
+  private async handleAskExperienceState(userId: string, text: string): Promise<BotReply> {
+    const experienceLevel = normalizeExperienceLevel(text);
+
+    if (!experienceLevel) {
+      // Mostrar lista interactiva cuando no entiende la respuesta
       return {
-        text: BotMessages.ASK_EXPERIENCE,
+        text: BotMessages.ERROR_EXPERIENCE_INVALID,
         listTitle: 'Seleccionar nivel',
         listSections: [
           {
@@ -462,19 +470,6 @@ export class ConversationService {
           },
         ],
       };
-    } else {
-      return { text: BotMessages.ASK_EXPERIENCE };
-    }
-  }
-
-  /**
-   * Estado ASK_EXPERIENCE: Esperando nivel de experiencia
-   */
-  private async handleAskExperienceState(userId: string, text: string): Promise<BotReply> {
-    const experienceLevel = normalizeExperienceLevel(text);
-
-    if (!experienceLevel) {
-      return { text: BotMessages.ERROR_EXPERIENCE_INVALID };
     }
 
     // Guardar en UserProfile
@@ -488,6 +483,7 @@ export class ConversationService {
 
   /**
    * Estado ASK_LOCATION: Esperando ciudad/ubicación
+   * ACTUALIZADO: Ahora va directamente a READY (sin preguntar jornada ni salario)
    */
   private async handleAskLocationState(userId: string, text: string): Promise<BotReply> {
     const location = normalizeLocation(text);
@@ -498,30 +494,21 @@ export class ConversationService {
 
     await this.updateUserProfile(userId, { location });
     
-    // [ACTUALIZADO] Flujo: ASK_LOCATION → ASK_JOB_TYPE (saltando ASK_WORK_MODE)
-    await this.updateSessionState(userId, ConversationState.ASK_JOB_TYPE);
+    // [ACTUALIZADO] Flujo: ASK_LOCATION → READY directamente
+    // Ya no se preguntan jornada ni salario (no aportan valor significativo)
+    await this.updateSessionState(userId, ConversationState.READY);
 
-    const deviceType = await this.getDeviceType(userId);
+    // Obtener usuario para mostrar mensaje de bienvenida
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
 
-    if (deviceType === 'MOBILE') {
-      return {
-        text: BotMessages.ASK_JOB_TYPE,
-        listTitle: 'Seleccionar tipo',
-        listSections: [
-          {
-            title: 'Tipo de Empleo',
-            rows: [
-              { id: 'full_time', title: 'Tiempo completo', description: 'Jornada laboral completa (8 horas)' },
-              { id: 'part_time', title: 'Medio tiempo', description: 'Jornada parcial (4-6 horas)' },
-              { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
-              { id: 'freelance', title: 'Freelance', description: 'Trabajo por proyectos' },
-            ],
-          },
-        ],
-      };
-    }
-
-    return { text: BotMessages.ASK_JOB_TYPE_DESKTOP };
+    // Mostrar mensaje de onboarding completo con menú interactivo
+    return await this.returnToMainMenu(
+      userId,
+      BotMessages.ONBOARDING_COMPLETE(user?.name || 'usuario'),
+    );
   }
 
   // [DESACTIVADO] Handler de ASK_WORK_MODE - Puede reactivarse en el futuro
@@ -578,147 +565,36 @@ export class ConversationService {
   //   return { text: BotMessages.ASK_JOB_TYPE_DESKTOP };
   // }
 
-  /**
-   * Estado ASK_JOB_TYPE: Esperando tipo de jornada
-   */
-  private async handleAskJobTypeState(userId: string, text: string): Promise<BotReply> {
-    const jobType = normalizeJobType(text);
+  // [DESACTIVADO] Estado ASK_JOB_TYPE - No aporta valor significativo
+  // private async handleAskJobTypeState(userId: string, text: string): Promise<BotReply> { ... }
 
-    if (!jobType) {
-      const deviceType = await this.getDeviceType(userId);
+  // [DESACTIVADO] Estado ASK_MIN_SALARY - No aporta valor significativo
+  // private async handleAskMinSalaryState(userId: string, text: string): Promise<BotReply> { ... }
 
-      if (deviceType === 'MOBILE') {
-        return {
-          text: BotMessages.ERROR_JOB_TYPE_INVALID,
-          listTitle: 'Seleccionar tipo',
-          listSections: [
-            {
-              title: 'Tipo de Empleo',
-              rows: [
-                {
-                  id: 'full_time',
-                  title: 'Tiempo completo',
-                  description: 'Jornada laboral completa (8 horas)',
-                },
-                {
-                  id: 'part_time',
-                  title: 'Medio tiempo',
-                  description: 'Jornada parcial (4-6 horas)',
-                },
-                { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
-                {
-                  id: 'freelance',
-                  title: 'Freelance',
-                  description: 'Trabajo por proyectos',
-                },
-              ],
-            },
-          ],
-        };
-      } else {
-        return {
-          text: BotMessages.ASK_JOB_TYPE_DESKTOP,
-        };
-      }
-    }
-
-    // Guardar en UserProfile
-    await this.updateUserProfile(userId, { jobType });
-
-    // Transición: ASK_JOB_TYPE → ASK_MIN_SALARY
-    await this.updateSessionState(userId, ConversationState.ASK_MIN_SALARY);
-
-    return { text: BotMessages.ASK_MIN_SALARY };
-  }
-
-  /**
-   * Estado ASK_MIN_SALARY: Esperando salario mínimo
-   */
-  private async handleAskMinSalaryState(userId: string, text: string): Promise<BotReply> {
-    // Si el usuario escribe "0", aceptamos sin filtro de salario
-    if (text.trim() === '0') {
-      await this.updateUserProfile(userId, { minSalary: 0 });
-      await this.updateSessionState(userId, ConversationState.ASK_ALERT_FREQUENCY);
-
-      // Obtener tipo de dispositivo para mostrar lista en móvil
-      const deviceType = await this.getDeviceType(userId);
-
-      if (deviceType === 'MOBILE') {
-        return {
-          text: BotMessages.ASK_ALERT_FREQUENCY,
-          listTitle: 'Seleccionar',
-          listSections: [
-            {
-              title: 'Frecuencia',
-              rows: [
-                { id: 'freq_daily', title: '☀️ Diariamente' },
-                { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
-                { id: 'freq_weekly', title: '📆 Semanalmente' },
-                { id: 'freq_monthly', title: '🗓️ Mensualmente' },
-              ],
-            },
-          ],
-        };
-      }
-
-      return { text: BotMessages.ASK_ALERT_FREQUENCY };
-    }
-
-    const minSalary = normalizeSalary(text);
-
-    if (!minSalary) {
-      return { text: BotMessages.ERROR_SALARY_INVALID };
-    }
-
-    // Guardar en UserProfile
-    await this.updateUserProfile(userId, { minSalary });
-
-    // [ACTUALIZADO] Transición: ASK_MIN_SALARY → READY (ya no pasa por alertas en onboarding)
-    await this.updateSessionState(userId, ConversationState.READY);
-
-    // Obtener usuario para mostrar mensaje de bienvenida
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { name: true },
-    });
-
-    // Mostrar mensaje de onboarding completo con resumen
-    return await this.returnToMainMenu(
-      userId,
-      BotMessages.ONBOARDING_COMPLETE(user?.name || 'usuario'),
-    );
-  }
-
-  // [ACTUALIZADO] Estado ASK_ALERT_FREQUENCY: Ahora se accede después de primera búsqueda
   /**
    * Estado ASK_ALERT_FREQUENCY: Esperando frecuencia de alertas
+   * ACTUALIZADO: Siempre muestra lista interactiva
    */
   private async handleAskAlertFrequencyState(userId: string, text: string): Promise<BotReply> {
     const frequency = normalizeAlertFrequency(text);
 
     if (!frequency) {
-      // Obtener tipo de dispositivo para mostrar lista o texto
-      const deviceType = await this.getDeviceType(userId);
-
-      if (deviceType === 'MOBILE') {
-        return {
-          text: BotMessages.ERROR_ALERT_FREQUENCY_INVALID,
-          listTitle: 'Seleccionar',
-          listSections: [
-            {
-              title: 'Frecuencia',
-              rows: [
-                { id: 'freq_daily', title: '☀️ Diariamente' },
-                { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
-                { id: 'freq_weekly', title: '📆 Semanalmente' },
-                { id: 'freq_monthly', title: '🗓️ Mensualmente' },
-              ],
-            },
-          ],
-        };
-      }
-
-      return { text: BotMessages.ERROR_ALERT_FREQUENCY_INVALID };
+      // Siempre mostrar lista interactiva
+      return {
+        text: BotMessages.ERROR_ALERT_FREQUENCY_INVALID,
+        listTitle: 'Seleccionar',
+        listSections: [
+          {
+            title: 'Frecuencia',
+            rows: [
+              { id: 'freq_daily', title: '☀️ Diariamente' },
+              { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
+              { id: 'freq_weekly', title: '📆 Semanalmente' },
+              { id: 'freq_monthly', title: '🗓️ Mensualmente' },
+            ],
+          },
+        ],
+      };
     }
 
     // Guardar temporalmente en session.data (lo guardamos definitivamente cuando guarde la hora)
@@ -727,15 +603,33 @@ export class ConversationService {
     // Transición: ASK_ALERT_FREQUENCY → ASK_ALERT_TIME
     await this.updateSessionState(userId, ConversationState.ASK_ALERT_TIME);
 
-    // Obtener tipo de dispositivo para mostrar lista de horas en móvil
-    const deviceType = await this.getDeviceType(userId);
+    // Mostrar lista desplegable con horas comunes
+    const timeOptions = generateTimeOptions();
 
-    if (deviceType === 'MOBILE') {
-      // Mostrar lista desplegable con horas comunes (6:00 AM - 4:00 PM)
+    return {
+      text: BotMessages.ASK_ALERT_TIME_MOBILE,
+      listTitle: 'Seleccionar hora',
+      listSections: [
+        {
+          title: 'Horas comunes',
+          rows: timeOptions,
+        },
+      ],
+    };
+  }
+
+  /**
+   * Estado ASK_ALERT_TIME: Esperando hora de alertas
+   * ACTUALIZADO: Siempre muestra lista interactiva para el menú
+   */
+  private async handleAskAlertTimeState(userId: string, text: string): Promise<BotReply> {
+    const alertTime = normalizeTime(text);
+
+    if (!alertTime) {
+      // Mostrar lista de horas cuando no entiende
       const timeOptions = generateTimeOptions();
-
-      return {
-        text: BotMessages.ASK_ALERT_TIME_MOBILE,
+      return { 
+        text: BotMessages.ERROR_TIME_INVALID,
         listTitle: 'Seleccionar hora',
         listSections: [
           {
@@ -744,19 +638,6 @@ export class ConversationService {
           },
         ],
       };
-    }
-
-    return { text: BotMessages.ASK_ALERT_TIME };
-  }
-
-  /**
-   * Estado ASK_ALERT_TIME: Esperando hora de alertas
-   */
-  private async handleAskAlertTimeState(userId: string, text: string): Promise<BotReply> {
-    const alertTime = normalizeTime(text);
-
-    if (!alertTime) {
-      return { text: BotMessages.ERROR_TIME_INVALID };
     }
 
     // Obtener frecuencia guardada en session.data
@@ -770,12 +651,6 @@ export class ConversationService {
     // Guardar en AlertPreference
     await this.upsertAlertPreference(userId, alertTime, alertFrequency);
 
-    // Obtener datos del usuario para el mensaje de confirmación
-    const user = await this.prisma.user.findUnique({ 
-      where: { id: userId },
-      select: { name: true },
-    });
-
     // Transición: ASK_ALERT_TIME → READY
     await this.updateSessionState(userId, ConversationState.READY);
 
@@ -786,94 +661,71 @@ export class ConversationService {
 
 Te enviaré ofertas nuevas directamente a este chat según tu configuración.`;
 
-    // Obtener tipo de dispositivo
-    const deviceType = await this.getDeviceType(userId);
-
-    // Si es móvil, mostrar lista desplegable con comandos
-    if (deviceType === 'MOBILE') {
-      return {
-        text: confirmationMessage,
-        listTitle: 'Ver opciones',
-        listSections: [
-          {
-            title: 'Comandos disponibles',
-            rows: [
-              {
-                id: 'cmd_buscar',
-                title: '🔍 Buscar empleos',
-                description: 'Encontrar ofertas ahora',
-              },
-              {
-                id: 'cmd_editar',
-                title: '✏️ Editar perfil',
-                description: 'Cambiar tus preferencias',
-              },
-              {
-                id: 'cmd_reiniciar',
-                title: '🔄 Reiniciar',
-                description: 'Reconfigurar desde cero',
-              },
-              {
-                id: 'cmd_cancelar',
-                title: '❌ Cancelar servicio',
-                description: 'Dejar de usar el servicio',
-              },
-            ],
-          },
-        ],
-      };
-    }
-
-    return { text: confirmationMessage };
+    // Siempre mostrar lista interactiva con comandos
+    return {
+      text: confirmationMessage,
+      listTitle: 'Ver opciones',
+      listSections: [
+        {
+          title: 'Comandos disponibles',
+          rows: [
+            {
+              id: 'cmd_buscar',
+              title: '🔍 Buscar empleos',
+              description: 'Encontrar ofertas ahora',
+            },
+            {
+              id: 'cmd_editar',
+              title: '✏️ Editar perfil',
+              description: 'Cambiar tus preferencias',
+            },
+            {
+              id: 'cmd_reiniciar',
+              title: '🔄 Reiniciar',
+              description: 'Reconfigurar desde cero',
+            },
+            {
+              id: 'cmd_cancelar',
+              title: '❌ Cancelar servicio',
+              description: 'Dejar de usar el servicio',
+            },
+          ],
+        },
+      ],
+    };
   }
 
   /**
    * Estado READY: Usuario completó onboarding
-   * Aquí se manejarían búsquedas, cambios de preferencias, etc.
+   * ACTUALIZADO: Siempre usa botones/listas interactivas
    */
   private async handleReadyState(
     userId: string,
     text: string,
     intent: UserIntent,
   ): Promise<BotReply> {
-    const deviceType = await this.getDeviceType(userId);
-
     // Detectar intención de reiniciar perfil
     if (isRestartIntent(text)) {
       await this.updateSessionState(userId, ConversationState.CONFIRM_RESTART);
-
-      if (deviceType === 'MOBILE') {
-        return {
-          text: BotMessages.CONFIRM_RESTART,
-          buttons: [
-            { id: 'confirm_restart', title: 'Sí, reiniciar' },
-            { id: 'cancel_restart', title: 'No, cancelar' },
-          ],
-        };
-      } else {
-        return {
-          text: BotMessages.CONFIRM_RESTART_DESKTOP,
-        };
-      }
+      return {
+        text: BotMessages.CONFIRM_RESTART,
+        buttons: [
+          { id: 'confirm_restart', title: 'Sí, reiniciar' },
+          { id: 'cancel_restart', title: 'No, cancelar' },
+        ],
+      };
     }
 
     // Detectar intención de cancelar servicio
     if (isCancelServiceIntent(text)) {
       await this.updateSessionState(userId, ConversationState.CONFIRM_CANCEL_SERVICE);
-
-      if (deviceType === 'MOBILE') {
-        return {
-          text: BotMessages.CONFIRM_CANCEL_SERVICE,
-          buttons: [
-            { id: 'confirm_cancel', title: 'Sí, confirmar' },
-            { id: 'abort_cancel', title: 'No, continuar' },
-          ],
-        };
-      } else {
-        return {
-          text: BotMessages.CONFIRM_CANCEL_SERVICE_DESKTOP,
-        };
-      }
+      return {
+        text: BotMessages.CONFIRM_CANCEL_SERVICE,
+        buttons: [
+          { id: 'confirm_cancel', title: 'Sí, confirmar' },
+          { id: 'abort_cancel', title: 'No, continuar' },
+        ],
+      };
     }
 
     // Detectar intención de editar perfil
@@ -911,42 +763,38 @@ Te enviaré ofertas nuevas directamente a este chat según tu configuración.`;
       return searchResult;
     }
 
-    // Mostrar menú de comandos disponibles
-    if (deviceType === 'MOBILE') {
-      return {
-        text: '¿Qué te gustaría hacer?',
-        listTitle: 'Ver opciones',
-        listSections: [
-          {
-            title: 'Comandos disponibles',
-            rows: [
-              {
-                id: 'cmd_buscar',
-                title: '🔍 Buscar empleos',
-                description: 'Encontrar ofertas ahora',
-              },
-              {
-                id: 'cmd_editar',
-                title: '✏️ Editar perfil',
-                description: 'Cambiar tus preferencias',
-              },
-              {
-                id: 'cmd_reiniciar',
-                title: '🔄 Reiniciar',
-                description: 'Reconfigurar desde cero',
-              },
-              {
-                id: 'cmd_cancelar',
-                title: '❌ Cancelar servicio',
-                description: 'Dejar de usar el servicio',
-              },
-            ],
-          },
-        ],
-      };
-    } else {
-      return { text: BotMessages.MENU_READY };
-    }
+    // Siempre mostrar menú de comandos con lista interactiva
+    return {
+      text: '¿Qué te gustaría hacer?',
+      listTitle: 'Ver opciones',
+      listSections: [
+        {
+          title: 'Comandos disponibles',
+          rows: [
+            {
+              id: 'cmd_buscar',
+              title: '🔍 Buscar empleos',
+              description: 'Encontrar ofertas ahora',
+            },
+            {
+              id: 'cmd_editar',
+              title: '✏️ Editar perfil',
+              description: 'Cambiar tus preferencias',
+            },
+            {
+              id: 'cmd_reiniciar',
+              title: '🔄 Reiniciar',
+              description: 'Reconfigurar desde cero',
+            },
+            {
+              id: 'cmd_cancelar',
+              title: '❌ Cancelar servicio',
+              description: 'Dejar de usar el servicio',
+            },
+          ],
+        },
+      ],
+    };
   }
 
   /**
@@ -989,34 +837,46 @@ Intenta de nuevo más tarde o escribe "reiniciar" para ajustar tus preferencias.
         where: { userId },
       });
 
+      // Tiempo de espera para mensaje retrasado: 1 minuto = 60000 ms
+      const DELAY_MS = 60000;
+
       // Si NO tiene alertas configuradas, ofrecer configurarlas después de mostrar resultados
       if (!alertPreference) {
         // Cambiar estado a OFFER_ALERTS para preguntar si desea alertas
         await this.updateSessionState(userId, ConversationState.OFFER_ALERTS);
 
-        // Retornar ofertas + pregunta de alertas en el MISMO mensaje
+        // Retornar ofertas ahora, y pregunta de alertas en mensaje retrasado
         return { 
-          text: formattedJobs + exhaustedMessage + `
-
----
-
-${BotMessages.OFFER_ALERTS}`
+          text: formattedJobs + exhaustedMessage,
+          delayedMessage: {
+            text: BotMessages.OFFER_ALERTS,
+            delayMs: DELAY_MS,
+          }
         };
       }
 
-      // Si ya tiene alertas configuradas, mostrar menú normal
-      const menuText = `
+      // Si ya tiene alertas configuradas, mostrar menú normal en mensaje retrasado
+      const menuText = `¿Qué quieres hacer ahora?`;
 
----
-
-¿Qué quieres hacer ahora?
-
-• Escribe *"buscar"* para buscar más ofertas
-• Escribe *"editar"* para cambiar tus preferencias
-• Escribe *"reiniciar"* para reconfigurar tu perfil
-• Escribe *"cancelar"* para dejar de usar el servicio`;
-
-      return { text: formattedJobs + exhaustedMessage + menuText };
+      return { 
+        text: formattedJobs + exhaustedMessage,
+        delayedMessage: {
+          text: menuText,
+          delayMs: DELAY_MS,
+          listTitle: 'Ver opciones',
+          listSections: [
+            {
+              title: 'Acciones disponibles',
+              rows: [
+                { id: 'cmd_buscar', title: '🔍 Buscar empleos', description: 'Encontrar más ofertas' },
+                { id: 'cmd_editar', title: '✏️ Editar perfil', description: 'Cambiar tus preferencias' },
+                { id: 'cmd_reiniciar', title: '🔄 Reiniciar', description: 'Reconfigurar tu perfil' },
+                { id: 'cmd_cancelar', title: '❌ Cancelar servicio', description: 'Dejar de usar el CIO' },
+              ],
+            },
+          ],
+        }
+      };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Error en búsqueda de empleos: ${errorMessage}`);
@@ -1030,7 +890,8 @@ Por favor intenta de nuevo en unos minutos.`,
   }
 
   /**
-   * [NUEVO] Estado OFFER_ALERTS: Pregunta si desea recibir alertas después de primera búsqueda
+   * Estado OFFER_ALERTS: Pregunta si desea recibir alertas después de primera búsqueda
+   * ACTUALIZADO: Siempre usa botones interactivos
    */
   private async handleOfferAlertsState(userId: string, text: string): Promise<BotReply> {
     // Verificar si acepta alertas
@@ -1038,27 +899,21 @@ Por favor intenta de nuevo en unos minutos.`,
       // Usuario quiere activar alertas → Preguntar frecuencia
       await this.updateSessionState(userId, ConversationState.ASK_ALERT_FREQUENCY);
 
-      const deviceType = await this.getDeviceType(userId);
-
-      if (deviceType === 'MOBILE') {
-        return {
-          text: BotMessages.ASK_ALERT_FREQUENCY,
-          listTitle: 'Seleccionar',
-          listSections: [
-            {
-              title: 'Frecuencia',
-              rows: [
-                { id: 'freq_daily', title: '☀️ Diariamente' },
-                { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
-                { id: 'freq_weekly', title: '📆 Semanalmente' },
-                { id: 'freq_monthly', title: '🗓️ Mensualmente' },
-              ],
-            },
-          ],
-        };
-      }
-
-      return { text: BotMessages.ASK_ALERT_FREQUENCY };
+      return {
+        text: BotMessages.ASK_ALERT_FREQUENCY,
+        listTitle: 'Seleccionar',
+        listSections: [
+          {
+            title: 'Frecuencia',
+            rows: [
+              { id: 'freq_daily', title: '☀️ Diariamente' },
+              { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
+              { id: 'freq_weekly', title: '📆 Semanalmente' },
+              { id: 'freq_monthly', title: '🗓️ Mensualmente' },
+            ],
+          },
+        ],
+      };
     }
 
     // Verificar si rechaza alertas
@@ -1080,21 +935,33 @@ Por favor intenta de nuevo en unos minutos.`,
       return await this.returnToMainMenu(userId, BotMessages.ALERTS_DISABLED);
     }
 
-    // No entendió la respuesta
+    // No entendió la respuesta, mostrar botones
     return {
-      text: `${BotMessages.OFFER_ALERTS}\n\n_Por favor, responde "Sí" o "No":_`,
+      text: `${BotMessages.OFFER_ALERTS}\n\n_Por favor, selecciona una opción:_`,
+      buttons: [
+        { id: 'accept_alerts', title: 'Sí, activar' },
+        { id: 'reject_alerts', title: 'No, gracias' },
+      ],
     };
   }
 
   /**
    * Estado CONFIRM_RESTART: Confirmando reinicio de perfil
+   * ACTUALIZADO: Siempre usa botones interactivos y va a ASK_TERMS con botones
    */
   private async handleConfirmRestartState(userId: string, text: string): Promise<BotReply> {
     if (isAcceptance(text)) {
       // Usuario confirmó reinicio
       await this.restartUserProfile(userId);
       await this.updateSessionState(userId, ConversationState.ASK_TERMS);
-      return { text: `${BotMessages.RESTARTED}\n\n${BotMessages.ASK_TERMS}` };
+      // Mostrar términos con botones después de reiniciar
+      return { 
+        text: `${BotMessages.RESTARTED}\n\n${BotMessages.ASK_TERMS}`,
+        buttons: [
+          { id: 'accept_terms', title: 'Acepto' },
+          { id: 'reject_terms', title: 'No acepto' },
+        ],
+      };
     }
 
     if (isRejection(text)) {
@@ -1103,7 +970,7 @@ Por favor intenta de nuevo en unos minutos.`,
       return await this.returnToMainMenu(userId, BotMessages.RESTART_CANCELLED);
     }
 
-    // No entendió la respuesta
+    // No entendió la respuesta, mostrar botones
     return {
       text: `${BotMessages.CONFIRM_RESTART}\n\n_Por favor, selecciona una opción:_`,
       buttons: [
@@ -1163,11 +1030,11 @@ Continúa con el proceso manual. 👇`,
 
   /**
    * Muestra el perfil actual del usuario y transiciona a EDITING_PROFILE
+   * ACTUALIZADO: Ya no muestra tipo de empleo ni salario (desactivados)
    */
   private async showProfileForEditing(userId: string): Promise<BotReply> {
     const profile = await this.prisma.userProfile.findUnique({ where: { userId } });
     const alertPref = await this.prisma.alertPreference.findUnique({ where: { userId } });
-    const deviceType = await this.getDeviceType(userId);
 
     if (!profile) {
       return { text: BotMessages.NOT_READY_YET };
@@ -1178,11 +1045,7 @@ Continúa con el proceso manual. 👇`,
       role: profile.role || 'No configurado',
       experience: this.formatExperienceLevel(profile.experienceLevel),
       location: profile.location || 'No configurado',
-      // workMode: this.formatWorkMode(profile.workMode), // [DESACTIVADO] Puede reactivarse
-      jobType: this.formatJobType(profile.jobType),
-      minSalary: profile.minSalary
-        ? `$${profile.minSalary.toLocaleString('es-CO')} COP`
-        : 'Sin filtro',
+      // jobType y minSalary desactivados - no aportan valor significativo
       alertFrequency: alertPref?.alertFrequency
         ? alertFrequencyToText(alertPref.alertFrequency as any)
         : 'No configurado',
@@ -1192,82 +1055,62 @@ Continúa con el proceso manual. 👇`,
     // Transicionar a EDITING_PROFILE
     await this.updateSessionState(userId, ConversationState.EDITING_PROFILE);
 
-    if (deviceType === 'DESKTOP') {
-      return { text: BotMessages.EDITING_PROFILE_DESKTOP(formattedProfile) };
-    } else {
-      // Móvil: mostrar lista desplegable con opciones de edición
-      return {
-        text: `📝 *Tus preferencias actuales:*
+    // Siempre mostrar lista desplegable con opciones de edición
+    return {
+      text: `📝 *Tus preferencias actuales:*
 
 🔹 *Rol:* ${formattedProfile.role}
 💡 *Experiencia:* ${formattedProfile.experience}
 📍 *Ubicación:* ${formattedProfile.location}
-💼 *Tipo de empleo:* ${formattedProfile.jobType}
-💰 *Salario mínimo:* ${formattedProfile.minSalary}
 🔔 *Frecuencia:* ${formattedProfile.alertFrequency}
 ⏰ *Horario de alertas:* ${formattedProfile.alertTime}
 
 Selecciona qué quieres editar:`,
-        listTitle: 'Editar campo',
-        listSections: [
-          {
-            title: 'Preferencias',
-            rows: [
-              {
-                id: 'edit_rol',
-                title: '🔹 Rol',
-                description: `Actual: ${formattedProfile.role}`,
-              },
-              {
-                id: 'edit_experiencia',
-                title: '💡 Experiencia',
-                description: `Actual: ${formattedProfile.experience}`,
-              },
-              {
-                id: 'edit_ubicacion',
-                title: '📍 Ubicación',
-                description: `Actual: ${formattedProfile.location}`,
-              },
-              // [DESACTIVADO] Opción de editar modalidad - Puede reactivarse
-              // {
-              //   id: 'edit_modalidad',
-              //   title: '🏠 Modalidad',
-              //   description: `Actual: ${formattedProfile.workMode}`,
-              // },
-              {
-                id: 'edit_tipo',
-                title: '💼 Tipo de empleo',
-                description: `Actual: ${formattedProfile.jobType}`,
-              },
-              {
-                id: 'edit_salario',
-                title: '💰 Salario ideal',
-                description: `Actual: ${formattedProfile.minSalary}`,
-              },
-              {
-                id: 'edit_frecuencia',
-                title: '🔔 Frecuencia',
-                description: `Actual: ${formattedProfile.alertFrequency}`,
-              },
-              {
-                id: 'edit_horario',
-                title: '⏰ Horario alertas',
-                description: `Actual: ${formattedProfile.alertTime}`,
-              },
-              {
-                id: 'cmd_cancelar',
-                title: '❌ Cancelar',
-                description: 'Volver al menú principal',
-              },
-            ],
-          },
-        ],
-      };
-    }
+      listTitle: 'Editar campo',
+      listSections: [
+        {
+          title: 'Preferencias',
+          rows: [
+            {
+              id: 'edit_rol',
+              title: '🔹 Rol',
+              description: `Actual: ${formattedProfile.role}`,
+            },
+            {
+              id: 'edit_experiencia',
+              title: '💡 Experiencia',
+              description: `Actual: ${formattedProfile.experience}`,
+            },
+            {
+              id: 'edit_ubicacion',
+              title: '📍 Ubicación',
+              description: `Actual: ${formattedProfile.location}`,
+            },
+            // [DESACTIVADO] Tipo de empleo y salario - no aportan valor significativo
+            {
+              id: 'edit_frecuencia',
+              title: '🔔 Frecuencia',
+              description: `Actual: ${formattedProfile.alertFrequency}`,
+            },
+            {
+              id: 'edit_horario',
+              title: '⏰ Horario alertas',
+              description: `Actual: ${formattedProfile.alertTime}`,
+            },
+            {
+              id: 'cmd_cancelar',
+              title: '❌ Cancelar',
+              description: 'Volver al menú principal',
+            },
+          ],
+        },
+      ],
+    };
   }
 
   /**
    * Estado EDITING_PROFILE: Usuario eligió editar, ahora debe seleccionar qué campo
+   * ACTUALIZADO: Siempre usa listas interactivas
    */
   private async handleEditingProfileState(userId: string, text: string): Promise<BotReply> {
     // Permitir cancelar
@@ -1280,7 +1123,8 @@ Selecciona qué quieres editar:`,
     const field = detectEditField(text);
 
     if (!field) {
-      return { text: BotMessages.EDIT_FIELD_NOT_FOUND };
+      // Mostrar lista de campos editables si no entendió
+      return await this.showProfileForEditing(userId);
     }
 
     // Transicionar al estado de edición correspondiente
@@ -1289,160 +1133,93 @@ Selecciona qué quieres editar:`,
         await this.updateSessionState(userId, ConversationState.EDIT_ROLE);
         return { text: BotMessages.ASK_ROLE };
 
-      case 'experiencia': {
+      case 'experiencia':
         await this.updateSessionState(userId, ConversationState.EDIT_EXPERIENCE);
-        const deviceType = await this.getDeviceType(userId);
-
-        if (deviceType === 'MOBILE') {
-          return {
-            text: BotMessages.ASK_EXPERIENCE,
-            listTitle: 'Seleccionar nivel',
-            listSections: [
-              {
-                title: 'Nivel de Experiencia',
-                rows: [
-                  {
-                    id: 'exp_none',
-                    title: 'Sin experiencia',
-                    description: 'Recién graduado',
-                  },
-                  {
-                    id: 'exp_junior',
-                    title: 'Junior (1-2 años)',
-                    description: 'Experiencia inicial',
-                  },
-                  {
-                    id: 'exp_mid',
-                    title: 'Intermedio (3-5 años)',
-                    description: 'Experiencia sólida',
-                  },
-                  {
-                    id: 'exp_senior',
-                    title: 'Senior (5+ años)',
-                    description: 'Experto',
-                  },
-                  {
-                    id: 'exp_lead',
-                    title: 'Lead/Expert (7+ años)',
-                    description: 'Liderazgo avanzado',
-                  },
-                ],
-              },
-            ],
-          };
-        }
-
-        return { text: BotMessages.ASK_EXPERIENCE };
-      }
-
-      case 'ubicacion':
-        await this.updateSessionState(userId, ConversationState.EDIT_LOCATION);
-        return { text: BotMessages.ASK_LOCATION };
-
-      // [DESACTIVADO] Edición de modalidad - Puede reactivarse en el futuro
-      // case 'modalidad': {
-      //   await this.updateSessionState(userId, ConversationState.EDIT_WORK_MODE);
-      //   const deviceType = await this.getDeviceType(userId);
-      //
-      //   if (deviceType === 'MOBILE') {
-      //     return {
-      //       text: BotMessages.ASK_WORK_MODE,
-      //       listTitle: 'Elige modalidad',
-      //       listSections: [
-      //         {
-      //           title: 'Modalidad de Trabajo',
-      //           rows: [
-      //             { id: 'work_remoto', title: '🏠 Remoto', description: 'Trabajar desde casa' },
-      //             { id: 'work_presencial', title: '🏢 Presencial', description: 'Ir a la oficina' },
-      //             { id: 'work_hibrido', title: '🔄 Híbrido', description: 'Mixto (remoto + presencial)' },
-      //             { id: 'work_sin_preferencia', title: '✨ Sin preferencia', description: 'Cualquier modalidad' },
-      //           ],
-      //         },
-      //       ],
-      //     };
-      //   }
-      //
-      //   return { text: BotMessages.ASK_WORK_MODE_DESKTOP };
-      // }
-
-      case 'tipo':
-        await this.updateSessionState(userId, ConversationState.EDIT_JOB_TYPE);
         return {
-          text: BotMessages.ASK_JOB_TYPE,
-          listTitle: 'Seleccionar tipo',
+          text: BotMessages.ASK_EXPERIENCE,
+          listTitle: 'Seleccionar nivel',
           listSections: [
             {
-              title: 'Tipo de Empleo',
+              title: 'Nivel de Experiencia',
               rows: [
                 {
-                  id: 'full_time',
-                  title: 'Tiempo completo',
-                  description: 'Jornada laboral completa (8 horas)',
+                  id: 'exp_none',
+                  title: 'Sin experiencia',
+                  description: 'Recién graduado',
                 },
                 {
-                  id: 'part_time',
-                  title: 'Medio tiempo',
-                  description: 'Jornada parcial (4-6 horas)',
+                  id: 'exp_junior',
+                  title: 'Junior (1-2 años)',
+                  description: 'Experiencia inicial',
                 },
-                { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
-                { id: 'freelance', title: 'Freelance', description: 'Trabajo por proyectos' },
+                {
+                  id: 'exp_mid',
+                  title: 'Intermedio (3-5 años)',
+                  description: 'Experiencia sólida',
+                },
+                {
+                  id: 'exp_senior',
+                  title: 'Senior (5+ años)',
+                  description: 'Experto',
+                },
+                {
+                  id: 'exp_lead',
+                  title: 'Lead/Expert (7+ años)',
+                  description: 'Liderazgo avanzado',
+                },
               ],
             },
           ],
         };
 
-      case 'salario':
-        await this.updateSessionState(userId, ConversationState.EDIT_MIN_SALARY);
-        return { text: BotMessages.ASK_MIN_SALARY };
+      case 'ubicacion':
+        await this.updateSessionState(userId, ConversationState.EDIT_LOCATION);
+        return { text: BotMessages.ASK_LOCATION };
 
-      case 'frecuencia': {
+      // [DESACTIVADO] Casos 'tipo' y 'salario' - No aportan valor significativo
+      // case 'tipo':
+      //   await this.updateSessionState(userId, ConversationState.EDIT_JOB_TYPE);
+      //   return { text: BotMessages.ASK_JOB_TYPE, ... };
+
+      // case 'salario':
+      //   await this.updateSessionState(userId, ConversationState.EDIT_MIN_SALARY);
+      //   return { text: BotMessages.ASK_MIN_SALARY };
+
+      case 'frecuencia':
         await this.updateSessionState(userId, ConversationState.EDIT_ALERT_FREQUENCY);
-        const deviceType = await this.getDeviceType(userId);
-
-        if (deviceType === 'MOBILE') {
-          return {
-            text: BotMessages.ASK_ALERT_FREQUENCY,
-            listTitle: 'Seleccionar',
-            listSections: [
-              {
-                title: 'Frecuencia',
-                rows: [
-                  { id: 'freq_daily', title: '☀️ Diariamente' },
-                  { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
-                  { id: 'freq_weekly', title: '📆 Semanalmente' },
-                  { id: 'freq_monthly', title: '🗓️ Mensualmente' },
-                ],
-              },
-            ],
-          };
-        }
-
-        return { text: BotMessages.ASK_ALERT_FREQUENCY };
-      }
+        return {
+          text: BotMessages.ASK_ALERT_FREQUENCY,
+          listTitle: 'Seleccionar',
+          listSections: [
+            {
+              title: 'Frecuencia',
+              rows: [
+                { id: 'freq_daily', title: '☀️ Diariamente' },
+                { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
+                { id: 'freq_weekly', title: '📆 Semanalmente' },
+                { id: 'freq_monthly', title: '🗓️ Mensualmente' },
+              ],
+            },
+          ],
+        };
 
       case 'horario': {
         await this.updateSessionState(userId, ConversationState.EDIT_ALERT_TIME);
-        const deviceType = await this.getDeviceType(userId);
-
-        if (deviceType === 'MOBILE') {
-          const timeOptions = generateTimeOptions();
-          return {
-            text: BotMessages.ASK_ALERT_TIME_MOBILE,
-            listTitle: 'Seleccionar hora',
-            listSections: [
-              {
-                title: 'Horas comunes',
-                rows: timeOptions,
-              },
-            ],
-          };
-        }
-
-        return { text: BotMessages.ASK_ALERT_TIME };
+        const timeOptions = generateTimeOptions();
+        return {
+          text: BotMessages.ASK_ALERT_TIME_MOBILE,
+          listTitle: 'Seleccionar hora',
+          listSections: [
+            {
+              title: 'Horas comunes',
+              rows: timeOptions,
+            },
+          ],
+        };
       }
 
       default:
-        return { text: BotMessages.EDIT_FIELD_NOT_FOUND };
+        return await this.showProfileForEditing(userId);
     }
   }
 
@@ -1464,12 +1241,28 @@ Selecciona qué quieres editar:`,
 
   /**
    * Estado EDIT_EXPERIENCE: Editando nivel de experiencia
+   * ACTUALIZADO: Siempre muestra lista interactiva en errores
    */
   private async handleEditExperienceState(userId: string, text: string): Promise<BotReply> {
     const experienceLevel = normalizeExperienceLevel(text);
 
     if (!experienceLevel) {
-      return { text: BotMessages.ERROR_EXPERIENCE_INVALID };
+      return {
+        text: BotMessages.ERROR_EXPERIENCE_INVALID,
+        listTitle: 'Seleccionar nivel',
+        listSections: [
+          {
+            title: 'Nivel de Experiencia',
+            rows: [
+              { id: 'exp_none', title: 'Sin experiencia', description: 'Recién graduado' },
+              { id: 'exp_junior', title: 'Junior (1-2 años)', description: 'Experiencia inicial' },
+              { id: 'exp_mid', title: 'Intermedio (3-5 años)', description: 'Experiencia sólida' },
+              { id: 'exp_senior', title: 'Senior (5+ años)', description: 'Experto' },
+              { id: 'exp_lead', title: 'Lead/Expert (7+ años)', description: 'Liderazgo avanzado' },
+            ],
+          },
+        ],
+      };
     }
 
     await this.updateUserProfile(userId, { experienceLevel });
@@ -1539,91 +1332,35 @@ Selecciona qué quieres editar:`,
   // }
 
 
-  /**
-   * Estado EDIT_JOB_TYPE: Editando tipo de empleo
-   */
-  private async handleEditJobTypeState(userId: string, text: string): Promise<BotReply> {
-    const jobType = normalizeJobType(text);
+  // [DESACTIVADO] Estado EDIT_JOB_TYPE - No aporta valor significativo
+  // private async handleEditJobTypeState(userId: string, text: string): Promise<BotReply> { ... }
 
-    if (!jobType) {
-      const deviceType = await this.getDeviceType(userId);
-
-      if (deviceType === 'MOBILE') {
-        return {
-          text: BotMessages.ERROR_JOB_TYPE_INVALID,
-          listTitle: 'Seleccionar tipo',
-          listSections: [
-            {
-              title: 'Tipo de Empleo',
-              rows: [
-                {
-                  id: 'full_time',
-                  title: 'Tiempo completo',
-                  description: 'Jornada laboral completa (8 horas)',
-                },
-                {
-                  id: 'part_time',
-                  title: 'Medio tiempo',
-                  description: 'Jornada parcial (4-6 horas)',
-                },
-                { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
-                { id: 'freelance', title: 'Freelance', description: 'Trabajo por proyectos' },
-              ],
-            },
-          ],
-        };
-      } else {
-        return {
-          text: BotMessages.ASK_JOB_TYPE_DESKTOP,
-        };
-      }
-    }
-
-    await this.updateUserProfile(userId, { jobType });
-    await this.updateSessionState(userId, ConversationState.READY);
-
-    return await this.returnToMainMenu(
-      userId,
-      BotMessages.FIELD_UPDATED('tipo de empleo', this.formatJobType(jobType)),
-    );
-  }
-
-  /**
-   * Estado EDIT_MIN_SALARY: Editando salario mínimo
-   */
-  private async handleEditMinSalaryState(userId: string, text: string): Promise<BotReply> {
-    if (text.trim() === '0') {
-      await this.updateUserProfile(userId, { minSalary: 0 });
-      await this.updateSessionState(userId, ConversationState.READY);
-      return await this.returnToMainMenu(
-        userId,
-        BotMessages.FIELD_UPDATED('salario mínimo', 'Sin filtro'),
-      );
-    }
-
-    const minSalary = normalizeSalary(text);
-
-    if (!minSalary) {
-      return { text: BotMessages.ERROR_SALARY_INVALID };
-    }
-
-    await this.updateUserProfile(userId, { minSalary });
-    await this.updateSessionState(userId, ConversationState.READY);
-
-    return await this.returnToMainMenu(
-      userId,
-      BotMessages.FIELD_UPDATED('salario mínimo', `$${minSalary.toLocaleString('es-CO')} COP`),
-    );
-  }
+  // [DESACTIVADO] Estado EDIT_MIN_SALARY - No aporta valor significativo
+  // private async handleEditMinSalaryState(userId: string, text: string): Promise<BotReply> { ... }
 
   /**
    * Estado EDIT_ALERT_FREQUENCY: Editando frecuencia de alertas
+   * ACTUALIZADO: Siempre muestra lista interactiva en errores
    */
   private async handleEditAlertFrequencyState(userId: string, text: string): Promise<BotReply> {
     const frequency = normalizeAlertFrequency(text);
 
     if (!frequency) {
-      return { text: BotMessages.ERROR_ALERT_FREQUENCY_INVALID };
+      return {
+        text: BotMessages.ERROR_ALERT_FREQUENCY_INVALID,
+        listTitle: 'Seleccionar',
+        listSections: [
+          {
+            title: 'Frecuencia',
+            rows: [
+              { id: 'freq_daily', title: '☀️ Diariamente' },
+              { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
+              { id: 'freq_weekly', title: '📆 Semanalmente' },
+              { id: 'freq_monthly', title: '🗓️ Mensualmente' },
+            ],
+          },
+        ],
+      };
     }
 
     // Obtener alertTime actual para mantenerla
@@ -1645,12 +1382,23 @@ Selecciona qué quieres editar:`,
 
   /**
    * Estado EDIT_ALERT_TIME: Editando horario de alertas
+   * ACTUALIZADO: Siempre muestra lista interactiva en errores
    */
   private async handleEditAlertTimeState(userId: string, text: string): Promise<BotReply> {
     const alertTime = normalizeTime(text);
 
     if (!alertTime) {
-      return { text: BotMessages.ERROR_TIME_INVALID };
+      const timeOptions = generateTimeOptions();
+      return { 
+        text: BotMessages.ERROR_TIME_INVALID,
+        listTitle: 'Seleccionar hora',
+        listSections: [
+          {
+            title: 'Horas comunes',
+            rows: timeOptions,
+          },
+        ],
+      };
     }
 
     // Obtener frecuencia actual para mantenerla
@@ -2126,59 +1874,46 @@ Selecciona qué quieres editar:`,
     return session;
   }
 
-  /**
-   * Obtiene el tipo de dispositivo del usuario (MOBILE o DESKTOP)
-   */
-  private async getDeviceType(userId: string): Promise<'MOBILE' | 'DESKTOP'> {
-    const session = await this.prisma.session.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return (session?.deviceType as 'MOBILE' | 'DESKTOP') || 'DESKTOP';
-  }
+  // [ELIMINADO] getDeviceType ya no se usa, todos son tratados como móvil
+  // private async getDeviceType(userId: string): Promise<'MOBILE' | 'DESKTOP'> { ... }
 
   /**
-   * Helper: Regresar al menú principal con opciones interactivas si está en móvil
+   * Helper: Regresar al menú principal con opciones interactivas
+   * ACTUALIZADO: Siempre muestra lista interactiva (todos tratados como móvil)
    */
-  private async returnToMainMenu(userId: string, message: string): Promise<BotReply> {
-    const deviceType = await this.getDeviceType(userId);
-
-    if (deviceType === 'MOBILE') {
-      return {
-        text: `${message}\n\n¿Qué te gustaría hacer?`,
-        listTitle: 'Ver opciones',
-        listSections: [
-          {
-            title: 'Comandos disponibles',
-            rows: [
-              {
-                id: 'cmd_buscar',
-                title: '🔍 Buscar empleos',
-                description: 'Encontrar ofertas ahora',
-              },
-              {
-                id: 'cmd_editar',
-                title: '✏️ Editar perfil',
-                description: 'Cambiar tus preferencias',
-              },
-              {
-                id: 'cmd_reiniciar',
-                title: '🔄 Reiniciar',
-                description: 'Reconfigurar desde cero',
-              },
-              {
-                id: 'cmd_cancelar',
-                title: '❌ Cancelar servicio',
-                description: 'Dejar de usar el servicio',
-              },
-            ],
-          },
-        ],
-      };
-    }
-
-    return { text: `${message}\n\n${BotMessages.MENU_READY}` };
+  private async returnToMainMenu(_userId: string, message: string): Promise<BotReply> {
+    // Siempre retornar lista interactiva
+    return {
+      text: `${message}\n\n¿Qué te gustaría hacer?`,
+      listTitle: 'Ver opciones',
+      listSections: [
+        {
+          title: 'Comandos disponibles',
+          rows: [
+            {
+              id: 'cmd_buscar',
+              title: '🔍 Buscar empleos',
+              description: 'Encontrar ofertas ahora',
+            },
+            {
+              id: 'cmd_editar',
+              title: '✏️ Editar perfil',
+              description: 'Cambiar tus preferencias',
+            },
+            {
+              id: 'cmd_reiniciar',
+              title: '🔄 Reiniciar',
+              description: 'Reconfigurar desde cero',
+            },
+            {
+              id: 'cmd_cancelar',
+              title: '❌ Cancelar servicio',
+              description: 'Dejar de usar el servicio',
+            },
+          ],
+        },
+      ],
+    };
   }
 
   /**

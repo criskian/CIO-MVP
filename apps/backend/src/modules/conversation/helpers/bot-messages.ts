@@ -5,6 +5,8 @@
 // CONFIGURACIÓN DE LINKS
 const WOMPI_CHECKOUT_LINK = process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ';
 const LANDING_URL = 'https://cio-stg.almia.com.co';
+const TERMS_URL = `${LANDING_URL}/terms-of-service`;
+const PRIVACY_URL = `${LANDING_URL}/privacy-policy`;
 
 export const BotMessages = {
   // BIENVENIDA Y NOMBRE
@@ -49,28 +51,23 @@ Escribe *"buscar"* cuando estés listo y te mostraré las mejores ofertas que en
 🔄 *reiniciar* - Reconfigurar tu perfil
 ❌ *cancelar* - Dejar de usar el servicio`,
 
-  // DISPOSITIVO
-
-  // Pregunta sobre dispositivo
-  ASK_DEVICE: `Antes de comenzar, *¿desde qué dispositivo me escribes?*
-
-📱 *Celular / Móvil*
-💻 *PC / Portátil / Computador*
-
-Esto me ayuda a mostrarte las opciones de la mejor manera.`,
+  // [ELIMINADO] DISPOSITIVO - Ya no se pregunta, asumimos celular
+  // ASK_DEVICE: (eliminado - todos los usuarios se tratan como móvil)
 
   // Términos y condiciones
-  ASK_TERMS: `Antes de comenzar, necesito que aceptes los términos de uso:
+  ASK_TERMS: `Antes de comenzar, necesitamos tu autorización. Al seleccionar *"Acepto"*, confirmas que:
 
-📋 *Términos de Uso*
+• Tienes *16 años o más*
+• Si eres menor de 18 años, cuentas con autorización de tu padre, madre o representante legal
+• Entiendes que el CIO ofrece una *prueba gratuita de 3 días*. Finalizado este periodo, deberás adquirir un *plan de pago* para continuar usando el servicio
+• Has leído y aceptas los *Términos y Condiciones del servicio*
+• Autorizas el tratamiento de tus datos personales conforme a la *Política de Privacidad* de Almia Consulting S.A.S., de acuerdo con la Ley 1581 de 2012
 
-• Recopilaré información básica sobre tu perfil laboral (cargo deseado, ubicación, preferencias salariales).
-• Si eliges compartir tu hoja de vida, lo almacenaré de forma segura.
-• Buscaré ofertas de empleo públicas.
+📄 *Consulta los documentos aquí:*
 
-Ver política de privacidad: https://cio-stg.almia.com.co/privacy-policy
+👉 Términos y Condiciones: ${TERMS_URL}
 
-¿Aceptas estos términos? (Responde "Sí" o "No")`,
+👉 Política de Privacidad: ${PRIVACY_URL}`,
 
   // Rechazo de términos
   TERMS_REJECTED: `Entiendo. Si cambias de opinión, puedes escribirme de nuevo cuando quieras. ¡Éxito en tu búsqueda de empleo! 👋`,
@@ -123,22 +120,24 @@ Ejemplo: "Bogotá", "Lima", "Colombia", "Argentina", etc.`,
   //
   // Selecciona una opción.`,
 
-  ASK_JOB_TYPE: `¿Qué tipo de jornada prefieres?
+  // [DESACTIVADO] Pregunta de tipo de jornada - No aporta valor significativo
+  // ASK_JOB_TYPE: `¿Qué tipo de jornada prefieres?
+  //
+  // 1️⃣ Tiempo completo
+  // 2️⃣ Medio tiempo
+  // 3️⃣ Pasantía
+  // 4️⃣ Freelance
+  //
+  // Responde con el número o el nombre.`,
 
-1️⃣ Tiempo completo
-2️⃣ Medio tiempo
-3️⃣ Pasantía
-4️⃣ Freelance
-
-Responde con el número o el nombre.`,
-
-  ASK_MIN_SALARY: `¿Cuál es tu salario ideal? (en pesos colombianos)
-
-_(Esto nos ayuda a priorizar ofertas que coincidan con tus expectativas, pero también te mostraremos otras opciones)_
-
-Ejemplo: "2000000", "2.5 millones", etc.
-
-_Si no tienes una preferencia específica, escribe "0"_`,
+  // [DESACTIVADO] Pregunta de salario - No aporta valor significativo
+  // ASK_MIN_SALARY: `¿Cuál es tu salario ideal? (en pesos colombianos)
+  //
+  // _(Esto nos ayuda a priorizar ofertas que coincidan con tus expectativas, pero también te mostraremos otras opciones)_
+  //
+  // Ejemplo: "2000000", "2.5 millones", etc.
+  //
+  // _Si no tienes una preferencia específica, escribe "0"_`,
 
   ASK_ALERT_FREQUENCY: `¡Ya casi terminamos! 🔔
 
@@ -189,16 +188,18 @@ Ejemplo: "Bogotá", "Lima", "México", "Colombia", "Perú", etc.`,
   // 🔄 *"Híbrido"* - Mixto (remoto + presencial)
   // ✨ *"Sin preferencia"* - Cualquier modalidad`,
 
-  ERROR_JOB_TYPE_INVALID: `No entendí tu respuesta. Por favor responde con:
+  // [DESACTIVADO] Mensajes de error para tipo de jornada - No aporta valor significativo
+  // ERROR_JOB_TYPE_INVALID: `No entendí tu respuesta. Por favor responde con:
+  //
+  // 1️⃣ Tiempo completo
+  // 2️⃣ Medio tiempo
+  // 3️⃣ Pasantía
+  // 4️⃣ Freelance`,
 
-1️⃣ Tiempo completo
-2️⃣ Medio tiempo
-3️⃣ Pasantía
-4️⃣ Freelance`,
-
-  ERROR_SALARY_INVALID: `Por favor ingresa un salario válido en pesos colombianos (entre 500,000 y 50,000,000) o escribe "0" si no tienes preferencia.
-
-Ejemplo: "2000000", "2.5 millones", "0"`,
+  // [DESACTIVADO] Mensajes de error para salario - No aporta valor significativo
+  // ERROR_SALARY_INVALID: `Por favor ingresa un salario válido en pesos colombianos (entre 500,000 y 50,000,000) o escribe "0" si no tienes preferencia.
+  //
+  // Ejemplo: "2000000", "2.5 millones", "0"`,
 
   ERROR_ALERT_FREQUENCY_INVALID: `No entendí tu respuesta. Por favor responde con:
 
@@ -357,29 +358,10 @@ Puedes buscar ofertas cuando quieras escribiendo *"buscar"*.
 
 _(Si cambias de opinión más adelante, puedes activar las alertas desde el menú de *"editar"*)_`,
 
-  // Versiones DESKTOP de mensajes (sin botones/listas)
-  ASK_TERMS_DESKTOP: `Antes de comenzar, necesito que aceptes los términos de uso:
+  // [ELIMINADO] Versiones DESKTOP de mensajes - Ya no se usan, todos son tratados como móvil
+  // ASK_TERMS_DESKTOP: (eliminado - ahora todos usan botones interactivos)
 
-📋 *Términos de Uso*
-
-• Recopilaré información sobre tu perfil laboral (cargo deseado, ubicación, preferencias salariales).
-• Si decides compartir tu CV, lo almacenaré de forma segura.
-• Buscaré ofertas de empleo públicas usando Google Empleos.
-• Te enviaré alertas diarias con nuevas oportunidades.
-• No compartiré tu información con terceros.
-
-Para continuar, escribe:
-• *"Acepto"* o *"Sí"* para aceptar
-• *"No acepto"* o *"No"* para rechazar`,
-
-  ASK_JOB_TYPE_DESKTOP: `¿Qué tipo de jornada prefieres?
-
-Escribe el *número* o el *nombre* de tu opción:
-
-*1* - Tiempo completo
-*2* - Medio tiempo
-*3* - Pasantía
-*4* - Freelance`,
+  // [ELIMINADO] ASK_JOB_TYPE_DESKTOP - Ya no se usa, todos usan listas interactivas
 
   // [DESACTIVADO] Mensajes de modalidad de trabajo para versión desktop
   // Puede reactivarse en el futuro si se requiere
@@ -391,55 +373,11 @@ Escribe el *número* o el *nombre* de tu opción:
   // • *"Híbrido"* - Para trabajar mixto (remoto + presencial) 🔄
   // • *"Sin preferencia"* - Para cualquier modalidad ✨`,
 
-  CONFIRM_RESTART_DESKTOP: `⚠️ ¿Estás seguro de que quieres *reiniciar tu perfil*?
+  // [ELIMINADO] CONFIRM_RESTART_DESKTOP - Ya no se usa, todos usan botones interactivos
 
-Se borrarán todas tus preferencias actuales y empezaremos desde cero.
+  // [ELIMINADO] CONFIRM_CANCEL_SERVICE_DESKTOP - Ya no se usa, todos usan botones interactivos
 
-Escribe:
-• *"Sí"* o *"Confirmar"* para reiniciar
-• *"No"* o *"Cancelar"* para mantener tu perfil`,
-
-  CONFIRM_CANCEL_SERVICE_DESKTOP: `⚠️ ¿Estás seguro de que quieres *cancelar el servicio*?
-
-Se eliminará tu cuenta y toda tu información de forma permanente.
-
-Escribe:
-• *"Sí"* o *"Confirmar"* para eliminar tu cuenta
-• *"No"* o *"Cancelar"* para mantener tu cuenta`,
-
-  EDITING_PROFILE_DESKTOP: (profile: {
-    role: string;
-    experience: string;
-    location: string;
-    // workMode: string; // [DESACTIVADO] Puede reactivarse
-    jobType: string;
-    minSalary: string;
-    alertFrequency: string;
-    alertTime: string;
-  }) => `📝 *Tus preferencias actuales:*
-
-🔹 *Rol:* ${profile.role}
-💡 *Experiencia:* ${profile.experience}
-📍 *Ubicación:* ${profile.location}
-💼 *Tipo de empleo:* ${profile.jobType}
-💰 *Salario ideal:* ${profile.minSalary}
-🔔 *Frecuencia:* ${profile.alertFrequency}
-⏰ *Horario de alertas:* ${profile.alertTime}
-
----
-
-Escribe el *número* o *nombre* del campo que quieres editar:
-
-*1* - *Rol* - Cambiar tu cargo deseado
-*2* - *Experiencia* - Cambiar tu nivel de experiencia
-*3* - *Ubicación* - Cambiar ciudad o país de búsqueda
-*4* - *Modalidad* - Cambiar entre remoto o presencial
-*5* - *Tipo* - Cambiar el tipo de empleo
-*6* - *Salario* - Cambiar tu salario ideal
-*7* - *Frecuencia* - Cambiar la frecuencia de alertas
-*8* - *Horario* - Cambiar la hora de alertas
-
-O escribe *"cancelar"* para volver al menú principal.`,
+  // [ELIMINADO] EDITING_PROFILE_DESKTOP - Ya no se usa, todos usan listas interactivas
 
   // ==========================================
   // MENSAJES DE SISTEMA DE PLANES

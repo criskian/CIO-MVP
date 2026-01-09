@@ -48,6 +48,13 @@ export interface BotReply {
   // Lista desplegable
   listTitle?: string; // Texto del botón que abre la lista (ej: "Ver opciones")
   listSections?: ListSection[]; // Secciones de la lista (máximo 10 filas por sección)
+  // Mensaje retrasado (se envía después de un tiempo)
+  delayedMessage?: {
+    text: string;
+    delayMs: number; // Tiempo de espera en milisegundos
+    listTitle?: string;
+    listSections?: ListSection[];
+  };
 }
 
 export interface IWhatsappProvider {

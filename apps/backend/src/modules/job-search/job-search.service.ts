@@ -25,6 +25,7 @@ export class JobSearchService {
     'jobleads.com',
     'trabajozy.com',
     'cazvid.com',
+    'co.trabajo',
   ];
 
   // Portales de empleo confiables (se priorizan en el scoring)
@@ -319,11 +320,11 @@ export class JobSearchService {
       const normalizedLocation = this.normalizeLocationForSerpApi(query.location);
 
       // Construir parámetros
+      // NOTA: Removido 'gl: co' porque puede causar conflictos cuando location ya está definido
       const params: Record<string, any> = {
         engine: 'google_jobs',
         q: queryString,
         location: normalizedLocation,
-        gl: 'co',
         hl: 'es',
         api_key: this.serpApiKey,
       };
@@ -850,122 +851,133 @@ export class JobSearchService {
     if (query.experienceKeywords && query.experienceKeywords.length > 0) {
       const contentText = titleLower + ' ' + snippetLower;
       
-      // Detectar si el usuario es "sin experiencia" (NONE)
+      // Detectar nivel del usuario
       const isNoExperience = query.experienceKeywords.some(kw => 
         ['sin experiencia', 'entry level', 'practicante', 'trainee', 'aprendiz'].includes(kw.toLowerCase())
       );
-
-      // Verificar si hay match con las keywords del nivel del usuario
-      const hasExperienceMatch = query.experienceKeywords.some(
-        (keyword) => contentText.includes(keyword.toLowerCase())
+      const isJunior = query.experienceKeywords.some(kw => 
+        ['junior', 'jr'].includes(kw.toLowerCase())
+      );
+      const isMid = query.experienceKeywords.some(kw => 
+        ['semi senior', 'mid', 'intermedio'].includes(kw.toLowerCase())
+      );
+      const isSenior = query.experienceKeywords.some(kw => 
+        ['senior', 'sr', 'experto', 'especialista'].includes(kw.toLowerCase())
+      );
+      const isLead = query.experienceKeywords.some(kw => 
+        ['lead', 'líder', 'principal', 'expert', 'arquitecto', 'director'].includes(kw.toLowerCase())
       );
 
-      if (hasExperienceMatch) {
-        // +15 puntos si el nivel de experiencia coincide (aumentado para perfiles sin experiencia)
-        score += 15;
-      }
+      // Keywords de niveles en las ofertas
+      const entryLevelKeywords = ['sin experiencia', 'entry level', 'practicante', 'trainee', 'aprendiz', 'pasante', 'becario'];
+      const juniorKeywords = ['junior', 'jr.', 'jr '];
+      const midKeywords = ['semi senior', 'semisenior', 'semi-senior', 'mid level', 'intermedio'];
+      const seniorKeywords = ['senior', 'sr.', 'sr '];
+      const leadKeywords = ['lead', 'líder', 'lider', 'principal', 'arquitecto', 'director', 'jefe', 'gerente', 'head'];
 
-      // [NUEVO] Penalizaciones especiales para perfiles SIN EXPERIENCIA
+      // Detectar nivel de la oferta
+      const offerIsEntry = entryLevelKeywords.some(kw => contentText.includes(kw));
+      const offerIsJunior = juniorKeywords.some(kw => contentText.includes(kw));
+      const offerIsMid = midKeywords.some(kw => contentText.includes(kw));
+      const offerIsSenior = seniorKeywords.some(kw => contentText.includes(kw));
+      const offerIsLead = leadKeywords.some(kw => contentText.includes(kw));
+
+      // Detectar años de experiencia requeridos
+      const yearsMatch = contentText.match(/(\d+)\s*[-+]?\s*años?\s*(de\s*)?(experiencia|exp)/i);
+      const yearsRequired = yearsMatch ? parseInt(yearsMatch[1]) : 0;
+
+      // ========== SCORING POR NIVEL ==========
+
+      // SIN EXPERIENCIA
       if (isNoExperience) {
-        // Keywords que indican requisitos de experiencia avanzada (PENALIZAR FUERTEMENTE)
-        const seniorKeywords = [
-          'senior', 'sr.', 'sr ', 'semisenior', 'semi senior', 'semi-senior',
-          'lead', 'líder', 'lider', 'principal', 'arquitecto', 'director',
-          'experto', 'especialista', 'expert', 'advanced'
-        ];
+        if (offerIsEntry) score += 25; // Match perfecto
+        else if (offerIsJunior) score += 15; // Aceptable
+        else if (offerIsMid) score -= 20; // Poco apropiado
+        else if (offerIsSenior) score -= 35; // Muy inapropiado
+        else if (offerIsLead) score -= 40; // Totalmente inapropiado
 
-        const hasSeniorKeyword = seniorKeywords.some(kw => contentText.includes(kw));
-        if (hasSeniorKeyword) {
-          score -= 30; // Penalización FUERTE para ofertas de senior cuando busca sin experiencia
-          this.logger.debug(`Oferta "${job.title}" penalizada (-30) por keyword senior para perfil sin experiencia`);
-        }
-
-        // Detectar requisitos explícitos de años de experiencia
-        // Patrones: "3 años", "5+ años", "mínimo 2 años", "3-5 años", etc.
-        const yearsExperiencePatterns = [
-          /\d+\s*[-+a-z]*\s*años?\s*(de\s*)?(experiencia|exp)/gi,
-          /\d+\+\s*años/gi,
-          /(mínimo|minimo|al menos)\s*\d+\s*años/gi,
-          /\d+\s*a\s*\d+\s*años/gi,
-        ];
-
-        const requiresYearsOfExperience = yearsExperiencePatterns.some(
-          pattern => pattern.test(contentText)
-        );
-
-        if (requiresYearsOfExperience) {
-          score -= 25; // Penalización fuerte por requisito explícito de años
-          this.logger.debug(`Oferta "${job.title}" penalizada (-25) por requerir años de experiencia`);
-        }
+        // Penalizar por años de experiencia requeridos
+        if (yearsRequired >= 1) score -= 20;
+        if (yearsRequired >= 3) score -= 15; // Adicional
+        if (yearsRequired >= 5) score -= 10; // Adicional
 
         // Frases que indican experiencia requerida
         const experienceRequiredPhrases = [
-          'experiencia comprobada',
-          'amplia experiencia',
-          'experiencia demostrable',
-          'experiencia previa',
-          'experiencia profesional',
-          'con experiencia',
+          'experiencia comprobada', 'amplia experiencia', 'experiencia demostrable',
+          'experiencia previa', 'experiencia profesional', 'con experiencia',
         ];
-
-        const requiresExperience = experienceRequiredPhrases.some(
-          phrase => contentText.includes(phrase)
-        );
-
-        if (requiresExperience) {
-          score -= 15; // Penalización moderada por frase de experiencia requerida
-          this.logger.debug(`Oferta "${job.title}" penalizada (-15) por requerir experiencia previa`);
+        if (experienceRequiredPhrases.some(p => contentText.includes(p))) {
+          score -= 15;
         }
 
-        // BONUS: Palabras que indican que NO se requiere experiencia
-        const noExperienceRequiredKeywords = [
-          'sin experiencia necesaria',
-          'no requiere experiencia',
-          'no es necesario experiencia',
-          'primera experiencia',
-          'recién egresado',
-          'recien egresado',
+        // BONUS para ofertas que no requieren experiencia
+        const noExpPhrases = [
+          'sin experiencia necesaria', 'no requiere experiencia', 'no es necesario experiencia',
+          'primera experiencia', 'recién egresado', 'recien egresado', 'sin experiencia previa',
         ];
-
-        const noExperienceRequired = noExperienceRequiredKeywords.some(
-          phrase => contentText.includes(phrase)
-        );
-
-        if (noExperienceRequired) {
-          score += 20; // BONUS extra para ofertas que explícitamente no requieren experiencia
-          this.logger.debug(`Oferta "${job.title}" bonificada (+20) por no requerir experiencia`);
+        if (noExpPhrases.some(p => contentText.includes(p))) {
+          score += 25;
         }
       }
 
-      // [NUEVO] Para otros niveles, también penalizar mismatches significativos
-      else {
-        // Si el usuario es JUNIOR pero la oferta pide SENIOR/LEAD
-        const isJunior = query.experienceKeywords.some(kw => 
-          ['junior', 'jr'].includes(kw.toLowerCase())
-        );
+      // JUNIOR
+      else if (isJunior) {
+        if (offerIsJunior) score += 25; // Match perfecto
+        else if (offerIsEntry) score += 10; // Puede considerar
+        else if (offerIsMid) score += 5; // Posible stretch
+        else if (offerIsSenior) score -= 25; // Inapropiado
+        else if (offerIsLead) score -= 30; // Muy inapropiado
 
-        if (isJunior) {
-          const seniorKeywords = ['senior', 'sr.', 'lead', 'líder', 'principal', 'arquitecto'];
-          const hasSeniorKeyword = seniorKeywords.some(kw => contentText.includes(kw));
-          
-          if (hasSeniorKeyword) {
-            score -= 15; // Penalización moderada para junior buscando senior
-          }
-        }
+        // Penalizar por años excesivos
+        if (yearsRequired >= 3) score -= 15;
+        if (yearsRequired >= 5) score -= 20;
+      }
 
-        // Si el usuario es SENIOR pero la oferta es JUNIOR
-        const isSenior = query.experienceKeywords.some(kw => 
-          ['senior', 'sr', 'experto', 'especialista'].includes(kw.toLowerCase())
-        );
+      // MID / SEMI-SENIOR
+      else if (isMid) {
+        if (offerIsMid) score += 25; // Match perfecto
+        else if (offerIsJunior) score -= 10; // Un poco bajo
+        else if (offerIsSenior) score += 5; // Posible stretch
+        else if (offerIsEntry) score -= 20; // Inapropiado
+        else if (offerIsLead) score -= 10; // Posible pero diferente rol
 
-        if (isSenior) {
-          const juniorKeywords = ['junior', 'jr', 'practicante', 'trainee', 'sin experiencia'];
-          const hasJuniorKeyword = juniorKeywords.some(kw => contentText.includes(kw));
-          
-          if (hasJuniorKeyword) {
-            score -= 10; // Penalización leve para senior buscando junior (puede ser intencional)
-          }
-        }
+        // Años de experiencia apropiados: 2-5
+        if (yearsRequired >= 2 && yearsRequired <= 5) score += 10;
+        if (yearsRequired >= 7) score -= 15;
+      }
+
+      // SENIOR
+      else if (isSenior) {
+        if (offerIsSenior) score += 25; // Match perfecto
+        else if (offerIsLead) score += 10; // Promoción natural
+        else if (offerIsMid) score -= 5; // Ligeramente bajo
+        else if (offerIsJunior) score -= 20; // Inapropiado
+        else if (offerIsEntry) score -= 30; // Muy inapropiado
+
+        // Años de experiencia apropiados: 4+
+        if (yearsRequired >= 4) score += 10;
+        if (yearsRequired < 2 && yearsRequired > 0) score -= 10;
+      }
+
+      // LEAD / DIRECTOR
+      else if (isLead) {
+        if (offerIsLead) score += 25; // Match perfecto
+        else if (offerIsSenior) score += 5; // Aceptable
+        else if (offerIsMid) score -= 15; // Bajo para el nivel
+        else if (offerIsJunior) score -= 25; // Inapropiado
+        else if (offerIsEntry) score -= 35; // Muy inapropiado
+
+        // Años de experiencia apropiados: 6+
+        if (yearsRequired >= 6) score += 15;
+        if (yearsRequired < 3 && yearsRequired > 0) score -= 10;
+      }
+
+      // Verificar match general con keywords del usuario
+      const hasExperienceMatch = query.experienceKeywords.some(
+        (keyword) => contentText.includes(keyword.toLowerCase())
+      );
+      if (hasExperienceMatch) {
+        score += 10; // Bonus adicional por match directo
       }
     }
 
@@ -1335,6 +1347,43 @@ export class JobSearchService {
   }
 
   /**
+   * Limpia una URL removiendo parámetros UTM y referencias a Google Jobs
+   * Esto hace los enlaces más cortos y no revela la fuente de búsqueda
+   */
+  private cleanJobUrl(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      
+      // Obtener todos los parámetros y filtrar los que empiezan con utm_
+      const paramsToDelete: string[] = [];
+      urlObj.searchParams.forEach((_, key) => {
+        if (key.toLowerCase().startsWith('utm_') || 
+            key.toLowerCase().includes('google') ||
+            key.toLowerCase() === 'source' ||
+            key.toLowerCase() === 'ref') {
+          paramsToDelete.push(key);
+        }
+      });
+      
+      // Eliminar los parámetros identificados
+      paramsToDelete.forEach(param => urlObj.searchParams.delete(param));
+      
+      // Reconstruir la URL
+      let cleanUrl = urlObj.toString();
+      
+      // Si la URL termina con '?' sin parámetros, quitarlo
+      if (cleanUrl.endsWith('?')) {
+        cleanUrl = cleanUrl.slice(0, -1);
+      }
+      
+      return cleanUrl;
+    } catch {
+      // Si hay error parseando la URL, retornarla tal cual
+      return url;
+    }
+  }
+
+  /**
    * Formatea ofertas para enviar por WhatsApp
    */
   formatJobsForWhatsApp(jobs: JobPosting[]): string {
@@ -1367,7 +1416,9 @@ Intenta de nuevo más tarde o ajusta tus preferencias.`;
           text += `📅 Publicada ${job.postedAtRaw}\n`;
         }
 
-        text += `🔗 ${job.url}\n`;
+        // Limpiar la URL de parámetros UTM y referencias a Google Jobs
+        const cleanUrl = this.cleanJobUrl(job.url);
+        text += `🔗 ${cleanUrl}\n`;
 
         return text;
       })

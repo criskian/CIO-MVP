@@ -141,12 +141,35 @@ export class WhatsappService {
 
   /**
    * Envía una respuesta del bot (BotReply)
-   * Soporta mensajes de texto simple, botones y listas
+   * Soporta mensajes de texto simple, botones, listas y mensajes retrasados
    */
   async sendBotReply(to: string, reply: BotReply): Promise<void> {
     try {
-      await this.provider.sendMessage(to, reply);
+      // Enviar mensaje principal (sin el delayedMessage)
+      const { delayedMessage, ...mainReply } = reply;
+      await this.provider.sendMessage(to, mainReply);
       this.logger.log(`✅ Mensaje enviado a ${to}`);
+
+      // Si hay mensaje retrasado, programar su envío
+      if (delayedMessage) {
+        const delayMs = delayedMessage.delayMs || 60000; // Default 1 minuto
+        this.logger.log(`⏰ Programando mensaje retrasado para ${to} en ${delayMs / 1000} segundos`);
+        
+        setTimeout(async () => {
+          try {
+            const delayedReply: BotReply = {
+              text: delayedMessage.text,
+              listTitle: delayedMessage.listTitle,
+              listSections: delayedMessage.listSections,
+            };
+            await this.provider.sendMessage(to, delayedReply);
+            this.logger.log(`✅ Mensaje retrasado enviado a ${to}`);
+          } catch (delayedError) {
+            const errorMessage = delayedError instanceof Error ? delayedError.message : 'Unknown error';
+            this.logger.error(`❌ Error enviando mensaje retrasado a ${to}: ${errorMessage}`);
+          }
+        }, delayMs);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
