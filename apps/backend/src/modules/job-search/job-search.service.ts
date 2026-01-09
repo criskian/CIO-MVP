@@ -1335,6 +1335,43 @@ export class JobSearchService {
   }
 
   /**
+   * Limpia una URL removiendo parámetros UTM y referencias a Google Jobs
+   * Esto hace los enlaces más cortos y no revela la fuente de búsqueda
+   */
+  private cleanJobUrl(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      
+      // Obtener todos los parámetros y filtrar los que empiezan con utm_
+      const paramsToDelete: string[] = [];
+      urlObj.searchParams.forEach((_, key) => {
+        if (key.toLowerCase().startsWith('utm_') || 
+            key.toLowerCase().includes('google') ||
+            key.toLowerCase() === 'source' ||
+            key.toLowerCase() === 'ref') {
+          paramsToDelete.push(key);
+        }
+      });
+      
+      // Eliminar los parámetros identificados
+      paramsToDelete.forEach(param => urlObj.searchParams.delete(param));
+      
+      // Reconstruir la URL
+      let cleanUrl = urlObj.toString();
+      
+      // Si la URL termina con '?' sin parámetros, quitarlo
+      if (cleanUrl.endsWith('?')) {
+        cleanUrl = cleanUrl.slice(0, -1);
+      }
+      
+      return cleanUrl;
+    } catch {
+      // Si hay error parseando la URL, retornarla tal cual
+      return url;
+    }
+  }
+
+  /**
    * Formatea ofertas para enviar por WhatsApp
    */
   formatJobsForWhatsApp(jobs: JobPosting[]): string {
@@ -1367,7 +1404,9 @@ Intenta de nuevo más tarde o ajusta tus preferencias.`;
           text += `📅 Publicada ${job.postedAtRaw}\n`;
         }
 
-        text += `🔗 ${job.url}\n`;
+        // Limpiar la URL de parámetros UTM y referencias a Google Jobs
+        const cleanUrl = this.cleanJobUrl(job.url);
+        text += `🔗 ${cleanUrl}\n`;
 
         return text;
       })
