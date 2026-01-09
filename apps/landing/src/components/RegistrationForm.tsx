@@ -8,27 +8,27 @@ interface RegistrationFormProps {
 }
 
 const COUNTRIES = [
-    { code: '54', name: 'Argentina 🇦🇷', digits: 10 },
-    { code: '591', name: 'Bolivia 🇧🇴', digits: 8 },
-    { code: '1', name: 'Canadá 🇨🇦', digits: 10 },
-    { code: '56', name: 'Chile 🇨🇱', digits: 9 },
-    { code: '57', name: 'Colombia 🇨🇴', digits: 10 },
-    { code: '506', name: 'Costa Rica 🇨🇷', digits: 8 },
-    { code: '53', name: 'Cuba 🇨🇺', digits: 8 },
-    { code: '593', name: 'Ecuador 🇪🇨', digits: 9 },
-    { code: '503', name: 'El Salvador 🇸🇻', digits: 8 },
-    { code: '34', name: 'España 🇪🇸', digits: 9 },
-    { code: '1', name: 'Estados Unidos 🇺🇸', digits: 10 },
-    { code: '502', name: 'Guatemala 🇬🇹', digits: 8 },
-    { code: '240', name: 'Guinea Ecuatorial 🇬🇶', digits: 9 },
-    { code: '504', name: 'Honduras 🇭🇳', digits: 8 },
-    { code: '52', name: 'México 🇲🇽', digits: 10 },
-    { code: '505', name: 'Nicaragua 🇳🇮', digits: 8 },
-    { code: '507', name: 'Panamá 🇵🇦', digits: 8 },
-    { code: '595', name: 'Paraguay 🇵🇾', digits: 9 },
-    { code: '51', name: 'Perú 🇵🇪', digits: 9 },
-    { code: '598', name: 'Uruguay 🇺🇾', digits: 8 },
-    { code: '58', name: 'Venezuela 🇻🇪', digits: 10 },
+    { code: '54', name: 'Argentina', flag: '🇦🇷', digits: 10 },
+    { code: '591', name: 'Bolivia', flag: '🇧🇴', digits: 8 },
+    { code: '1', name: 'Canadá', flag: '🇨🇦', digits: 10, id: 'CA' },
+    { code: '56', name: 'Chile', flag: '🇨🇱', digits: 9 },
+    { code: '57', name: 'Colombia', flag: '🇨🇴', digits: 10 },
+    { code: '506', name: 'Costa Rica', flag: '🇨🇷', digits: 8 },
+    { code: '53', name: 'Cuba', flag: '🇨🇺', digits: 8 },
+    { code: '593', name: 'Ecuador', flag: '🇪🇨', digits: 9 },
+    { code: '503', name: 'El Salvador', flag: '🇸🇻', digits: 8 },
+    { code: '34', name: 'España', flag: '🇪🇸', digits: 9 },
+    { code: '1', name: 'Estados Unidos', flag: '🇺🇸', digits: 10, id: 'US' },
+    { code: '502', name: 'Guatemala', flag: '🇬🇹', digits: 8 },
+    { code: '240', name: 'Guinea Ecuatorial', flag: '🇬🇶', digits: 9 },
+    { code: '504', name: 'Honduras', flag: '🇭🇳', digits: 8 },
+    { code: '52', name: 'México', flag: '🇲🇽', digits: 10 },
+    { code: '505', name: 'Nicaragua', flag: '🇳🇮', digits: 8 },
+    { code: '507', name: 'Panamá', flag: '🇵🇦', digits: 8 },
+    { code: '595', name: 'Paraguay', flag: '🇵🇾', digits: 9 },
+    { code: '51', name: 'Perú', flag: '🇵🇪', digits: 9 },
+    { code: '598', name: 'Uruguay', flag: '🇺🇾', digits: 8 },
+    { code: '58', name: 'Venezuela', flag: '🇻🇪', digits: 10 },
 ];
 
 export default function RegistrationForm({ onSuccess, onClose }: RegistrationFormProps) {
@@ -38,7 +38,8 @@ export default function RegistrationForm({ onSuccess, onClose }: RegistrationFor
         phone: '',
         acceptedTerms: false,
     });
-    const [countryCode, setCountryCode] = useState('57');
+    // Usamos un identificador único para países con el mismo código (ej: US y CA tienen +1)
+    const [selectedCountryId, setSelectedCountryId] = useState('57'); // Colombia por defecto
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
@@ -46,7 +47,9 @@ export default function RegistrationForm({ onSuccess, onClose }: RegistrationFor
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '573226906461';
 
-    const selectedCountry = COUNTRIES.find(c => c.code === countryCode) || COUNTRIES[0];
+    // Buscar país por id o por código
+    const selectedCountry = COUNTRIES.find(c => (c.id || c.code) === selectedCountryId) || COUNTRIES[4]; // Colombia
+    const countryCode = selectedCountry.code;
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -56,7 +59,7 @@ export default function RegistrationForm({ onSuccess, onClose }: RegistrationFor
         // Validar que el teléfono tenga la cantidad correcta de dígitos
         const phoneDigits = formData.phone.replace(/\D/g, '');
         if (phoneDigits.length !== selectedCountry.digits) {
-            setError(`El número debe tener ${selectedCountry.digits} dígitos para ${selectedCountry.name.split(' ')[0]}`);
+            setError(`El número debe tener ${selectedCountry.digits} dígitos para ${selectedCountry.name}`);
             setLoading(false);
             return;
         }
@@ -128,8 +131,8 @@ export default function RegistrationForm({ onSuccess, onClose }: RegistrationFor
         <div className="bg-[#9054C6] rounded-b-2xl">
             <form onSubmit={handleSubmit} className="space-y-5 px-6 py-8">
                 {error && (
-                    <div className="bg-white/10 border border-white/30 text-white px-4 py-3 rounded-lg text-sm font-poppins">
-                        {error}
+                    <div className="bg-red-600 border border-red-400 text-white px-4 py-3 rounded-lg text-sm font-poppins font-medium shadow-lg animate-pulse">
+                        ⚠️ {error}
                     </div>
                 )}
 
@@ -174,16 +177,20 @@ export default function RegistrationForm({ onSuccess, onClose }: RegistrationFor
                     </label>
                     <div className="flex gap-2 w-full">
                         <select
-                            value={countryCode}
+                            value={selectedCountryId}
                             onChange={(e) => {
-                                setCountryCode(e.target.value);
+                                setSelectedCountryId(e.target.value);
                                 setFormData({ ...formData, phone: '' });
                             }}
-                            className="font-poppins w-24 px-2 py-3 border-2 border-white/30 bg-white/10 text-white rounded-lg focus:ring-2 focus:ring-white focus:border-white outline-none transition-all cursor-pointer appearance-none text-center"
+                            className="font-poppins w-28 px-2 py-3 border-2 border-white/30 bg-white/10 text-white rounded-lg focus:ring-2 focus:ring-white focus:border-white outline-none transition-all cursor-pointer text-center"
                         >
                             {COUNTRIES.map((country) => (
-                                <option key={country.code} value={country.code} className="bg-[#7c3aac] text-white">
-                                    +{country.code}
+                                <option 
+                                    key={country.id || country.code} 
+                                    value={country.id || country.code} 
+                                    className="bg-[#7c3aac] text-white"
+                                >
+                                    {country.flag} +{country.code}
                                 </option>
                             ))}
                         </select>
@@ -198,7 +205,7 @@ export default function RegistrationForm({ onSuccess, onClose }: RegistrationFor
                         />
                     </div>
                     <p className="font-poppins text-xs text-white/70 mt-1">
-                        {selectedCountry.name} - {selectedCountry.digits} dígitos
+                        {selectedCountry.flag} {selectedCountry.name} - {selectedCountry.digits} dígitos
                     </p>
                 </div>
 
