@@ -837,34 +837,46 @@ Intenta de nuevo más tarde o escribe "reiniciar" para ajustar tus preferencias.
         where: { userId },
       });
 
+      // Tiempo de espera para mensaje retrasado: 1 minuto = 60000 ms
+      const DELAY_MS = 60000;
+
       // Si NO tiene alertas configuradas, ofrecer configurarlas después de mostrar resultados
       if (!alertPreference) {
         // Cambiar estado a OFFER_ALERTS para preguntar si desea alertas
         await this.updateSessionState(userId, ConversationState.OFFER_ALERTS);
 
-        // Retornar ofertas + pregunta de alertas en el MISMO mensaje
+        // Retornar ofertas ahora, y pregunta de alertas en mensaje retrasado
         return { 
-          text: formattedJobs + exhaustedMessage + `
-
----
-
-${BotMessages.OFFER_ALERTS}`
+          text: formattedJobs + exhaustedMessage,
+          delayedMessage: {
+            text: BotMessages.OFFER_ALERTS,
+            delayMs: DELAY_MS,
+          }
         };
       }
 
-      // Si ya tiene alertas configuradas, mostrar menú normal
-      const menuText = `
+      // Si ya tiene alertas configuradas, mostrar menú normal en mensaje retrasado
+      const menuText = `¿Qué quieres hacer ahora?`;
 
----
-
-¿Qué quieres hacer ahora?
-
-• Escribe *"buscar"* para buscar más ofertas
-• Escribe *"editar"* para cambiar tus preferencias
-• Escribe *"reiniciar"* para reconfigurar tu perfil
-• Escribe *"cancelar"* para dejar de usar el servicio`;
-
-      return { text: formattedJobs + exhaustedMessage + menuText };
+      return { 
+        text: formattedJobs + exhaustedMessage,
+        delayedMessage: {
+          text: menuText,
+          delayMs: DELAY_MS,
+          listTitle: 'Ver opciones',
+          listSections: [
+            {
+              title: 'Acciones disponibles',
+              rows: [
+                { id: 'cmd_buscar', title: '🔍 Buscar empleos', description: 'Encontrar más ofertas' },
+                { id: 'cmd_editar', title: '✏️ Editar perfil', description: 'Cambiar tus preferencias' },
+                { id: 'cmd_reiniciar', title: '🔄 Reiniciar', description: 'Reconfigurar tu perfil' },
+                { id: 'cmd_cancelar', title: '❌ Cancelar servicio', description: 'Dejar de usar el CIO' },
+              ],
+            },
+          ],
+        }
+      };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Error en búsqueda de empleos: ${errorMessage}`);
