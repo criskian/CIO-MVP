@@ -1,13 +1,13 @@
 /**
  * Estados de la máquina de conversación
- * Flujo actualizado: NEW → ASK_NAME → ASK_DEVICE → ASK_TERMS → ASK_ROLE → ASK_EXPERIENCE → ASK_LOCATION → ASK_JOB_TYPE → ASK_MIN_SALARY → READY
+ * Flujo actualizado: NEW → ASK_TERMS → ASK_ROLE → ASK_EXPERIENCE → ASK_LOCATION → ASK_JOB_TYPE → ASK_MIN_SALARY → READY
  * Después de primera búsqueda: OFFER_ALERTS → (Si acepta) → ASK_ALERT_FREQUENCY → ASK_ALERT_TIME → READY
- * NOTA: ASK_WORK_MODE fue removido del flujo principal (se puede reimplementar en el futuro)
+ * NOTA: ASK_WORK_MODE y ASK_DEVICE fueron removidos del flujo (se asume siempre móvil)
  */
 export enum ConversationState {
   NEW = 'NEW',
-  ASK_NAME = 'ASK_NAME', // Preguntar nombre al inicio (NUEVO)
-  ASK_DEVICE = 'ASK_DEVICE', // Preguntar si está en celular o PC
+  // ASK_NAME = 'ASK_NAME', // [ELIMINADO] Nombre se obtiene del registro en landing
+  // ASK_DEVICE = 'ASK_DEVICE', // [ELIMINADO] Siempre asumimos celular/móvil para usar botones interactivos
   ASK_TERMS = 'ASK_TERMS',
   ASK_ROLE = 'ASK_ROLE',
   ASK_EXPERIENCE = 'ASK_EXPERIENCE', // Pregunta por años de experiencia
