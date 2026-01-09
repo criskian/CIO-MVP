@@ -1,8 +1,8 @@
 /**
  * Estados de la máquina de conversación
- * Flujo actualizado: NEW → ASK_TERMS → ASK_ROLE → ASK_EXPERIENCE → ASK_LOCATION → ASK_JOB_TYPE → ASK_MIN_SALARY → READY
+ * Flujo actualizado: NEW → ASK_TERMS → ASK_ROLE → ASK_EXPERIENCE → ASK_LOCATION → READY
  * Después de primera búsqueda: OFFER_ALERTS → (Si acepta) → ASK_ALERT_FREQUENCY → ASK_ALERT_TIME → READY
- * NOTA: ASK_WORK_MODE y ASK_DEVICE fueron removidos del flujo (se asume siempre móvil)
+ * NOTA: ASK_WORK_MODE, ASK_DEVICE, ASK_JOB_TYPE y ASK_MIN_SALARY fueron removidos del flujo
  */
 export enum ConversationState {
   NEW = 'NEW',
@@ -11,10 +11,10 @@ export enum ConversationState {
   ASK_TERMS = 'ASK_TERMS',
   ASK_ROLE = 'ASK_ROLE',
   ASK_EXPERIENCE = 'ASK_EXPERIENCE', // Pregunta por años de experiencia
-  ASK_LOCATION = 'ASK_LOCATION', // Pregunta por la ciudad
-  // ASK_WORK_MODE = 'ASK_WORK_MODE', // [DESACTIVADO] Pregunta si quiere remoto o presencial - Puede reactivarse en futuro
-  ASK_JOB_TYPE = 'ASK_JOB_TYPE',
-  ASK_MIN_SALARY = 'ASK_MIN_SALARY',
+  ASK_LOCATION = 'ASK_LOCATION', // Pregunta por la ciudad/país
+  // ASK_WORK_MODE = 'ASK_WORK_MODE', // [DESACTIVADO] Pregunta si quiere remoto o presencial
+  // ASK_JOB_TYPE = 'ASK_JOB_TYPE', // [DESACTIVADO] No aporta valor significativo
+  // ASK_MIN_SALARY = 'ASK_MIN_SALARY', // [DESACTIVADO] No aporta valor significativo
   READY = 'READY',
   
   // Estados de configuración de alertas (después de primera búsqueda)
@@ -31,9 +31,9 @@ export enum ConversationState {
   EDIT_ROLE = 'EDIT_ROLE', // Editando rol específicamente
   EDIT_EXPERIENCE = 'EDIT_EXPERIENCE', // Editando experiencia
   EDIT_LOCATION = 'EDIT_LOCATION', // Editando ubicación (ciudad)
-  // EDIT_WORK_MODE = 'EDIT_WORK_MODE', // [DESACTIVADO] Editando modalidad (remoto/presencial) - Puede reactivarse en futuro
-  EDIT_JOB_TYPE = 'EDIT_JOB_TYPE', // Editando tipo de empleo
-  EDIT_MIN_SALARY = 'EDIT_MIN_SALARY', // Editando salario mínimo
+  // EDIT_WORK_MODE = 'EDIT_WORK_MODE', // [DESACTIVADO] Editando modalidad (remoto/presencial)
+  // EDIT_JOB_TYPE = 'EDIT_JOB_TYPE', // [DESACTIVADO] No aporta valor significativo
+  // EDIT_MIN_SALARY = 'EDIT_MIN_SALARY', // [DESACTIVADO] No aporta valor significativo
   EDIT_ALERT_FREQUENCY = 'EDIT_ALERT_FREQUENCY', // Editando frecuencia de alertas
   EDIT_ALERT_TIME = 'EDIT_ALERT_TIME', // Editando horario de alertas
   

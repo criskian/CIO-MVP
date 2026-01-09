@@ -25,6 +25,7 @@ export class JobSearchService {
     'jobleads.com',
     'trabajozy.com',
     'cazvid.com',
+    'co.trabajo',
   ];
 
   // Portales de empleo confiables (se priorizan en el scoring)

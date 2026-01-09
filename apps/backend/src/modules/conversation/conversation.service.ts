@@ -194,11 +194,12 @@ export class ConversationService {
       // case ConversationState.ASK_WORK_MODE:
       //   return await this.handleAskWorkModeState(userId, text);
 
-      case ConversationState.ASK_JOB_TYPE:
-        return await this.handleAskJobTypeState(userId, text);
+      // [DESACTIVADO] Estados ASK_JOB_TYPE y ASK_MIN_SALARY - No aportan valor significativo
+      // case ConversationState.ASK_JOB_TYPE:
+      //   return await this.handleAskJobTypeState(userId, text);
 
-      case ConversationState.ASK_MIN_SALARY:
-        return await this.handleAskMinSalaryState(userId, text);
+      // case ConversationState.ASK_MIN_SALARY:
+      //   return await this.handleAskMinSalaryState(userId, text);
 
       case ConversationState.ASK_ALERT_FREQUENCY:
         return await this.handleAskAlertFrequencyState(userId, text);
@@ -241,11 +242,12 @@ export class ConversationService {
       // case ConversationState.EDIT_WORK_MODE:
       //   return await this.handleEditWorkModeState(userId, text);
 
-      case ConversationState.EDIT_JOB_TYPE:
-        return await this.handleEditJobTypeState(userId, text);
+      // [DESACTIVADO] Estados EDIT_JOB_TYPE y EDIT_MIN_SALARY - No aportan valor significativo
+      // case ConversationState.EDIT_JOB_TYPE:
+      //   return await this.handleEditJobTypeState(userId, text);
 
-      case ConversationState.EDIT_MIN_SALARY:
-        return await this.handleEditMinSalaryState(userId, text);
+      // case ConversationState.EDIT_MIN_SALARY:
+      //   return await this.handleEditMinSalaryState(userId, text);
 
       case ConversationState.EDIT_ALERT_FREQUENCY:
         return await this.handleEditAlertFrequencyState(userId, text);
@@ -481,7 +483,7 @@ export class ConversationService {
 
   /**
    * Estado ASK_LOCATION: Esperando ciudad/ubicación
-   * ACTUALIZADO: Siempre muestra lista interactiva para tipo de empleo
+   * ACTUALIZADO: Ahora va directamente a READY (sin preguntar jornada ni salario)
    */
   private async handleAskLocationState(userId: string, text: string): Promise<BotReply> {
     const location = normalizeLocation(text);
@@ -492,25 +494,21 @@ export class ConversationService {
 
     await this.updateUserProfile(userId, { location });
     
-    // Flujo: ASK_LOCATION → ASK_JOB_TYPE
-    await this.updateSessionState(userId, ConversationState.ASK_JOB_TYPE);
+    // [ACTUALIZADO] Flujo: ASK_LOCATION → READY directamente
+    // Ya no se preguntan jornada ni salario (no aportan valor significativo)
+    await this.updateSessionState(userId, ConversationState.READY);
 
-    // Siempre mostrar lista interactiva
-    return {
-      text: BotMessages.ASK_JOB_TYPE,
-      listTitle: 'Seleccionar tipo',
-      listSections: [
-        {
-          title: 'Tipo de Empleo',
-          rows: [
-            { id: 'full_time', title: 'Tiempo completo', description: 'Jornada laboral completa (8 horas)' },
-            { id: 'part_time', title: 'Medio tiempo', description: 'Jornada parcial (4-6 horas)' },
-            { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
-            { id: 'freelance', title: 'Freelance', description: 'Trabajo por proyectos' },
-          ],
-        },
-      ],
-    };
+    // Obtener usuario para mostrar mensaje de bienvenida
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+
+    // Mostrar mensaje de onboarding completo con menú interactivo
+    return await this.returnToMainMenu(
+      userId,
+      BotMessages.ONBOARDING_COMPLETE(user?.name || 'usuario'),
+    );
   }
 
   // [DESACTIVADO] Handler de ASK_WORK_MODE - Puede reactivarse en el futuro
@@ -567,89 +565,11 @@ export class ConversationService {
   //   return { text: BotMessages.ASK_JOB_TYPE_DESKTOP };
   // }
 
-  /**
-   * Estado ASK_JOB_TYPE: Esperando tipo de jornada
-   * ACTUALIZADO: Siempre muestra lista interactiva en errores
-   */
-  private async handleAskJobTypeState(userId: string, text: string): Promise<BotReply> {
-    const jobType = normalizeJobType(text);
+  // [DESACTIVADO] Estado ASK_JOB_TYPE - No aporta valor significativo
+  // private async handleAskJobTypeState(userId: string, text: string): Promise<BotReply> { ... }
 
-    if (!jobType) {
-      // Siempre mostrar lista interactiva
-      return {
-        text: BotMessages.ERROR_JOB_TYPE_INVALID,
-        listTitle: 'Seleccionar tipo',
-        listSections: [
-          {
-            title: 'Tipo de Empleo',
-            rows: [
-              {
-                id: 'full_time',
-                title: 'Tiempo completo',
-                description: 'Jornada laboral completa (8 horas)',
-              },
-              {
-                id: 'part_time',
-                title: 'Medio tiempo',
-                description: 'Jornada parcial (4-6 horas)',
-              },
-              { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
-              {
-                id: 'freelance',
-                title: 'Freelance',
-                description: 'Trabajo por proyectos',
-              },
-            ],
-          },
-        ],
-      };
-    }
-
-    // Guardar en UserProfile
-    await this.updateUserProfile(userId, { jobType });
-
-    // Transición: ASK_JOB_TYPE → ASK_MIN_SALARY
-    await this.updateSessionState(userId, ConversationState.ASK_MIN_SALARY);
-
-    return { text: BotMessages.ASK_MIN_SALARY };
-  }
-
-  /**
-   * Estado ASK_MIN_SALARY: Esperando salario ideal
-   * ACTUALIZADO: Siempre va a READY tras completar, alertas se preguntan después de primera búsqueda
-   */
-  private async handleAskMinSalaryState(userId: string, text: string): Promise<BotReply> {
-    // Si el usuario escribe "0", aceptamos sin filtro de salario
-    let minSalary: number | null = null;
-    
-    if (text.trim() === '0') {
-      minSalary = 0;
-    } else {
-      minSalary = normalizeSalary(text);
-    }
-
-    if (minSalary === null) {
-      return { text: BotMessages.ERROR_SALARY_INVALID };
-    }
-
-    // Guardar en UserProfile
-    await this.updateUserProfile(userId, { minSalary });
-
-    // Transición: ASK_MIN_SALARY → READY (alertas se preguntan después de primera búsqueda)
-    await this.updateSessionState(userId, ConversationState.READY);
-
-    // Obtener usuario para mostrar mensaje de bienvenida
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { name: true },
-    });
-
-    // Mostrar mensaje de onboarding completo con menú interactivo
-    return await this.returnToMainMenu(
-      userId,
-      BotMessages.ONBOARDING_COMPLETE(user?.name || 'usuario'),
-    );
-  }
+  // [DESACTIVADO] Estado ASK_MIN_SALARY - No aporta valor significativo
+  // private async handleAskMinSalaryState(userId: string, text: string): Promise<BotReply> { ... }
 
   /**
    * Estado ASK_ALERT_FREQUENCY: Esperando frecuencia de alertas
@@ -1098,7 +1018,7 @@ Continúa con el proceso manual. 👇`,
 
   /**
    * Muestra el perfil actual del usuario y transiciona a EDITING_PROFILE
-   * ACTUALIZADO: Siempre muestra lista interactiva
+   * ACTUALIZADO: Ya no muestra tipo de empleo ni salario (desactivados)
    */
   private async showProfileForEditing(userId: string): Promise<BotReply> {
     const profile = await this.prisma.userProfile.findUnique({ where: { userId } });
@@ -1113,10 +1033,7 @@ Continúa con el proceso manual. 👇`,
       role: profile.role || 'No configurado',
       experience: this.formatExperienceLevel(profile.experienceLevel),
       location: profile.location || 'No configurado',
-      jobType: this.formatJobType(profile.jobType),
-      minSalary: profile.minSalary
-        ? `$${profile.minSalary.toLocaleString('es-CO')} COP`
-        : 'Sin filtro',
+      // jobType y minSalary desactivados - no aportan valor significativo
       alertFrequency: alertPref?.alertFrequency
         ? alertFrequencyToText(alertPref.alertFrequency as any)
         : 'No configurado',
@@ -1133,8 +1050,6 @@ Continúa con el proceso manual. 👇`,
 🔹 *Rol:* ${formattedProfile.role}
 💡 *Experiencia:* ${formattedProfile.experience}
 📍 *Ubicación:* ${formattedProfile.location}
-💼 *Tipo de empleo:* ${formattedProfile.jobType}
-💰 *Salario ideal:* ${formattedProfile.minSalary}
 🔔 *Frecuencia:* ${formattedProfile.alertFrequency}
 ⏰ *Horario de alertas:* ${formattedProfile.alertTime}
 
@@ -1159,16 +1074,7 @@ Selecciona qué quieres editar:`,
               title: '📍 Ubicación',
               description: `Actual: ${formattedProfile.location}`,
             },
-            {
-              id: 'edit_tipo',
-              title: '💼 Tipo de empleo',
-              description: `Actual: ${formattedProfile.jobType}`,
-            },
-            {
-              id: 'edit_salario',
-              title: '💰 Salario ideal',
-              description: `Actual: ${formattedProfile.minSalary}`,
-            },
+            // [DESACTIVADO] Tipo de empleo y salario - no aportan valor significativo
             {
               id: 'edit_frecuencia',
               title: '🔔 Frecuencia',
@@ -1258,35 +1164,14 @@ Selecciona qué quieres editar:`,
         await this.updateSessionState(userId, ConversationState.EDIT_LOCATION);
         return { text: BotMessages.ASK_LOCATION };
 
-      case 'tipo':
-        await this.updateSessionState(userId, ConversationState.EDIT_JOB_TYPE);
-        return {
-          text: BotMessages.ASK_JOB_TYPE,
-          listTitle: 'Seleccionar tipo',
-          listSections: [
-            {
-              title: 'Tipo de Empleo',
-              rows: [
-                {
-                  id: 'full_time',
-                  title: 'Tiempo completo',
-                  description: 'Jornada laboral completa (8 horas)',
-                },
-                {
-                  id: 'part_time',
-                  title: 'Medio tiempo',
-                  description: 'Jornada parcial (4-6 horas)',
-                },
-                { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
-                { id: 'freelance', title: 'Freelance', description: 'Trabajo por proyectos' },
-              ],
-            },
-          ],
-        };
+      // [DESACTIVADO] Casos 'tipo' y 'salario' - No aportan valor significativo
+      // case 'tipo':
+      //   await this.updateSessionState(userId, ConversationState.EDIT_JOB_TYPE);
+      //   return { text: BotMessages.ASK_JOB_TYPE, ... };
 
-      case 'salario':
-        await this.updateSessionState(userId, ConversationState.EDIT_MIN_SALARY);
-        return { text: BotMessages.ASK_MIN_SALARY };
+      // case 'salario':
+      //   await this.updateSessionState(userId, ConversationState.EDIT_MIN_SALARY);
+      //   return { text: BotMessages.ASK_MIN_SALARY };
 
       case 'frecuencia':
         await this.updateSessionState(userId, ConversationState.EDIT_ALERT_FREQUENCY);
@@ -1435,75 +1320,11 @@ Selecciona qué quieres editar:`,
   // }
 
 
-  /**
-   * Estado EDIT_JOB_TYPE: Editando tipo de empleo
-   * ACTUALIZADO: Siempre muestra lista interactiva en errores
-   */
-  private async handleEditJobTypeState(userId: string, text: string): Promise<BotReply> {
-    const jobType = normalizeJobType(text);
+  // [DESACTIVADO] Estado EDIT_JOB_TYPE - No aporta valor significativo
+  // private async handleEditJobTypeState(userId: string, text: string): Promise<BotReply> { ... }
 
-    if (!jobType) {
-      return {
-        text: BotMessages.ERROR_JOB_TYPE_INVALID,
-        listTitle: 'Seleccionar tipo',
-        listSections: [
-          {
-            title: 'Tipo de Empleo',
-            rows: [
-              {
-                id: 'full_time',
-                title: 'Tiempo completo',
-                description: 'Jornada laboral completa (8 horas)',
-              },
-              {
-                id: 'part_time',
-                title: 'Medio tiempo',
-                description: 'Jornada parcial (4-6 horas)',
-              },
-              { id: 'internship', title: 'Pasantía', description: 'Prácticas profesionales' },
-              { id: 'freelance', title: 'Freelance', description: 'Trabajo por proyectos' },
-            ],
-          },
-        ],
-      };
-    }
-
-    await this.updateUserProfile(userId, { jobType });
-    await this.updateSessionState(userId, ConversationState.READY);
-
-    return await this.returnToMainMenu(
-      userId,
-      BotMessages.FIELD_UPDATED('tipo de empleo', this.formatJobType(jobType)),
-    );
-  }
-
-  /**
-   * Estado EDIT_MIN_SALARY: Editando salario mínimo
-   */
-  private async handleEditMinSalaryState(userId: string, text: string): Promise<BotReply> {
-    if (text.trim() === '0') {
-      await this.updateUserProfile(userId, { minSalary: 0 });
-      await this.updateSessionState(userId, ConversationState.READY);
-      return await this.returnToMainMenu(
-        userId,
-        BotMessages.FIELD_UPDATED('salario mínimo', 'Sin filtro'),
-      );
-    }
-
-    const minSalary = normalizeSalary(text);
-
-    if (!minSalary) {
-      return { text: BotMessages.ERROR_SALARY_INVALID };
-    }
-
-    await this.updateUserProfile(userId, { minSalary });
-    await this.updateSessionState(userId, ConversationState.READY);
-
-    return await this.returnToMainMenu(
-      userId,
-      BotMessages.FIELD_UPDATED('salario mínimo', `$${minSalary.toLocaleString('es-CO')} COP`),
-    );
-  }
+  // [DESACTIVADO] Estado EDIT_MIN_SALARY - No aporta valor significativo
+  // private async handleEditMinSalaryState(userId: string, text: string): Promise<BotReply> { ... }
 
   /**
    * Estado EDIT_ALERT_FREQUENCY: Editando frecuencia de alertas

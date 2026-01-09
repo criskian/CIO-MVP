@@ -120,22 +120,24 @@ Ejemplo: "Bogotá", "Lima", "Colombia", "Argentina", etc.`,
   //
   // Selecciona una opción.`,
 
-  ASK_JOB_TYPE: `¿Qué tipo de jornada prefieres?
+  // [DESACTIVADO] Pregunta de tipo de jornada - No aporta valor significativo
+  // ASK_JOB_TYPE: `¿Qué tipo de jornada prefieres?
+  //
+  // 1️⃣ Tiempo completo
+  // 2️⃣ Medio tiempo
+  // 3️⃣ Pasantía
+  // 4️⃣ Freelance
+  //
+  // Responde con el número o el nombre.`,
 
-1️⃣ Tiempo completo
-2️⃣ Medio tiempo
-3️⃣ Pasantía
-4️⃣ Freelance
-
-Responde con el número o el nombre.`,
-
-  ASK_MIN_SALARY: `¿Cuál es tu salario ideal? (en pesos colombianos)
-
-_(Esto nos ayuda a priorizar ofertas que coincidan con tus expectativas, pero también te mostraremos otras opciones)_
-
-Ejemplo: "2000000", "2.5 millones", etc.
-
-_Si no tienes una preferencia específica, escribe "0"_`,
+  // [DESACTIVADO] Pregunta de salario - No aporta valor significativo
+  // ASK_MIN_SALARY: `¿Cuál es tu salario ideal? (en pesos colombianos)
+  //
+  // _(Esto nos ayuda a priorizar ofertas que coincidan con tus expectativas, pero también te mostraremos otras opciones)_
+  //
+  // Ejemplo: "2000000", "2.5 millones", etc.
+  //
+  // _Si no tienes una preferencia específica, escribe "0"_`,
 
   ASK_ALERT_FREQUENCY: `¡Ya casi terminamos! 🔔
 
@@ -186,16 +188,18 @@ Ejemplo: "Bogotá", "Lima", "México", "Colombia", "Perú", etc.`,
   // 🔄 *"Híbrido"* - Mixto (remoto + presencial)
   // ✨ *"Sin preferencia"* - Cualquier modalidad`,
 
-  ERROR_JOB_TYPE_INVALID: `No entendí tu respuesta. Por favor responde con:
+  // [DESACTIVADO] Mensajes de error para tipo de jornada - No aporta valor significativo
+  // ERROR_JOB_TYPE_INVALID: `No entendí tu respuesta. Por favor responde con:
+  //
+  // 1️⃣ Tiempo completo
+  // 2️⃣ Medio tiempo
+  // 3️⃣ Pasantía
+  // 4️⃣ Freelance`,
 
-1️⃣ Tiempo completo
-2️⃣ Medio tiempo
-3️⃣ Pasantía
-4️⃣ Freelance`,
-
-  ERROR_SALARY_INVALID: `Por favor ingresa un salario válido en pesos colombianos (entre 500,000 y 50,000,000) o escribe "0" si no tienes preferencia.
-
-Ejemplo: "2000000", "2.5 millones", "0"`,
+  // [DESACTIVADO] Mensajes de error para salario - No aporta valor significativo
+  // ERROR_SALARY_INVALID: `Por favor ingresa un salario válido en pesos colombianos (entre 500,000 y 50,000,000) o escribe "0" si no tienes preferencia.
+  //
+  // Ejemplo: "2000000", "2.5 millones", "0"`,
 
   ERROR_ALERT_FREQUENCY_INVALID: `No entendí tu respuesta. Por favor responde con:
 
