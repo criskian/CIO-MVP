@@ -278,7 +278,7 @@ export class AdminService {
         if (!user) throw new NotFoundException('Usuario no encontrado');
 
         const now = new Date();
-        const weekStart = this.getWeekStart(now);
+        const premiumEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
         const subscription = await this.prisma.subscription.upsert({
             where: { userId },
@@ -286,8 +286,9 @@ export class AdminService {
                 plan: 'PREMIUM',
                 status: 'ACTIVE',
                 premiumStartDate: now,
+                premiumEndDate: premiumEndDate,
                 premiumUsesLeft: 5,
-                premiumWeekStart: weekStart,
+                premiumWeekStart: now, // Semana empieza desde activación
                 freemiumExpired: true,
             },
             create: {
@@ -295,15 +296,16 @@ export class AdminService {
                 plan: 'PREMIUM',
                 status: 'ACTIVE',
                 premiumStartDate: now,
+                premiumEndDate: premiumEndDate,
                 premiumUsesLeft: 5,
-                premiumWeekStart: weekStart,
+                premiumWeekStart: now, // Semana empieza desde activación
                 freemiumUsesLeft: 0,
                 freemiumStartDate: now,
                 freemiumExpired: true,
             },
         });
 
-        this.logger.log(`👑 Premium activado para usuario: ${userId}`);
+        this.logger.log(`👑 Premium activado para usuario: ${userId} (expira: ${premiumEndDate.toISOString()})`);
         return subscription;
     }
 

@@ -122,7 +122,7 @@ export class SchedulerService implements OnModuleInit {
       for (let i = 0; i < totalUsers; i += this.BATCH_SIZE) {
         batchNumber++;
         const batch = usersToNotify.slice(i, i + this.BATCH_SIZE);
-        
+
         this.logger.log(`📦 Procesando lote ${batchNumber} (${batch.length} usuarios)...`);
 
         // [FIX] Procesar lote en PARALELO (pero limitado por BATCH_SIZE)
@@ -425,9 +425,28 @@ Te volveré a notificar cuando encuentre algo interesante. ✨`;
 
     // PLAN PREMIUM
     if (subscription.plan === 'PREMIUM' && subscription.status === 'ACTIVE') {
-      // Verificar si es nueva semana
-      const weekStart = subscription.premiumWeekStart;
       const now = new Date();
+
+      // Verificar si el plan premium expiró (30 días)
+      if (subscription.premiumEndDate && now > subscription.premiumEndDate) {
+        await this.prisma.subscription.update({
+          where: { userId },
+          data: {
+            status: 'EXPIRED',
+            plan: 'FREEMIUM',
+            freemiumExpired: true,
+          },
+        });
+        return {
+          allowed: false,
+          reason: 'Plan Premium expirado (30 días)',
+          plan: 'PREMIUM',
+          shouldNotify: true,
+        };
+      }
+
+      // Verificar si es nueva semana (cada 7 días desde premiumWeekStart)
+      const weekStart = subscription.premiumWeekStart;
 
       if (!weekStart || this.isNewWeek(weekStart, now)) {
         // Resetear usos semanales
@@ -435,7 +454,7 @@ Te volveré a notificar cuando encuentre algo interesante. ✨`;
           where: { userId },
           data: {
             premiumUsesLeft: 4, // 5 - 1 que está usando ahora
-            premiumWeekStart: this.getWeekStart(now),
+            premiumWeekStart: now, // Nueva semana empieza desde ahora
           },
         });
         return { allowed: true, usesLeft: 4, plan: 'PREMIUM' };
@@ -535,7 +554,7 @@ Una vez realices el pago, escríbeme por este chat para activar tu cuenta.`;
   }
 
   /**
-   * Verifica si estamos en una nueva semana (lunes a domingo)
+   * Verifica si han pasado 7 días desde el inicio de la semana premium
    */
   private isNewWeek(weekStart: Date, now: Date): boolean {
     const weekEnd = new Date(weekStart);
@@ -544,15 +563,11 @@ Una vez realices el pago, escríbeme por este chat para activar tu cuenta.`;
   }
 
   /**
-   * Obtiene el inicio de la semana actual (lunes 00:00)
+   * Ya no se usa - mantenido por compatibilidad
+   * @deprecated Ahora premiumWeekStart se establece como la fecha actual
    */
   private getWeekStart(date: Date): Date {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    d.setDate(diff);
-    d.setHours(0, 0, 0, 0);
-    return d;
+    return new Date(date);
   }
 }
 
