@@ -144,7 +144,7 @@ export class ConversationService {
         `Error procesando mensaje: ${errorMessage}`,
         error instanceof Error ? error.stack : undefined,
       );
-      
+
       // 💾 GUARDAR ERROR EN HISTORIAL
       const user = await this.findUserByPhone(message.phone);
       if (user) {
@@ -154,7 +154,7 @@ export class ConversationService {
           'ERROR',
         );
       }
-      
+
       return { text: BotMessages.ERROR_GENERAL };
     }
   }
@@ -493,7 +493,7 @@ export class ConversationService {
     }
 
     await this.updateUserProfile(userId, { location });
-    
+
     // [ACTUALIZADO] Flujo: ASK_LOCATION → READY directamente
     // Ya no se preguntan jornada ni salario (no aportan valor significativo)
     await this.updateSessionState(userId, ConversationState.READY);
@@ -628,7 +628,7 @@ export class ConversationService {
     if (!alertTime) {
       // Mostrar lista de horas cuando no entiende
       const timeOptions = generateTimeOptions();
-      return { 
+      return {
         text: BotMessages.ERROR_TIME_INVALID,
         listTitle: 'Seleccionar hora',
         listSections: [
@@ -846,7 +846,7 @@ Intenta de nuevo más tarde o escribe "reiniciar" para ajustar tus preferencias.
         await this.updateSessionState(userId, ConversationState.OFFER_ALERTS);
 
         // Retornar ofertas ahora, y pregunta de alertas en mensaje retrasado
-        return { 
+        return {
           text: formattedJobs + exhaustedMessage,
           delayedMessage: {
             text: BotMessages.OFFER_ALERTS,
@@ -858,7 +858,7 @@ Intenta de nuevo más tarde o escribe "reiniciar" para ajustar tus preferencias.
       // Si ya tiene alertas configuradas, mostrar menú normal en mensaje retrasado
       const menuText = `¿Qué quieres hacer ahora?`;
 
-      return { 
+      return {
         text: formattedJobs + exhaustedMessage,
         delayedMessage: {
           text: menuText,
@@ -955,7 +955,7 @@ Por favor intenta de nuevo en unos minutos.`,
       await this.restartUserProfile(userId);
       await this.updateSessionState(userId, ConversationState.ASK_TERMS);
       // Mostrar términos con botones después de reiniciar
-      return { 
+      return {
         text: `${BotMessages.RESTARTED}\n\n${BotMessages.ASK_TERMS}`,
         buttons: [
           { id: 'accept_terms', title: 'Acepto' },
@@ -1389,7 +1389,7 @@ Selecciona qué quieres editar:`,
 
     if (!alertTime) {
       const timeOptions = generateTimeOptions();
-      return { 
+      return {
         text: BotMessages.ERROR_TIME_INVALID,
         listTitle: 'Seleccionar hora',
         listSections: [
@@ -1459,11 +1459,11 @@ Selecciona qué quieres editar:`,
     if (await this.checkIfUserHasUsesAvailable(userId)) {
       this.logger.log(`🔄 Usuario ${userId} recuperó usos, volviendo a READY`);
       await this.updateSessionState(userId, ConversationState.READY);
-      const user = await this.prisma.user.findUnique({ 
+      const user = await this.prisma.user.findUnique({
         where: { id: userId },
         include: { subscription: true }
       });
-      return { 
+      return {
         text: `🎉 ¡Buenas noticias, ${user?.name || 'usuario'}! Tienes búsquedas disponibles nuevamente.
 
 ¿Qué te gustaría hacer?
@@ -1488,11 +1488,11 @@ Selecciona qué quieres editar:`,
     if (await this.checkIfUserHasUsesAvailable(userId)) {
       this.logger.log(`🔄 Usuario ${userId} recuperó usos, volviendo a READY`);
       await this.updateSessionState(userId, ConversationState.READY);
-      const user = await this.prisma.user.findUnique({ 
+      const user = await this.prisma.user.findUnique({
         where: { id: userId },
         include: { subscription: true }
       });
-      return { 
+      return {
         text: `🎉 ¡Buenas noticias, ${user?.name || 'usuario'}! Tienes búsquedas disponibles nuevamente.
 
 ¿Qué te gustaría hacer?
@@ -1555,11 +1555,11 @@ Selecciona qué quieres editar:`,
     if (await this.checkIfUserHasUsesAvailable(userId)) {
       this.logger.log(`🔄 Usuario ${userId} recuperó usos, volviendo a READY`);
       await this.updateSessionState(userId, ConversationState.READY);
-      const user = await this.prisma.user.findUnique({ 
+      const user = await this.prisma.user.findUnique({
         where: { id: userId },
         include: { subscription: true }
       });
-      return { 
+      return {
         text: `🎉 ¡Buenas noticias, ${user?.name || 'usuario'}! Tienes búsquedas disponibles nuevamente.
 
 ¿Qué te gustaría hacer?
@@ -1654,19 +1654,23 @@ Selecciona qué quieres editar:`,
       },
     });
 
-    // Actualizar suscripción a premium
+    // Actualizar suscripción a premium con expiración a 30 días
+    const now = new Date();
+    const premiumEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
     await this.prisma.subscription.update({
       where: { userId },
       data: {
         plan: 'PREMIUM',
         status: 'ACTIVE',
-        premiumStartDate: new Date(),
+        premiumStartDate: now,
+        premiumEndDate: premiumEndDate,
         premiumUsesLeft: 5,
-        premiumWeekStart: this.getWeekStart(new Date()),
+        premiumWeekStart: now, // Semana empieza desde la compra
       },
     });
 
-    this.logger.log(`👑 Usuario ${userId} activado como PREMIUM`);
+    this.logger.log(`👑 Usuario ${userId} activado como PREMIUM (expira: ${premiumEndDate.toISOString()})`);
   }
 
   /**
@@ -1695,9 +1699,26 @@ Selecciona qué quieres editar:`,
 
     // PLAN PREMIUM
     if (subscription.plan === 'PREMIUM' && subscription.status === 'ACTIVE') {
-      // Verificar si es nueva semana
-      const weekStart = subscription.premiumWeekStart;
       const now = new Date();
+
+      // Verificar si el plan premium expiró (30 días)
+      if (subscription.premiumEndDate && now > subscription.premiumEndDate) {
+        await this.prisma.subscription.update({
+          where: { userId },
+          data: {
+            status: 'EXPIRED',
+            plan: 'FREEMIUM',
+            freemiumExpired: true,
+          },
+        });
+        return {
+          allowed: false,
+          message: `⏳ *Tu plan Premium ha expirado.*\n\nHan pasado 30 días desde tu activación.\n\nPara seguir disfrutando de búsquedas ilimitadas, renueva tu plan:\n\n🔗 *Enlace de pago:* ${process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ'}\n\nUna vez realices el pago, escríbeme *"verificar"* para activar tu cuenta.`,
+        };
+      }
+
+      // Verificar si es nueva semana (cada 7 días desde premiumWeekStart)
+      const weekStart = subscription.premiumWeekStart;
 
       if (!weekStart || this.isNewWeek(weekStart, now)) {
         // Resetear usos semanales
@@ -1705,7 +1726,7 @@ Selecciona qué quieres editar:`,
           where: { userId },
           data: {
             premiumUsesLeft: 4, // 5 - 1 que está usando ahora
-            premiumWeekStart: this.getWeekStart(now),
+            premiumWeekStart: now, // Nueva semana empieza desde ahora
           },
         });
         return { allowed: true, usesLeft: 4 };
@@ -1756,7 +1777,7 @@ Selecciona qué quieres editar:`,
   }
 
   /**
-   * Verifica si estamos en una nueva semana (lunes a domingo)
+   * Verifica si han pasado 7 días desde el inicio de la semana premium
    */
   private isNewWeek(weekStart: Date, now: Date): boolean {
     const weekEnd = new Date(weekStart);
@@ -1765,15 +1786,11 @@ Selecciona qué quieres editar:`,
   }
 
   /**
-   * Obtiene el inicio de la semana actual (lunes 00:00)
+   * Ya no se usa - mantenido por compatibilidad
+   * @deprecated Ahora premiumWeekStart se establece como la fecha actual
    */
   private getWeekStart(date: Date): Date {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    d.setDate(diff);
-    d.setHours(0, 0, 0, 0);
-    return d;
+    return new Date(date);
   }
 
   /**

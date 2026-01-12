@@ -388,10 +388,10 @@ _(Si cambias de opinión más adelante, puedes activar las alertas desde el men�
 
 Has usado tus 3 búsquedas/alertas gratuitas o han pasado 3 días desde tu registro.
 
-✨ Para seguir usando CIO sin límites, activa el *Plan Premium*:
-• 5 búsquedas/alertas por semana
-• Sin límite de tiempo
-• Acceso prioritario a nuevas funciones
+✨ Para seguir usando CIO sin límites, activa el *Plan Premium* por 30 días:
+• 5 búsquedas semanales (20 al mes)
+• Alertas personalizadas de empleo
+• Soporte prioritario
 
 🔗 *Enlace de pago:* ${WOMPI_CHECKOUT_LINK}
 
@@ -436,9 +436,9 @@ Si el problema persiste, escribe otro correo o contacta soporte.
 
 Tu pago ha sido *confirmado exitosamente*.
 
-✨ Ya tienes acceso al *Plan Premium*:
-• 5 búsquedas/alertas por semana
-• Sin límite de tiempo
+✨ Ya tienes acceso al *Plan Premium* por 30 días:
+• 5 búsquedas semanales (20 al mes)
+• Alertas personalizadas de empleo
 • Soporte prioritario
 
 ¿Qué te gustaría hacer?
@@ -453,9 +453,11 @@ Tu pago ha sido *confirmado exitosamente*.
 🔗 *Enlace de pago:* ${WOMPI_CHECKOUT_LINK}`,
 
   // Límite semanal de premium alcanzado
-  PREMIUM_WEEKLY_LIMIT_REACHED: `⏳ Has alcanzado tu límite de 5 búsquedas/alertas esta semana.
+  PREMIUM_WEEKLY_LIMIT_REACHED: `⏳ Has alcanzado tu límite de 5 búsquedas esta semana.
 
-Tus búsquedas se renovarán el próximo *lunes*.
+Recuerda que tu plan incluye *20 búsquedas al mes* (5 por semana).
+
+Tus búsquedas se renovarán en *7 días* desde tu última renovación.
 
 Mientras tanto, puedes:
 • Revisar las ofertas que ya te enviamos

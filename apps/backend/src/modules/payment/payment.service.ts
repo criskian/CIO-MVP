@@ -160,24 +160,29 @@ export class PaymentService {
             },
         });
 
-        // Activar premium
+        // Activar premium con expiración a 30 días
+        const now = new Date();
+        const premiumEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
         await this.prisma.subscription.upsert({
             where: { userId: user.id },
             update: {
                 plan: 'PREMIUM',
                 status: 'ACTIVE',
-                premiumStartDate: new Date(),
+                premiumStartDate: now,
+                premiumEndDate: premiumEndDate,
                 premiumUsesLeft: 5,
-                premiumWeekStart: this.getWeekStart(new Date()),
+                premiumWeekStart: now, // Semana empieza desde la compra
                 freemiumExpired: true, // Marcar freemium como usado
             },
             create: {
                 userId: user.id,
                 plan: 'PREMIUM',
                 status: 'ACTIVE',
-                premiumStartDate: new Date(),
+                premiumStartDate: now,
+                premiumEndDate: premiumEndDate,
                 premiumUsesLeft: 5,
-                premiumWeekStart: this.getWeekStart(new Date()),
+                premiumWeekStart: now, // Semana empieza desde la compra
                 freemiumExpired: true,
             },
         });
@@ -189,10 +194,10 @@ export class PaymentService {
 
 Tu pago ha sido confirmado exitosamente.
 
-✨ Ya tienes acceso al *Plan Premium*:
-• 5 búsquedas/alertas por semana
-• Sin límite de tiempo
-• Acceso prioritario a nuevas funciones
+✨ Ya tienes acceso al *Plan Premium* por 30 días:
+• 5 búsquedas semanales (20 al mes)
+• Alertas personalizadas de empleo
+• Soporte prioritario
 
 ¿Qué te gustaría hacer?
 • Escribe *"buscar"* para encontrar ofertas ahora

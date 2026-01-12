@@ -203,7 +203,7 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
                     <dd className="mt-1">
                       <Badge variant={
                         user.subscription.status === 'ACTIVE' ? 'success' :
-                        user.subscription.status === 'EXPIRED' ? 'warning' : 'danger'
+                          user.subscription.status === 'EXPIRED' ? 'warning' : 'danger'
                       }>
                         {getStatusLabel(user.subscription.status)}
                       </Badge>
@@ -235,10 +235,18 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
                     <>
                       <div>
                         <dt className="text-sm font-medium text-admin-text-secondary">
-                          Búsquedas Semanales
+                          Búsquedas Realizadas (esta semana)
                         </dt>
                         <dd className="mt-1 text-sm text-admin-text-primary">
-                          {user.subscription.premiumUsesLeft} / 5
+                          {5 - user.subscription.premiumUsesLeft} de 5
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm font-medium text-admin-text-secondary">
+                          Búsquedas Restantes (esta semana)
+                        </dt>
+                        <dd className="mt-1 text-sm text-admin-text-primary">
+                          {user.subscription.premiumUsesLeft} de 5
                         </dd>
                       </div>
                       {user.subscription.premiumStartDate && (
@@ -248,6 +256,16 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
                           </dt>
                           <dd className="mt-1 text-sm text-admin-text-primary">
                             {formatDate(user.subscription.premiumStartDate)}
+                          </dd>
+                        </div>
+                      )}
+                      {user.subscription.premiumEndDate && (
+                        <div>
+                          <dt className="text-sm font-medium text-admin-text-secondary">
+                            Fecha de Expiración
+                          </dt>
+                          <dd className="mt-1 text-sm text-admin-text-primary">
+                            {formatDate(user.subscription.premiumEndDate)}
                           </dd>
                         </div>
                       )}
