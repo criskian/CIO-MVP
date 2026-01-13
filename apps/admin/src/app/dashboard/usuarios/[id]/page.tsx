@@ -214,18 +214,34 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
                     <>
                       <div>
                         <dt className="text-sm font-medium text-admin-text-secondary">
-                          Usos Restantes
+                          Búsquedas Realizadas
                         </dt>
                         <dd className="mt-1 text-sm text-admin-text-primary">
-                          {user.subscription.freemiumUsesLeft} / 3
+                          {3 - user.subscription.freemiumUsesLeft} de 3
                         </dd>
                       </div>
                       <div>
                         <dt className="text-sm font-medium text-admin-text-secondary">
-                          Inicio Periodo
+                          Búsquedas Restantes
+                        </dt>
+                        <dd className="mt-1 text-sm text-admin-text-primary">
+                          {user.subscription.freemiumUsesLeft} de 3
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm font-medium text-admin-text-secondary">
+                          Fecha de Activación
                         </dt>
                         <dd className="mt-1 text-sm text-admin-text-primary">
                           {formatDate(user.subscription.freemiumStartDate)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm font-medium text-admin-text-secondary">
+                          Fecha de Expiración
+                        </dt>
+                        <dd className="mt-1 text-sm text-admin-text-primary">
+                          {formatDate(new Date(new Date(user.subscription.freemiumStartDate).getTime() + 3 * 24 * 60 * 60 * 1000).toISOString())}
                         </dd>
                       </div>
                     </>
