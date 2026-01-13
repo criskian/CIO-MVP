@@ -393,6 +393,8 @@ Has usado tus 3 búsquedas/alertas gratuitas o han pasado 3 días desde tu regis
 • Alertas personalizadas de empleo
 • Soporte prioritario
 
+💡 _Recuerda: aplicar a vacantes buenas es mejor que aplicar masivamente._
+
 🔗 *Enlace de pago:* ${WOMPI_CHECKOUT_LINK}
 
 Una vez realices el pago, ingresa el *correo electrónico* que usaste para pagar y verificaremos tu suscripción automáticamente.`,
@@ -441,6 +443,8 @@ Tu pago ha sido *confirmado exitosamente*.
 • Alertas personalizadas de empleo
 • Soporte prioritario
 
+💡 _Recuerda: aplicar a vacantes buenas es mejor que aplicar masivamente._
+
 ¿Qué te gustaría hacer?
 • Escribe *"buscar"* para encontrar ofertas ahora`,
 
@@ -456,6 +460,8 @@ Tu pago ha sido *confirmado exitosamente*.
   PREMIUM_WEEKLY_LIMIT_REACHED: `⏳ Has alcanzado tu límite de 5 búsquedas esta semana.
 
 Recuerda que tu plan incluye *20 búsquedas al mes* (5 por semana).
+
+💡 _Aplicar a vacantes buenas es mejor que aplicar masivamente._
 
 Tus búsquedas se renovarán en *7 días* desde tu última renovación.
 

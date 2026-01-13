@@ -199,6 +199,8 @@ Tu pago ha sido confirmado exitosamente.
 • Alertas personalizadas de empleo
 • Soporte prioritario
 
+💡 _Recuerda: aplicar a vacantes buenas es mejor que aplicar masivamente._
+
 ¿Qué te gustaría hacer?
 • Escribe *"buscar"* para encontrar ofertas ahora
 • Escribe *"editar"* para ajustar tus preferencias`,
