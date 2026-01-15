@@ -57,6 +57,7 @@ export class SchedulerService implements OnModuleInit {
 
   onModuleInit() {
     this.startJobAlertsCron();
+    this.startFreemiumReminderCron();
   }
 
   /**
@@ -71,6 +72,79 @@ export class SchedulerService implements OnModuleInit {
     });
 
     this.logger.log('✅ Scheduler de alertas iniciado (cada 5 minutos)');
+  }
+
+  /**
+   * Inicia el cron para enviar recordatorios de freemium (23 horas después)
+   */
+  private startFreemiumReminderCron() {
+    // Ejecutar cada hora para revisar usuarios pendientes
+    cron.schedule('0 * * * *', async () => {
+      this.logger.log('⏰ Revisando recordatorios de freemium...');
+      await this.sendFreemiumReminders();
+    });
+
+    this.logger.log('✅ Scheduler de recordatorios freemium iniciado (cada hora)');
+  }
+
+  /**
+   * Envía recordatorios a usuarios que recibieron FREEMIUM_EXPIRED hace 23+ horas
+   * y no han respondido ni pagado
+   */
+  private async sendFreemiumReminders() {
+    try {
+      const twentyThreeHoursAgo = new Date(Date.now() - 23 * 60 * 60 * 1000);
+
+      // Buscar usuarios que:
+      // - Tienen freemiumExpiredSentAt (se les envió FREEMIUM_EXPIRED)
+      // - Hace más de 23 horas
+      // - No se les ha enviado el reminder todavía
+      // - Siguen sin pagar (plan = FREEMIUM y freemiumExpired = true)
+      const usersToRemind = await this.prisma.subscription.findMany({
+        where: {
+          freemiumExpiredSentAt: {
+            not: null,
+            lte: twentyThreeHoursAgo,
+          },
+          freemiumReminderSent: false,
+          plan: 'FREEMIUM',
+          freemiumExpired: true,
+        },
+        include: {
+          user: true,
+        },
+      });
+
+      this.logger.log(`📬 ${usersToRemind.length} usuarios pendientes de recordatorio freemium`);
+
+      for (const subscription of usersToRemind) {
+        try {
+          const userName = subscription.user?.name;
+          const phone = subscription.user?.phone;
+
+          if (!phone) continue;
+
+          // Importar mensaje dinámicamente para evitar dependencia circular
+          const { BotMessages } = await import('../conversation/helpers/bot-messages');
+
+          await this.whatsappService.sendBotReply(phone, {
+            text: BotMessages.FREEMIUM_REMINDER(userName),
+          });
+
+          // Marcar como enviado
+          await this.prisma.subscription.update({
+            where: { id: subscription.id },
+            data: { freemiumReminderSent: true },
+          });
+
+          this.logger.log(`✅ Recordatorio enviado a ${phone}`);
+        } catch (error) {
+          this.logger.error(`❌ Error enviando recordatorio a ${subscription.userId}: ${error}`);
+        }
+      }
+    } catch (error) {
+      this.logger.error(`❌ Error en sendFreemiumReminders: ${error}`);
+    }
   }
 
   /**

@@ -741,6 +741,16 @@ Te enviaré ofertas nuevas directamente a este chat según tu configuración.`;
       if (!usageCheck.allowed) {
         // Redirigir al flujo de freemium agotado
         await this.updateSessionState(userId, ConversationState.FREEMIUM_EXPIRED);
+
+        // Guardar timestamp para el recordatorio de 23 horas
+        await this.prisma.subscription.update({
+          where: { userId },
+          data: {
+            freemiumExpiredSentAt: new Date(),
+            freemiumReminderSent: false,
+          },
+        });
+
         return { text: usageCheck.message || BotMessages.FREEMIUM_EXPIRED };
       }
 
