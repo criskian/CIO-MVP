@@ -71,6 +71,10 @@ model Subscription {
   freemiumStartDate DateTime           @default(now())
   freemiumExpired   Boolean            @default(false)
   
+  // Control de recordatorio freemium (23 horas después de expirar)
+  freemiumExpiredSentAt  DateTime?     // Cuándo se envió el mensaje FREEMIUM_EXPIRED
+  freemiumReminderSent   Boolean       @default(false) // Si ya se envió el recordatorio
+  
   // Control de usos premium (5 por semana)
   premiumUsesLeft   Int                @default(0)
   premiumWeekStart  DateTime?

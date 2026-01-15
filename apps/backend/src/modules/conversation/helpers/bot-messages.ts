@@ -384,20 +384,31 @@ _(Si cambias de opinión más adelante, puedes activar las alertas desde el men�
   // ==========================================
 
   // Freemium agotado (primera vez)
-  FREEMIUM_EXPIRED: `😔 *Tu período de prueba gratuita ha terminado.*
+  FREEMIUM_EXPIRED: `*⏳ Tu acceso gratuito a CIO ha finalizado*
 
-Has usado tus 3 búsquedas/alertas gratuitas o han pasado 3 días desde tu registro.
+Ya usaste tus 3 alertas gratuitas o han pasado 3 días desde tu registro.
 
-✨ Para seguir usando CIO sin límites, activa el *Plan Premium* por 30 días:
-• 5 búsquedas semanales (20 al mes)
-• Alertas personalizadas de empleo
-• Soporte prioritario
+🚀 *No frenes tu búsqueda ahora.*
 
-💡 _Recuerda: aplicar a vacantes buenas es mejor que aplicar masivamente._
+Con *CIO Premium* sigues recibiendo *ofertas reales y alineadas a tu perfil*, sin perder tiempo buscando manualmente.
 
-🔗 *Enlace de pago:* ${WOMPI_CHECKOUT_LINK}
+Por solo *$20.000 COP* tienes acceso por *30 días* a:
 
-Una vez realices el pago, ingresa el *correo electrónico* que usaste para pagar y verificaremos tu suscripción automáticamente.`,
+✅ Hasta *20 búsquedas de empleo al mes*
+
+✅ *Alertas personalizadas* directo a WhatsApp
+
+✅ Ahorro de horas semanales buscando vacantes
+
+🔐 *Activa tu Plan Premium aquí por solo $20.000 COP:*
+
+${WOMPI_CHECKOUT_LINK}
+
+Después del pago, solo escríbenos el *correo con el que pagaste* y activamos tu acceso automáticamente.
+
+💬 ¿Tienes dudas o quieres hablar con un humano?
+
+Escríbenos directamente por WhatsApp: *+57 333 239 3280*`,
 
   // Freemium agotado (usuario que vuelve después de cancelar)
   FREEMIUM_EXPIRED_RETURNING_USER: (name?: string | null) => `¡Hola${name ? ` ${name}` : ''}! 👋
@@ -409,6 +420,25 @@ Para continuar usando CIO, necesitas activar el *Plan Premium*.
 🔗 *Enlace de pago:* ${WOMPI_CHECKOUT_LINK}
 
 Una vez realices el pago, ingresa el *correo electrónico* que usaste para pagar.`,
+
+  // Recordatorio de freemium expirado (23 horas después)
+  FREEMIUM_REMINDER: (name?: string | null) => `Hola${name ? ` ${name}` : ''} 👋
+
+Veo que aún no has activado *Premium*.
+
+Recuerda: _las oportunidades no llegan solas, hay que salir a cazarlas con foco._
+
+Yo busco y filtro ofertas según tu perfil y te las envío directo a WhatsApp, para ahorrarte tiempo y ruido.
+
+🚀 *CIO Premium* → $20.000 COP / 30 días
+
+🔗 *Activa aquí:* ${WOMPI_CHECKOUT_LINK}
+
+Mira cómo funciona:
+🔗 https://www.instagram.com/p/DTghZbMDS3O/
+
+Si tienes dudas, puedes hablar con un humano aquí:
+📱 +57 333 239 3280`,
 
   // Pedir email para vincular pago
   FREEMIUM_EXPIRED_ASK_EMAIL: `Para verificar tu pago, ingresa el *correo electrónico* que usaste al momento de realizar el pago:`,
