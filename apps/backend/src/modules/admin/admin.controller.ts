@@ -203,4 +203,30 @@ export class AdminController {
         this.logger.log(`📈 Obteniendo estadísticas`);
         return this.adminService.getStats();
     }
+
+    // ==============================
+    // TEST (TEMPORAL)
+    // ==============================
+
+    /**
+     * POST /api/admin/test/template
+     * [TEMPORAL] Envía un template de prueba para verificar integración con Meta
+     * Body: { phone: string, name?: string, jobCount?: string, role?: string }
+     */
+    @Post('test/template')
+    async testTemplate(@Body() body: { phone: string; name?: string; jobCount?: string; role?: string }) {
+        this.logger.log(`🧪 Enviando template de prueba a: ${body.phone}`);
+
+        const name = body.name || 'Usuario de prueba';
+        const jobCount = body.jobCount || '5';
+        const role = body.role || 'Desarrollador';
+
+        await this.adminService.sendTestTemplate(body.phone, name, jobCount, role);
+
+        return {
+            success: true,
+            message: `Template enviado a ${body.phone}`,
+            params: { name, jobCount, role }
+        };
+    }
 }

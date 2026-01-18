@@ -264,13 +264,22 @@ export class SchedulerService implements OnModuleInit {
 
   /**
    * Determina si un usuario debe recibir alerta ahora
-   * Considera: hora configurada, frecuencia y última notificación
-   * [MEJORADO] Ventana ampliada y mejor logging
+   * Considera: hora configurada, frecuencia, última notificación Y días hábiles
+   * [MEJORADO] Ventana ampliada, mejor logging y solo días hábiles
    */
   private shouldSendAlertNow(alertPref: any): boolean {
     try {
       const now = dayjs().tz(alertPref.timezone || 'America/Bogota');
       const userId = alertPref.userId;
+
+      // [NUEVO] Solo días hábiles (lunes=1 a viernes=5)
+      const dayOfWeek = now.day(); // 0=domingo, 1=lunes, ..., 6=sábado
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        this.logger.debug(
+          `📅 Usuario ${userId}: Hoy es ${dayOfWeek === 0 ? 'domingo' : 'sábado'} → NO ENVIAR (solo días hábiles)`,
+        );
+        return false;
+      }
 
       // Extraer hora y minutos configurados (formato "HH:mm" ej: "09:00")
       const [targetHour, targetMinute] = alertPref.alertTimeLocal.split(':').map(Number);
@@ -398,10 +407,10 @@ export class SchedulerService implements OnModuleInit {
         return;
       }
 
-      // 2. Obtener teléfono del usuario
+      // 2. Obtener datos del usuario
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { phone: true, name: true },
+        include: { profile: true },
       });
 
       if (!user) {
@@ -411,39 +420,36 @@ export class SchedulerService implements OnModuleInit {
       // 3. Buscar empleos usando el JobSearchService
       const searchResult = await this.jobSearchService.searchJobsForUser(userId);
 
-      // 4. Preparar y enviar mensaje
-      let messageText: string;
-
       if (searchResult.jobs.length === 0) {
-        // No hay ofertas nuevas
-        messageText = `🔍 Hola! He buscado nuevas ofertas para ti, pero no encontré resultados nuevos que coincidan con tu perfil en este momento. 😔
-
-Te volveré a notificar cuando encuentre algo interesante. ✨`;
-      } else {
-        // Hay ofertas → formatear y enviar
-        const formattedJobs = this.jobSearchService.formatJobsForWhatsApp(searchResult.jobs);
-
-        messageText = `🎯 *¡Nuevas ofertas de empleo para ti!*\n\n${formattedJobs}`;
-
-        // Marcar ofertas como enviadas
-        await this.jobSearchService.markJobsAsSent(userId, searchResult.jobs);
+        // No hay ofertas nuevas → enviar mensaje simple
+        this.logger.log(`📭 Usuario ${userId}: Sin ofertas nuevas, no se envía notificación`);
+        return;
       }
 
-      // 5. Agregar info de usos restantes al final del mensaje
-      if (usageCheck.usesLeft !== undefined) {
-        if (usageCheck.plan === 'PREMIUM') {
-          messageText += `\n\n📊 _Te quedan *${usageCheck.usesLeft}* búsqueda${usageCheck.usesLeft !== 1 ? 's' : ''} esta semana._`;
-        } else {
-          messageText += `\n\n📊 _Te quedan *${usageCheck.usesLeft}* búsqueda${usageCheck.usesLeft !== 1 ? 's' : ''} gratuita${usageCheck.usesLeft !== 1 ? 's' : ''}._`;
-        }
-      }
+      // 4. Guardar ofertas en PendingJobAlert para que el usuario las pida después
+      await this.prisma.pendingJobAlert.create({
+        data: {
+          userId,
+          jobs: searchResult.jobs as any,
+          jobCount: searchResult.jobs.length,
+        },
+      });
 
-      messageText += `\n\n_Te seguiré enviando alertas según tu configuración._ ⏰`;
+      this.logger.log(`💾 ${searchResult.jobs.length} ofertas guardadas como pendientes para ${userId}`);
 
-      // 6. Enviar mensaje por WhatsApp
-      await this.whatsappService.sendBotReply(user.phone, { text: messageText });
+      // 5. Enviar template de notificación (fuera de ventana 24h)
+      const userName = user.name || 'usuario';
+      const jobCount = String(searchResult.jobs.length);
+      const roleName = user.profile?.role || 'tu perfil';
 
-      // 7. Actualizar lastNotification en AlertPreference
+      await this.whatsappService.sendTemplateMessage(
+        user.phone,
+        'job_alert_notification',  // Nombre del template aprobado
+        'es_CO',                   // Idioma
+        [userName, jobCount, roleName]  // Variables: {{1}}, {{2}}, {{3}}
+      );
+
+      // 6. Actualizar lastNotification en AlertPreference  
       await this.prisma.alertPreference.updateMany({
         where: { userId },
         data: {
@@ -452,7 +458,7 @@ Te volveré a notificar cuando encuentre algo interesante. ✨`;
         },
       });
 
-      this.logger.log(`✅ Usuario ${userId} notificado con ${searchResult.jobs.length} ofertas (usos restantes: ${usageCheck.usesLeft})`);
+      this.logger.log(`✅ Usuario ${userId} notificado via template con ${searchResult.jobs.length} ofertas pendientes`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`❌ Error en runJobSearchAndNotifyUser para ${userId}: ${errorMessage}`);

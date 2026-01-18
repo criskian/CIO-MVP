@@ -131,6 +131,59 @@ export class CloudApiProvider implements IWhatsappProvider {
   }
 
   /**
+   * Envía un mensaje de template de WhatsApp
+   * Usado para notificaciones fuera de la ventana de 24 horas
+   */
+  async sendTemplateMessage(
+    to: string,
+    templateName: string,
+    languageCode: string,
+    bodyParams: string[]
+  ): Promise<void> {
+    try {
+      const url = `${this.apiUrl}/${this.phoneNumberId}/messages`;
+      const formattedTo = to.startsWith('+') ? to : `+${to}`;
+
+      this.logger.debug(`📤 Enviando template "${templateName}" a ${formattedTo}`);
+
+      const messageBody = {
+        messaging_product: 'whatsapp',
+        to: formattedTo,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          components: [
+            {
+              type: 'body',
+              parameters: bodyParams.map(text => ({ type: 'text', text }))
+            }
+          ]
+        }
+      };
+
+      await axios.post(url, messageBody, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.accessToken}`,
+        },
+        timeout: 15000,
+      });
+
+      this.logger.log(`✅ Template "${templateName}" enviado a ${formattedTo}`);
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      if (error?.response?.data) {
+        this.logger.error(`❌ Error enviando template: ${JSON.stringify(error.response.data, null, 2)}`);
+      }
+
+      this.logger.error(`Error enviando template: ${errorMessage}`);
+      throw error;
+    }
+  }
+
+  /**
    * Normaliza el payload de Cloud API al formato interno
    * Soporta mensajes de texto, interactivos (botones/listas), imágenes y documentos
    */

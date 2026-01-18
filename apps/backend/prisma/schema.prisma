@@ -41,12 +41,13 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relaciones existentes
-  profile       UserProfile?
-  sessions      Session[]
-  alert         AlertPreference?
-  searchLogs    JobSearchLog[]
-  sentJobs      SentJob[]
-  chatMessages  ChatMessage[]
+  profile         UserProfile?
+  sessions        Session[]
+  alert           AlertPreference?
+  searchLogs      JobSearchLog[]
+  sentJobs        SentJob[]
+  chatMessages    ChatMessage[]
+  pendingAlerts   PendingJobAlert[]
   
   // Nuevas relaciones para sistema de planes
   subscription  Subscription?
@@ -256,3 +257,21 @@ model AdminUser {
   @@map("admin_users")
 }
 
+// ==========================================
+// MODELO DE ALERTAS PENDIENTES (TEMPLATES)
+// ==========================================
+
+model PendingJobAlert {
+  id        String    @id @default(cuid())
+  userId    String
+  jobs      Json      // Array de ofertas encontradas
+  jobCount  Int       // Número de ofertas
+  createdAt DateTime  @default(now())
+  viewedAt  DateTime? // Cuándo el usuario pidió ver las ofertas
+  sentAt    DateTime? // Cuándo se le enviaron las ofertas
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, viewedAt])
+  @@map("pending_job_alerts")
+}
