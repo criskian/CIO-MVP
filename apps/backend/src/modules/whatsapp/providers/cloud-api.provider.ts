@@ -133,19 +133,29 @@ export class CloudApiProvider implements IWhatsappProvider {
   /**
    * Envía un mensaje de template de WhatsApp
    * Usado para notificaciones fuera de la ventana de 24 horas
+   * 
+   * @param to - Número de teléfono destino
+   * @param templateName - Nombre del template aprobado en Meta
+   * @param languageCode - Código de idioma (ej: 'es_CO')
+   * @param bodyParams - Parámetros para el body del template
+   * @param buttonPayload - Payload opcional para botones Quick Reply (por defecto: 'SEARCH_NOW')
    */
   async sendTemplateMessage(
     to: string,
     templateName: string,
     languageCode: string,
-    bodyParams: string[]
+    bodyParams: string[],
+    buttonPayload: string = 'SEARCH_NOW'
   ): Promise<void> {
     try {
       const url = `${this.apiUrl}/${this.phoneNumberId}/messages`;
-      const formattedTo = to.startsWith('+') ? to : `+${to}`;
+      // Formato correcto: sin + al inicio para la API de WhatsApp
+      const formattedTo = to.replace(/^\+/, '');
 
       this.logger.debug(`📤 Enviando template "${templateName}" a ${formattedTo}`);
 
+      // Estructura del mensaje según documentación oficial de Meta
+      // https://developers.facebook.com/docs/whatsapp/cloud-api/guides/send-message-templates
       const messageBody = {
         messaging_product: 'whatsapp',
         to: formattedTo,
@@ -154,15 +164,30 @@ export class CloudApiProvider implements IWhatsappProvider {
           name: templateName,
           language: { code: languageCode },
           components: [
+            // Componente BODY con los parámetros variables
             {
               type: 'body',
               parameters: bodyParams.map(text => ({ type: 'text', text }))
+            },
+            // Componente BUTTON para Quick Reply (requerido para templates con botones)
+            {
+              type: 'button',
+              sub_type: 'quick_reply',
+              index: '0',
+              parameters: [
+                {
+                  type: 'payload',
+                  payload: buttonPayload
+                }
+              ]
             }
           ]
         }
       };
 
-      await axios.post(url, messageBody, {
+      this.logger.debug(`📤 Request body: ${JSON.stringify(messageBody, null, 2)}`);
+
+      const response = await axios.post(url, messageBody, {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.accessToken}`,
@@ -170,7 +195,17 @@ export class CloudApiProvider implements IWhatsappProvider {
         timeout: 15000,
       });
 
-      this.logger.log(`✅ Template "${templateName}" enviado a ${formattedTo}`);
+      // Log completo de respuesta de Meta para debug
+      this.logger.log(`📨 Respuesta de Meta: ${JSON.stringify(response.data, null, 2)}`);
+
+      // Verificar si el mensaje fue aceptado
+      if (response.data?.messages?.[0]?.id) {
+        this.logger.log(`✅ Template "${templateName}" enviado exitosamente. Message ID: ${response.data.messages[0].id}`);
+      } else if (response.data?.error) {
+        this.logger.error(`⚠️ Meta devolvió error en respuesta: ${JSON.stringify(response.data.error)}`);
+      } else {
+        this.logger.log(`✅ Template "${templateName}" enviado a ${formattedTo}`);
+      }
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
