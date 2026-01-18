@@ -154,7 +154,7 @@ export class WhatsappService {
       if (delayedMessage) {
         const delayMs = delayedMessage.delayMs || 60000; // Default 1 minuto
         this.logger.log(`⏰ Programando mensaje retrasado para ${to} en ${delayMs / 1000} segundos`);
-        
+
         setTimeout(async () => {
           try {
             const delayedReply: BotReply = {
@@ -174,6 +174,26 @@ export class WhatsappService {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
       this.logger.error(`❌ Error enviando mensaje a ${to}: ${errorMessage}`, errorStack);
+      throw error;
+    }
+  }
+
+  /**
+   * Envía un mensaje de template de WhatsApp
+   * Usado para notificaciones de alerta fuera de la ventana de 24 horas
+   */
+  async sendTemplateMessage(
+    to: string,
+    templateName: string,
+    languageCode: string,
+    bodyParams: string[]
+  ): Promise<void> {
+    try {
+      await this.cloudApiProvider.sendTemplateMessage(to, templateName, languageCode, bodyParams);
+      this.logger.log(`✅ Template "${templateName}" enviado a ${to}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`❌ Error enviando template a ${to}: ${errorMessage}`);
       throw error;
     }
   }

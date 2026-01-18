@@ -5,6 +5,7 @@ import {
     ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 import {
     UpdateUserDto,
     UpdateSubscriptionDto,
@@ -19,7 +20,10 @@ import {
 export class AdminService {
     private readonly logger = new Logger(AdminService.name);
 
-    constructor(private readonly prisma: PrismaService) { }
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly whatsappService: WhatsappService,
+    ) { }
 
     // ==============================
     // USUARIOS
@@ -402,5 +406,30 @@ export class AdminService {
         d.setDate(diff);
         d.setHours(0, 0, 0, 0);
         return d;
+    }
+
+    // ==============================
+    // TEST (TEMPORAL)
+    // ==============================
+
+    /**
+     * [TEMPORAL] Envía un template de prueba para verificar integración
+     */
+    async sendTestTemplate(
+        phone: string,
+        name: string,
+        jobCount: string,
+        role: string,
+    ): Promise<void> {
+        this.logger.log(`🧪 Enviando template de prueba a ${phone}`);
+
+        await this.whatsappService.sendTemplateMessage(
+            phone,
+            'job_alert_notification',
+            'es_CO',
+            [name, jobCount, role]
+        );
+
+        this.logger.log(`✅ Template de prueba enviado a ${phone}`);
     }
 }

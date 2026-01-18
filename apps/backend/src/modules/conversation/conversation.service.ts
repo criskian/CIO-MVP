@@ -735,6 +735,43 @@ Te enviaré ofertas nuevas directamente a este chat según tu configuración.`;
 
     // Detectar intención de buscar empleos
     if (intent === UserIntent.SEARCH_NOW) {
+      // PRIMERO: Verificar si hay alertas pendientes de un template notification
+      const pendingAlert = await this.prisma.pendingJobAlert.findFirst({
+        where: {
+          userId,
+          viewedAt: null,  // Aún no vistas
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (pendingAlert) {
+        // Hay ofertas pendientes del template → enviarlas
+        this.logger.log(`📬 Usuario ${userId} tiene ${pendingAlert.jobCount} ofertas pendientes`);
+
+        // Marcar como vistas
+        await this.prisma.pendingJobAlert.update({
+          where: { id: pendingAlert.id },
+          data: { viewedAt: new Date() },
+        });
+
+        // Formatear y enviar ofertas
+        const jobs = pendingAlert.jobs as any[];
+        const formattedJobs = jobs.map((job: any, index: number) => {
+          return `*${index + 1}. ${job.title}*\n` +
+            `🏢 ${job.company || 'Empresa confidencial'}\n` +
+            `📍 ${job.location || 'Sin ubicación'}\n` +
+            `🔗 ${job.url}`;
+        }).join('\n\n');
+
+        // Marcar ofertas como enviadas (evitar duplicados en futuras búsquedas)
+        await this.jobSearchService.markJobsAsSent(userId, jobs);
+
+        return {
+          text: `🎯 *¡Aquí están tus ofertas de empleo!*\n\n${formattedJobs}\n\n💡 _Recuerda: aplicar a vacantes buenas es mejor que aplicar masivamente._`
+        };
+      }
+
+      // No hay alertas pendientes → hacer búsqueda normal
       // Verificar usos disponibles antes de buscar
       const usageCheck = await this.checkAndDeductUsage(userId, 'search');
 
