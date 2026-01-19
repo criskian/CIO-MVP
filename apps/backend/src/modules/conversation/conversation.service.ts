@@ -759,7 +759,7 @@ Te enviaré ofertas nuevas directamente a este chat según tu configuración.`;
         const formattedJobs = jobs.map((job: any, index: number) => {
           return `*${index + 1}. ${job.title}*\n` +
             `🏢 ${job.company || 'Empresa confidencial'}\n` +
-            `📍 ${job.location || 'Sin ubicación'}\n` +
+            `📍 ${job.locationRaw || 'Sin ubicación'}\n` +
             `🔗 ${job.url}`;
         }).join('\n\n');
 
