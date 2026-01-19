@@ -333,6 +333,24 @@ export class CloudApiProvider implements IWhatsappProvider {
           mediaUrl = message.document?.id;
           break;
 
+        case 'button':
+          // Respuesta de botón Quick Reply de un template
+          // Estructura: { "button": { "payload": "SEARCH_NOW", "text": "Ver ofertas ahora" } }
+          const buttonPayload = message.button?.payload;
+          const buttonText = message.button?.text;
+
+          // Mapear payloads conocidos a intents/comandos
+          if (buttonPayload === 'SEARCH_NOW') {
+            text = 'ver ofertas'; // Esto dispara el intent SEARCH_NOW
+          } else if (buttonPayload) {
+            text = buttonPayload; // Usar el payload directamente
+          } else {
+            text = buttonText; // Fallback al texto del botón
+          }
+
+          this.logger.debug(`🔘 Quick Reply de template - Payload: ${buttonPayload}, Texto: ${buttonText}, Extraído: ${text}`);
+          break;
+
         default:
           this.logger.warn(`Tipo de mensaje no soportado: ${messageType}`);
       }
@@ -342,7 +360,9 @@ export class CloudApiProvider implements IWhatsappProvider {
         text,
         mediaUrl,
         messageType:
-          messageType === 'interactive' ? 'text' : (messageType as 'text' | 'image' | 'document'),
+          messageType === 'interactive' || messageType === 'button'
+            ? 'text'
+            : (messageType as 'text' | 'image' | 'document'),
         timestamp,
         messageId,
         raw: payload,
