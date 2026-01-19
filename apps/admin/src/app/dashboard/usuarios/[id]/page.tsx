@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Crown, RotateCcw, Trash2, Edit } from 'lucide-react';
+import { ArrowLeft, Crown, RotateCcw, Trash2, Edit, MessageCircle } from 'lucide-react';
 import {
   getUserById,
   activatePremium,
@@ -126,6 +126,13 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
         subtitle={formatPhone(user.phone)}
         actions={
           <div className="flex gap-2">
+            <Button
+              variant="primary"
+              onClick={() => router.push(`/dashboard/conversaciones/${params.id}`)}
+            >
+              <MessageCircle size={20} className="mr-2" />
+              Ver Conversación
+            </Button>
             <Button variant="secondary" onClick={() => setIsEditModalOpen(true)}>
               <Edit size={20} className="mr-2" />
               Editar

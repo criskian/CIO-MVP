@@ -26,7 +26,7 @@ export default function ConversacionesPage() {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       const response = await fetch(`${API_URL}/chat-history/conversations?limit=100`);
-      
+
       if (!response.ok) {
         throw new Error('Error al cargar conversaciones');
       }
@@ -41,11 +41,13 @@ export default function ConversacionesPage() {
     }
   };
 
-  const filteredConversations = conversations.filter(
-    (conv) =>
-      conv.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      conv.phone.includes(searchTerm)
-  );
+  const filteredConversations = conversations
+    .filter(
+      (conv) =>
+        conv.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        conv.phone.includes(searchTerm)
+    )
+    .sort((a, b) => new Date(b.lastMessageDate).getTime() - new Date(a.lastMessageDate).getTime());
 
   const formatDate = (date: Date) => {
     const d = new Date(date);
@@ -59,7 +61,7 @@ export default function ConversacionesPage() {
     if (diffMins < 60) return `Hace ${diffMins}m`;
     if (diffHours < 24) return `Hace ${diffHours}h`;
     if (diffDays < 7) return `Hace ${diffDays}d`;
-    
+
     return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
   };
 
@@ -127,9 +129,9 @@ export default function ConversacionesPage() {
                       {formatDate(conv.lastMessageDate)}
                     </span>
                   </div>
-                  
+
                   <p className="text-sm text-gray-600 mb-1">{conv.phone}</p>
-                  
+
                   <p className="text-sm text-gray-500 truncate">
                     {conv.lastMessage || 'Sin mensajes'}
                   </p>
