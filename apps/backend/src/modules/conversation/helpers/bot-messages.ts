@@ -487,17 +487,29 @@ Tu pago ha sido *confirmado exitosamente*.
 🔗 *Enlace de pago:* ${WOMPI_CHECKOUT_LINK}`,
 
   // Límite semanal de premium alcanzado
-  PREMIUM_WEEKLY_LIMIT_REACHED: `⏳ Has alcanzado tu límite de 5 búsquedas esta semana.
+  PREMIUM_WEEKLY_LIMIT_REACHED: (resetDate: Date) => {
+    const options: Intl.DateTimeFormatOptions = {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    };
+    const formattedDate = resetDate.toLocaleDateString('es-CO', options);
+
+    return `⏳ *Has alcanzado tu límite de 5 búsquedas esta semana.*
 
 Recuerda que tu plan incluye *20 búsquedas al mes* (5 por semana).
 
-💡 _Aplicar a vacantes buenas es mejor que aplicar masivamente._
+📅 *Tus búsquedas se renovarán el ${formattedDate}*
 
-Tus búsquedas se renovarán en *7 días* desde tu última renovación.
+💡 _Aplicar a vacantes buenas es mejor que aplicar masivamente._
 
 Mientras tanto, puedes:
 • Revisar las ofertas que ya te enviamos
-• Editar tu perfil para mejores resultados la próxima semana`,
+• Editar tu perfil con *"editar"* para mejores resultados`;
+  },
 
   // Email inválido
   ERROR_EMAIL_INVALID: `Por favor, ingresa un correo electrónico válido.

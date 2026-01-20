@@ -1502,6 +1502,49 @@ Selecciona qué quieres editar:`,
    * Estado FREEMIUM_EXPIRED: El usuario agotó su freemium
    */
   private async handleFreemiumExpiredState(userId: string, text: string): Promise<BotReply> {
+    // PRIMERO: Si el usuario hace clic en "ver ofertas" y tiene alertas pendientes, mostrarlas
+    const intent = detectIntent(text);
+    if (intent === UserIntent.SEARCH_NOW) {
+      const pendingAlert = await this.prisma.pendingJobAlert.findFirst({
+        where: {
+          userId,
+          viewedAt: null,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (pendingAlert) {
+        this.logger.log(`📬 Usuario ${userId} (FREEMIUM_EXPIRED) tiene ${pendingAlert.jobCount} ofertas pendientes`);
+
+        // Marcar como vistas
+        await this.prisma.pendingJobAlert.update({
+          where: { id: pendingAlert.id },
+          data: { viewedAt: new Date() },
+        });
+
+        // Formatear ofertas
+        const jobs = pendingAlert.jobs as any[];
+        const formattedJobs = jobs.map((job: any, index: number) => {
+          return `*${index + 1}. ${job.title}*\n` +
+            `🏢 ${job.company || 'Empresa confidencial'}\n` +
+            `📍 ${job.locationRaw || 'Sin ubicación'}\n` +
+            `🔗 ${job.url}`;
+        }).join('\n\n');
+
+        // Marcar ofertas como enviadas
+        await this.jobSearchService.markJobsAsSent(userId, jobs);
+
+        // Si el usuario tiene usos disponibles, volver a READY
+        if (await this.checkIfUserHasUsesAvailable(userId)) {
+          await this.updateSessionState(userId, ConversationState.READY);
+        }
+
+        return {
+          text: `🎯 *¡Aquí están tus ofertas de empleo!*\n\n${formattedJobs}\n\n💡 _Recuerda: aplicar a vacantes buenas es mejor que aplicar masivamente._`
+        };
+      }
+    }
+
     // Verificar si el admin añadió usos mientras estaba en este estado
     if (await this.checkIfUserHasUsesAvailable(userId)) {
       this.logger.log(`🔄 Usuario ${userId} recuperó usos, volviendo a READY`);
@@ -1788,9 +1831,12 @@ Selecciona qué quieres editar:`,
         return { allowed: true, usesLeft: newUsesLeft };
       }
 
+      // Calcular fecha de reinicio (7 días desde premiumWeekStart)
+      const resetDate = new Date(weekStart!.getTime() + 7 * 24 * 60 * 60 * 1000);
+
       return {
         allowed: false,
-        message: BotMessages.PREMIUM_WEEKLY_LIMIT_REACHED,
+        message: BotMessages.PREMIUM_WEEKLY_LIMIT_REACHED(resetDate),
       };
     }
 
