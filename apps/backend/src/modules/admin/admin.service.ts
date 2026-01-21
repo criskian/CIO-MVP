@@ -309,6 +309,19 @@ export class AdminService {
             },
         });
 
+        // Reactivar alertas si el usuario las tenía configuradas
+        const alertPref = await this.prisma.alertPreference.findUnique({
+            where: { userId }
+        });
+
+        if (alertPref && !alertPref.enabled) {
+            await this.prisma.alertPreference.update({
+                where: { userId },
+                data: { enabled: true }
+            });
+            this.logger.log(`🔔 Alertas reactivadas para usuario ${userId}`);
+        }
+
         this.logger.log(`👑 Premium activado para usuario: ${userId} (expira: ${premiumEndDate.toISOString()})`);
         return subscription;
     }
