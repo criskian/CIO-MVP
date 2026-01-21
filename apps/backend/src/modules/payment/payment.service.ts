@@ -187,6 +187,19 @@ export class PaymentService {
             },
         });
 
+        // Reactivar alertas si el usuario las tenía configuradas
+        const alertPref = await this.prisma.alertPreference.findUnique({
+            where: { userId: user.id }
+        });
+
+        if (alertPref && !alertPref.enabled) {
+            await this.prisma.alertPreference.update({
+                where: { userId: user.id },
+                data: { enabled: true }
+            });
+            this.logger.log(`🔔 Alertas reactivadas para usuario ${user.id}`);
+        }
+
         this.logger.log(`🎉 Usuario ${user.id} (${user.phone}) activado como PREMIUM automáticamente`);
         try {
             await this.whatsappService.sendBotReply(user.phone, {
