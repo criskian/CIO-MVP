@@ -8,6 +8,8 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // Configuración para evitar agotamiento de conexiones
+  // Usar DATABASE_URL con parámetros: ?pgbouncer=true&connection_limit=5
 }
 
 // ==========================================
