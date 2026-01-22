@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, User, Phone, Calendar, MessageSquare } from 'lucide-react';
+import { ArrowLeft, User, Phone, Calendar, MessageSquare, ExternalLink } from 'lucide-react';
+import { getUserById, getChatHistory, getChatStats } from '@/lib/api';
 
 interface ChatMessage {
   id: string;
@@ -54,29 +55,18 @@ export default function ConversacionDetailPage() {
 
   const fetchData = async () => {
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      
       // Cargar mensajes, info del usuario y estadísticas en paralelo
-      const [messagesRes, statsRes, userRes] = await Promise.all([
-        fetch(`${API_URL}/chat-history/user/${userId}?limit=500`),
-        fetch(`${API_URL}/chat-history/user/${userId}/stats`),
-        fetch(`${API_URL}/users/${userId}`),
+      const [messagesData, statsData, userData] = await Promise.all([
+        getChatHistory(userId, 500),
+        getChatStats(userId),
+        getUserById(userId),
       ]);
-
-      if (!messagesRes.ok || !statsRes.ok) {
-        throw new Error('Error al cargar datos');
-      }
-
-      const messagesData = await messagesRes.json();
-      const statsData = await statsRes.json();
       
       setMessages(messagesData);
       setStats(statsData);
-
-      if (userRes.ok) {
-        const userData = await userRes.json();
-        setUserInfo(userData);
-      }
+      setUserInfo(userData);
+      
+      console.log('📊 Datos del usuario recibidos:', userData);
     } catch (error) {
       console.error('Error:', error);
       alert('Error al cargar la conversación');
@@ -177,6 +167,16 @@ export default function ConversacionDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Botón Ver Perfil */}
+          <button
+            onClick={() => router.push(`/dashboard/usuarios/${userId}`)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+          >
+            <User className="w-4 h-4" />
+            <span>Ver Perfil</span>
+            <ExternalLink className="w-3 h-3" />
+          </button>
         </div>
       </div>
 
@@ -249,27 +249,18 @@ export default function ConversacionDetailPage() {
 
       {/* Footer - Info adicional */}
       <div className="bg-white border-t border-gray-200 px-4 py-3">
-        <div className="max-w-4xl mx-auto flex items-center justify-between text-sm text-gray-600">
-          <div className="flex items-center gap-4">
-            {userInfo?.email && (
-              <span className="flex items-center gap-1">
-                📧 {userInfo.email}
-              </span>
-            )}
-            {userInfo?.createdAt && (
-              <span className="flex items-center gap-1">
-                <Calendar className="w-4 h-4" />
-                Registrado: {new Date(userInfo.createdAt).toLocaleDateString('es-CO')}
-              </span>
-            )}
-          </div>
-          
-          <button
-            onClick={() => router.push(`/dashboard/usuarios/${userId}`)}
-            className="text-blue-600 hover:text-blue-700 font-medium"
-          >
-            Ver perfil completo →
-          </button>
+        <div className="max-w-4xl mx-auto flex items-center justify-center gap-4 text-sm text-gray-600">
+          {userInfo?.email && (
+            <span className="flex items-center gap-1">
+              📧 {userInfo.email}
+            </span>
+          )}
+          {userInfo?.createdAt && (
+            <span className="flex items-center gap-1">
+              <Calendar className="w-4 h-4" />
+              Registrado: {new Date(userInfo.createdAt).toLocaleDateString('es-CO')}
+            </span>
+          )}
         </div>
       </div>
     </div>

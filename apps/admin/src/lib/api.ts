@@ -182,5 +182,16 @@ export async function getStats(): Promise<Stats> {
   return data;
 }
 
+// Chat History
+export async function getChatHistory(userId: string, limit: number = 500) {
+  const { data } = await api.get(`/chat-history/user/${userId}?limit=${limit}`);
+  return data;
+}
+
+export async function getChatStats(userId: string) {
+  const { data } = await api.get(`/chat-history/user/${userId}/stats`);
+  return data;
+}
+
 export default api;
 
