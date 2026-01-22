@@ -14,7 +14,7 @@ export const BotMessages = {
   // Bienvenida (usada internamente, ya no se muestra sola)
   WELCOME: `¡Hola! 👋 Soy *CIO, tu Cazador Inteligente de Ofertas* by ALMIA.
 
-Estás usando la *versión Free*: Estoy aquí para ayudarte a encontrar las *mejores ofertas de empleo en Colombia*, de forma rápida y personalizada. Conmigo podrás:
+Estás usando la *versión Free*: Estoy aquí para ayudarte a encontrar las *mejores ofertas de empleo en Latam*, de forma rápida y personalizada. Conmigo podrás:
 
 ✨ Buscar empleos ajustados a tu perfil
 ✨ Recibir alertas diarias según tus intereses
@@ -32,7 +32,7 @@ El registro es *gratis* y solo toma unos segundos. Una vez registrado, podrás c
   // Bienvenida para usuario registrado (primera vez en el chat)
   WELCOME_REGISTERED: (name: string) => `¡Hola *${name}*! 👋 Bienvenido a CIO, tu Cazador Inteligente de Ofertas.
 
-Estás usando la *versión Free*: Estoy aquí para ayudarte a encontrar las *mejores ofertas de empleo en Colombia* 🇨🇴, de forma rápida y personalizada.
+Estás usando la *versión Free*: Estoy aquí para ayudarte a encontrar las *mejores ofertas de empleo en Latam*, de forma rápida y personalizada.
 
 ✨ *Incluye:*
 • 3 búsquedas personalizadas GRATIS

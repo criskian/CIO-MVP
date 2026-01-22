@@ -757,10 +757,11 @@ Te enviaré ofertas nuevas directamente a este chat según tu configuración.`;
         // Formatear y enviar ofertas
         const jobs = pendingAlert.jobs as any[];
         const formattedJobs = jobs.map((job: any, index: number) => {
+          const cleanUrl = this.jobSearchService.cleanJobUrl(job.url);
           return `*${index + 1}. ${job.title}*\n` +
             `🏢 ${job.company || 'Empresa confidencial'}\n` +
             `📍 ${job.locationRaw || 'Sin ubicación'}\n` +
-            `🔗 ${job.url}`;
+            `🔗 ${cleanUrl}`;
         }).join('\n\n');
 
         // Marcar ofertas como enviadas (evitar duplicados en futuras búsquedas)
@@ -1525,10 +1526,11 @@ Selecciona qué quieres editar:`,
         // Formatear ofertas
         const jobs = pendingAlert.jobs as any[];
         const formattedJobs = jobs.map((job: any, index: number) => {
+          const cleanUrl = this.jobSearchService.cleanJobUrl(job.url);
           return `*${index + 1}. ${job.title}*\n` +
             `🏢 ${job.company || 'Empresa confidencial'}\n` +
             `📍 ${job.locationRaw || 'Sin ubicación'}\n` +
-            `🔗 ${job.url}`;
+            `🔗 ${cleanUrl}`;
         }).join('\n\n');
 
         // Marcar ofertas como enviadas

@@ -3,7 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function enableAlerts() {
-    const userId = 'cmkl7xsvr001zn5k44pbekgg5';
+    const userId = 'cmjpx4sd000bo7e1c1mb4jcoz';
 
     const updated = await prisma.alertPreference.update({
         where: { userId },

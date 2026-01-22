@@ -1350,7 +1350,7 @@ export class JobSearchService {
    * Limpia una URL removiendo parámetros UTM y referencias a Google Jobs
    * Esto hace los enlaces más cortos y no revela la fuente de búsqueda
    */
-  private cleanJobUrl(url: string): string {
+  public cleanJobUrl(url: string): string {
     try {
       const urlObj = new URL(url);
       
