@@ -20,7 +20,7 @@ interface ChatMessage {
 interface UserInfo {
   id: string;
   phone: string;
-  name: string;
+  name: string | null;
   email: string | null;
   createdAt: string;
 }
