@@ -777,7 +777,19 @@ Te enviaré ofertas nuevas directamente a este chat según tu configuración.`;
       const usageCheck = await this.checkAndDeductUsage(userId, 'search');
 
       if (!usageCheck.allowed) {
-        // Redirigir al flujo de freemium agotado
+        // Verificar si es usuario premium sin búsquedas semanales
+        const subscription = await this.prisma.subscription.findUnique({
+          where: { userId },
+        });
+
+        if (subscription?.plan === 'PREMIUM' && subscription?.status === 'ACTIVE') {
+          // Usuario premium que alcanzó límite semanal: NO cambiar estado
+          // Solo mostrar el mensaje de espera y quedarse en READY
+          this.logger.log(`⏳ Usuario premium ${userId} alcanzó límite semanal, mostrando mensaje de espera`);
+          return { text: usageCheck.message || 'Has alcanzado tu límite semanal de búsquedas.' };
+        }
+
+        // Usuario freemium agotado: redirigir al flujo de pago
         await this.updateSessionState(userId, ConversationState.FREEMIUM_EXPIRED);
 
         // Guardar timestamp para el recordatorio de 23 horas
@@ -1547,7 +1559,41 @@ Selecciona qué quieres editar:`,
       }
     }
 
-    // Verificar si el admin añadió usos mientras estaba en este estado
+    // Verificar el tipo de suscripción
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+    });
+
+    // Si es usuario PREMIUM activo, NO debería estar aquí - devolverlo a READY
+    if (subscription?.plan === 'PREMIUM' && subscription?.status === 'ACTIVE') {
+      this.logger.log(`🔄 Usuario premium ${userId} estaba en FREEMIUM_EXPIRED incorrectamente, volviendo a READY`);
+      await this.updateSessionState(userId, ConversationState.READY);
+      
+      // Verificar si tiene búsquedas disponibles o está esperando
+      const weekStart = subscription.premiumWeekStart;
+      const now = new Date();
+      const hasUses = !weekStart || this.isNewWeek(weekStart, now) || subscription.premiumUsesLeft > 0;
+      
+      if (hasUses) {
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        return {
+          text: `🎉 ¡Hola de nuevo, ${user?.name || 'usuario'}! Tienes búsquedas disponibles.
+
+¿Qué te gustaría hacer?
+
+🔍 *"Buscar"* - Encontrar ofertas de empleo
+✏️ *"Editar perfil"* - Modificar tus preferencias
+🔄 *"Reiniciar"* - Comenzar de nuevo
+❌ *"Cancelar servicio"* - Darte de baja`
+        };
+      } else {
+        // Premium sin búsquedas semanales - mostrar mensaje de espera
+        const resetDate = new Date(weekStart!.getTime() + 7 * 24 * 60 * 60 * 1000);
+        return { text: BotMessages.PREMIUM_WEEKLY_LIMIT_REACHED(resetDate) };
+      }
+    }
+
+    // Verificar si el admin añadió usos mientras estaba en este estado (para freemium)
     if (await this.checkIfUserHasUsesAvailable(userId)) {
       this.logger.log(`🔄 Usuario ${userId} recuperó usos, volviendo a READY`);
       await this.updateSessionState(userId, ConversationState.READY);
@@ -1567,7 +1613,7 @@ Selecciona qué quieres editar:`,
       };
     }
 
-    // Transición directa a pedir email
+    // Solo para usuarios freemium: transición a pedir email
     await this.updateSessionState(userId, ConversationState.ASK_EMAIL);
     return { text: BotMessages.FREEMIUM_EXPIRED_ASK_EMAIL };
   }
@@ -1576,6 +1622,37 @@ Selecciona qué quieres editar:`,
    * Estado ASK_EMAIL: Pedir email para vincular pago
    */
   private async handleAskEmailState(userId: string, text: string): Promise<BotReply> {
+    // Verificar si es usuario premium - no debería estar aquí
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+    });
+
+    if (subscription?.plan === 'PREMIUM' && subscription?.status === 'ACTIVE') {
+      this.logger.log(`🔄 Usuario premium ${userId} estaba en ASK_EMAIL incorrectamente, volviendo a READY`);
+      await this.updateSessionState(userId, ConversationState.READY);
+      
+      const weekStart = subscription.premiumWeekStart;
+      const now = new Date();
+      const hasUses = !weekStart || this.isNewWeek(weekStart, now) || subscription.premiumUsesLeft > 0;
+      
+      if (hasUses) {
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        return {
+          text: `🎉 ¡Hola de nuevo, ${user?.name || 'usuario'}! Tienes búsquedas disponibles.
+
+¿Qué te gustaría hacer?
+
+🔍 *"Buscar"* - Encontrar ofertas de empleo
+✏️ *"Editar perfil"* - Modificar tus preferencias
+🔄 *"Reiniciar"* - Comenzar de nuevo
+❌ *"Cancelar servicio"* - Darte de baja`
+        };
+      } else {
+        const resetDate = new Date(weekStart!.getTime() + 7 * 24 * 60 * 60 * 1000);
+        return { text: BotMessages.PREMIUM_WEEKLY_LIMIT_REACHED(resetDate) };
+      }
+    }
+
     // Verificar si el admin añadió usos mientras estaba en este estado
     if (await this.checkIfUserHasUsesAvailable(userId)) {
       this.logger.log(`🔄 Usuario ${userId} recuperó usos, volviendo a READY`);
@@ -1643,6 +1720,37 @@ Selecciona qué quieres editar:`,
    * Estado WAITING_PAYMENT: Usuario esperando confirmación de pago
    */
   private async handleWaitingPaymentState(userId: string, text: string): Promise<BotReply> {
+    // Verificar si es usuario premium - no debería estar aquí
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+    });
+
+    if (subscription?.plan === 'PREMIUM' && subscription?.status === 'ACTIVE') {
+      this.logger.log(`🔄 Usuario premium ${userId} estaba en WAITING_PAYMENT incorrectamente, volviendo a READY`);
+      await this.updateSessionState(userId, ConversationState.READY);
+      
+      const weekStart = subscription.premiumWeekStart;
+      const now = new Date();
+      const hasUses = !weekStart || this.isNewWeek(weekStart, now) || subscription.premiumUsesLeft > 0;
+      
+      if (hasUses) {
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        return {
+          text: `🎉 ¡Hola de nuevo, ${user?.name || 'usuario'}! Tienes búsquedas disponibles.
+
+¿Qué te gustaría hacer?
+
+🔍 *"Buscar"* - Encontrar ofertas de empleo
+✏️ *"Editar perfil"* - Modificar tus preferencias
+🔄 *"Reiniciar"* - Comenzar de nuevo
+❌ *"Cancelar servicio"* - Darte de baja`
+        };
+      } else {
+        const resetDate = new Date(weekStart!.getTime() + 7 * 24 * 60 * 60 * 1000);
+        return { text: BotMessages.PREMIUM_WEEKLY_LIMIT_REACHED(resetDate) };
+      }
+    }
+
     // Verificar si el admin añadió usos mientras estaba en este estado
     if (await this.checkIfUserHasUsesAvailable(userId)) {
       this.logger.log(`🔄 Usuario ${userId} recuperó usos, volviendo a READY`);
