@@ -30,6 +30,7 @@ import {
   normalizeAlertFrequency,
   alertFrequencyToText,
   generateTimeOptions,
+  getFirstName,
 } from './helpers/input-validators';
 
 /**
@@ -295,7 +296,7 @@ export class ConversationService {
       this.logger.log(`👑 Usuario premium ${userId}`);
       await this.updateSessionState(userId, ConversationState.ASK_TERMS);
       return {
-        text: `${BotMessages.WELCOME_BACK_PREMIUM(user.name)}\n\n${BotMessages.ASK_TERMS}`,
+        text: `${BotMessages.WELCOME_BACK_PREMIUM(getFirstName(user.name))}\n\n${BotMessages.ASK_TERMS}`,
         buttons: [
           { id: 'accept_terms', title: 'Acepto' },
           { id: 'reject_terms', title: 'No acepto' },
@@ -308,7 +309,7 @@ export class ConversationService {
       this.logger.log(`⏰ Usuario ${userId} con freemium expirado`);
       await this.updateSessionState(userId, ConversationState.FREEMIUM_EXPIRED);
       return {
-        text: BotMessages.FREEMIUM_EXPIRED_RETURNING_USER(user?.name),
+        text: BotMessages.FREEMIUM_EXPIRED_RETURNING_USER(getFirstName(user?.name)),
         buttons: [
           { id: 'cmd_pagar', title: 'Quiero pagar' },
           { id: 'cmd_ofertas', title: 'Ver ofertas gratis' },
@@ -333,7 +334,7 @@ export class ConversationService {
     await this.updateSessionState(userId, ConversationState.ASK_TERMS);
 
     return {
-      text: `${BotMessages.WELCOME_REGISTERED(user?.name || 'usuario')}\n\n${BotMessages.ASK_TERMS}`,
+      text: `${BotMessages.WELCOME_REGISTERED(getFirstName(user?.name))}\n\n${BotMessages.ASK_TERMS}`,
       buttons: [
         { id: 'accept_terms', title: 'Acepto' },
         { id: 'reject_terms', title: 'No acepto' },
@@ -769,8 +770,8 @@ Te enviaré ofertas nuevas *todos los días* directamente a este chat.
       }
 
       // No hay alertas pendientes → hacer búsqueda normal
-      // Verificar usos disponibles antes de buscar
-      const usageCheck = await this.checkAndDeductUsage(userId, 'search');
+      // Verificar usos disponibles ANTES de buscar (sin descontar)
+      const usageCheck = await this.checkUsageAvailable(userId);
 
       if (!usageCheck.allowed) {
         // Verificar si es usuario premium sin búsquedas semanales
@@ -780,7 +781,6 @@ Te enviaré ofertas nuevas *todos los días* directamente a este chat.
 
         if (subscription?.plan === 'PREMIUM' && subscription?.status === 'ACTIVE') {
           // Usuario premium que alcanzó límite semanal: NO cambiar estado
-          // Solo mostrar el mensaje de espera y quedarse en READY
           this.logger.log(`⏳ Usuario premium ${userId} alcanzó límite semanal, mostrando mensaje de espera`);
           return { text: usageCheck.message || 'Has alcanzado tu límite semanal de búsquedas.' };
         }
@@ -800,20 +800,29 @@ Te enviaré ofertas nuevas *todos los días* directamente a este chat.
         return { text: usageCheck.message || BotMessages.FREEMIUM_EXPIRED };
       }
 
-      // Ejecutar búsqueda y agregar info de usos restantes
+      // Ejecutar búsqueda
       const searchResult = await this.performJobSearch(userId);
 
-      // Agregar info de usos restantes al mensaje
-      if (usageCheck.usesLeft !== undefined) {
+      // SOLO descontar si la búsqueda fue exitosa (no hubo error)
+      // Detectamos el error por el mensaje específico de fallo
+      const isError = searchResult.text?.includes('Lo siento, no pude buscar ofertas');
+      
+      if (!isError) {
+        // Búsqueda exitosa → descontar uso
+        const deduction = await this.deductUsage(userId);
+        
+        // Agregar info de usos restantes al mensaje
         const subscription = await this.prisma.subscription.findUnique({
           where: { userId },
         });
 
         if (subscription?.plan === 'PREMIUM') {
-          searchResult.text += BotMessages.USES_REMAINING_PREMIUM(usageCheck.usesLeft);
+          searchResult.text += BotMessages.USES_REMAINING_PREMIUM(deduction.usesLeft);
         } else {
-          searchResult.text += BotMessages.USES_REMAINING_FREEMIUM(usageCheck.usesLeft);
+          searchResult.text += BotMessages.USES_REMAINING_FREEMIUM(deduction.usesLeft);
         }
+      } else {
+        this.logger.log(`⚠️ Búsqueda falló para usuario ${userId}, no se descuenta uso`);
       }
 
       return searchResult;
@@ -1546,7 +1555,7 @@ Selecciona qué quieres editar:`,
       
       if (hasUses) {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
-        return await this.returnToMainMenu(userId, `🎉 ¡Hola de nuevo, ${user?.name || 'usuario'}! Tienes búsquedas disponibles.`);
+        return await this.returnToMainMenu(userId, `🎉 ¡Hola de nuevo, ${getFirstName(user?.name)}! Tienes búsquedas disponibles.`);
       } else {
         // Premium sin búsquedas semanales - mostrar mensaje de espera
         const resetDate = new Date(weekStart!.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -1562,7 +1571,7 @@ Selecciona qué quieres editar:`,
         where: { id: userId },
         include: { subscription: true }
       });
-      return await this.returnToMainMenu(userId, `🎉 ¡Buenas noticias, ${user?.name || 'usuario'}! Tienes búsquedas disponibles nuevamente.`);
+      return await this.returnToMainMenu(userId, `🎉 ¡Buenas noticias, ${getFirstName(user?.name)}! Tienes búsquedas disponibles nuevamente.`);
     }
 
     // Solo para usuarios freemium: transición a pedir email
@@ -1589,7 +1598,7 @@ Selecciona qué quieres editar:`,
       
       if (hasUses) {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
-        return await this.returnToMainMenu(userId, `🎉 ¡Hola de nuevo, ${user?.name || 'usuario'}! Tienes búsquedas disponibles.`);
+        return await this.returnToMainMenu(userId, `🎉 ¡Hola de nuevo, ${getFirstName(user?.name)}! Tienes búsquedas disponibles.`);
       } else {
         const resetDate = new Date(weekStart!.getTime() + 7 * 24 * 60 * 60 * 1000);
         return { text: BotMessages.PREMIUM_WEEKLY_LIMIT_REACHED(resetDate) };
@@ -1604,7 +1613,7 @@ Selecciona qué quieres editar:`,
         where: { id: userId },
         include: { subscription: true }
       });
-      return await this.returnToMainMenu(userId, `🎉 ¡Buenas noticias, ${user?.name || 'usuario'}! Tienes búsquedas disponibles nuevamente.`);
+      return await this.returnToMainMenu(userId, `🎉 ¡Buenas noticias, ${getFirstName(user?.name)}! Tienes búsquedas disponibles nuevamente.`);
     }
 
     const email = text.trim().toLowerCase();
@@ -1633,7 +1642,7 @@ Selecciona qué quieres editar:`,
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
       return {
-        text: BotMessages.PAYMENT_CONFIRMED(user?.name),
+        text: BotMessages.PAYMENT_CONFIRMED(getFirstName(user?.name)),
       };
     }
 
@@ -1669,7 +1678,7 @@ Selecciona qué quieres editar:`,
       
       if (hasUses) {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
-        return await this.returnToMainMenu(userId, `🎉 ¡Hola de nuevo, ${user?.name || 'usuario'}! Tienes búsquedas disponibles.`);
+        return await this.returnToMainMenu(userId, `🎉 ¡Hola de nuevo, ${getFirstName(user?.name)}! Tienes búsquedas disponibles.`);
       } else {
         const resetDate = new Date(weekStart!.getTime() + 7 * 24 * 60 * 60 * 1000);
         return { text: BotMessages.PREMIUM_WEEKLY_LIMIT_REACHED(resetDate) };
@@ -1684,7 +1693,7 @@ Selecciona qué quieres editar:`,
         where: { id: userId },
         include: { subscription: true }
       });
-      return await this.returnToMainMenu(userId, `🎉 ¡Buenas noticias, ${user?.name || 'usuario'}! Tienes búsquedas disponibles nuevamente.`);
+      return await this.returnToMainMenu(userId, `🎉 ¡Buenas noticias, ${getFirstName(user?.name)}! Tienes búsquedas disponibles nuevamente.`);
     }
 
     const lower = text.toLowerCase().trim();
@@ -1717,7 +1726,7 @@ Selecciona qué quieres editar:`,
         await this.updateSessionState(userId, ConversationState.READY);
 
         return {
-          text: BotMessages.PAYMENT_CONFIRMED(user.name),
+          text: BotMessages.PAYMENT_CONFIRMED(getFirstName(user.name)),
         };
       }
 
@@ -1793,7 +1802,123 @@ Selecciona qué quieres editar:`,
   }
 
   /**
-   * Verifica si el usuario puede usar el servicio y deduce un uso
+   * Verifica si el usuario puede usar el servicio SIN descontar
+   * @returns { allowed: boolean, message?: string, currentUses?: number }
+   */
+  async checkUsageAvailable(
+    userId: string,
+  ): Promise<{ allowed: boolean; message?: string; currentUses?: number }> {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+    });
+
+    // Si no tiene suscripción, puede usar (se creará freemium después)
+    if (!subscription) {
+      return { allowed: true, currentUses: 3 };
+    }
+
+    // PLAN PREMIUM
+    if (subscription.plan === 'PREMIUM' && subscription.status === 'ACTIVE') {
+      const now = new Date();
+      const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
+
+      // Verificar si el plan premium expiró (30 días)
+      if (subscription.premiumEndDate && now > subscription.premiumEndDate) {
+        return { allowed: false, message: BotMessages.PREMIUM_EXPIRED };
+      }
+
+      if (!subscription.premiumEndDate && subscription.premiumStartDate) {
+        const msSinceStart = now.getTime() - subscription.premiumStartDate.getTime();
+        if (msSinceStart > thirtyDaysInMs) {
+          return { allowed: false, message: BotMessages.PREMIUM_EXPIRED };
+        }
+      }
+
+      // Verificar usos semanales
+      const weekStart = subscription.premiumWeekStart;
+      const now2 = new Date();
+
+      if (!weekStart || this.isNewWeek(weekStart, now2)) {
+        return { allowed: true, currentUses: 5 }; // Nueva semana
+      }
+
+      if (subscription.premiumUsesLeft > 0) {
+        return { allowed: true, currentUses: subscription.premiumUsesLeft };
+      }
+
+      const resetDate = new Date(weekStart!.getTime() + 7 * 24 * 60 * 60 * 1000);
+      return { allowed: false, message: BotMessages.PREMIUM_WEEKLY_LIMIT_REACHED(resetDate) };
+    }
+
+    // PLAN FREEMIUM
+    const daysSinceStart = Math.floor(
+      (Date.now() - subscription.freemiumStartDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    if (daysSinceStart >= 3 || subscription.freemiumUsesLeft <= 0) {
+      return { allowed: false, message: BotMessages.FREEMIUM_EXPIRED };
+    }
+
+    return { allowed: true, currentUses: subscription.freemiumUsesLeft };
+  }
+
+  /**
+   * Descuenta un uso del servicio (llamar SOLO después de una operación exitosa)
+   * @returns { usesLeft: number }
+   */
+  async deductUsage(userId: string): Promise<{ usesLeft: number }> {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+    });
+
+    // Si no tiene suscripción, crear una freemium
+    if (!subscription) {
+      await this.prisma.subscription.create({
+        data: {
+          userId,
+          plan: 'FREEMIUM',
+          freemiumUsesLeft: 2, // Ya usó 1
+        },
+      });
+      return { usesLeft: 2 };
+    }
+
+    // PLAN PREMIUM
+    if (subscription.plan === 'PREMIUM' && subscription.status === 'ACTIVE') {
+      const now = new Date();
+      const weekStart = subscription.premiumWeekStart;
+
+      if (!weekStart || this.isNewWeek(weekStart, now)) {
+        await this.prisma.subscription.update({
+          where: { userId },
+          data: {
+            premiumUsesLeft: 4, // 5 - 1 usado
+            premiumWeekStart: now,
+          },
+        });
+        return { usesLeft: 4 };
+      }
+
+      const newUsesLeft = subscription.premiumUsesLeft - 1;
+      await this.prisma.subscription.update({
+        where: { userId },
+        data: { premiumUsesLeft: newUsesLeft },
+      });
+      return { usesLeft: newUsesLeft };
+    }
+
+    // PLAN FREEMIUM
+    const newUsesLeft = subscription.freemiumUsesLeft - 1;
+    await this.prisma.subscription.update({
+      where: { userId },
+      data: { freemiumUsesLeft: newUsesLeft },
+    });
+    return { usesLeft: newUsesLeft };
+  }
+
+  /**
+   * [LEGACY] Verifica si el usuario puede usar el servicio y deduce un uso
+   * NOTA: Usar checkUsageAvailable + deductUsage para mejor control
    * @returns { allowed: boolean, message?: string, usesLeft?: number }
    */
   async checkAndDeductUsage(

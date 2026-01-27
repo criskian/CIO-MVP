@@ -1,5 +1,16 @@
 import { JobType, UserIntent, ExperienceLevel, AlertFrequency } from '../types/conversation-states';
 
+/**
+ * Extrae solo el primer nombre de un nombre completo
+ * Ejemplo: "Cristian Suarez" -> "Cristian"
+ */
+export function getFirstName(fullName: string | null | undefined): string {
+  if (!fullName) return 'usuario';
+  const firstName = fullName.trim().split(/\s+/)[0];
+  // Capitalizar primera letra
+  return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+}
+
 // Detecta si el usuario está en móvil/celular
 export function isMobileDevice(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();

@@ -408,6 +408,198 @@ export class AdminService {
         };
     }
 
+    /**
+     * Obtiene estadísticas detalladas con filtros de fecha
+     */
+    async getDetailedStats(startDate?: Date, endDate?: Date) {
+        const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Últimos 30 días por defecto
+        const end = endDate || new Date();
+
+        const [
+            // Conteos básicos
+            totalUsers,
+            freemiumActive,
+            premiumActive,
+            freemiumExpired,
+            
+            // Conteos en el período
+            newUsersInPeriod,
+            conversionsInPeriod,
+            paymentsInPeriod,
+            
+            // Actividad
+            usersWithSearches,
+            totalJobsSent,
+            
+            // Ingresos
+            totalRevenue,
+        ] = await Promise.all([
+            // Total usuarios
+            this.prisma.user.count(),
+            
+            // Freemium activos
+            this.prisma.subscription.count({
+                where: { plan: 'FREEMIUM', freemiumExpired: false },
+            }),
+            
+            // Premium activos
+            this.prisma.subscription.count({
+                where: { plan: 'PREMIUM', status: 'ACTIVE' },
+            }),
+            
+            // Freemium expirados
+            this.prisma.subscription.count({
+                where: { freemiumExpired: true },
+            }),
+            
+            // Nuevos usuarios en el período
+            this.prisma.user.count({
+                where: { createdAt: { gte: start, lte: end } },
+            }),
+            
+            // Conversiones a premium en el período
+            this.prisma.subscription.count({
+                where: {
+                    plan: 'PREMIUM',
+                    premiumStartDate: { gte: start, lte: end },
+                },
+            }),
+            
+            // Pagos en el período
+            this.prisma.transaction.count({
+                where: {
+                    wompiStatus: 'APPROVED',
+                    createdAt: { gte: start, lte: end },
+                },
+            }),
+            
+            // Usuarios que han buscado (tienen perfil)
+            this.prisma.userProfile.count(),
+            
+            // Total de ofertas enviadas
+            this.prisma.sentJob.count(),
+            
+            // Ingresos totales (transacciones aprobadas)
+            this.prisma.transaction.aggregate({
+                where: { wompiStatus: 'APPROVED' },
+                _sum: { amount: true },
+            }),
+        ]);
+
+        // Calcular tasa de conversión
+        const conversionRate = totalUsers > 0 
+            ? ((premiumActive / totalUsers) * 100).toFixed(1) 
+            : '0';
+
+        // Obtener series de tiempo para gráficos (últimos 30 días)
+        const dailyStats = await this.getDailyStats(start, end);
+
+        return {
+            summary: {
+                totalUsers,
+                freemiumActive,
+                premiumActive,
+                freemiumExpired,
+                conversionRate: parseFloat(conversionRate),
+                totalRevenue: totalRevenue._sum.amount || 0,
+                totalJobsSent,
+                usersWithSearches,
+            },
+            period: {
+                startDate: start.toISOString(),
+                endDate: end.toISOString(),
+                newUsers: newUsersInPeriod,
+                conversions: conversionsInPeriod,
+                payments: paymentsInPeriod,
+            },
+            dailyStats,
+            timestamp: new Date().toISOString(),
+        };
+    }
+
+    /**
+     * Obtiene estadísticas diarias para gráficos
+     */
+    private async getDailyStats(start: Date, end: Date) {
+        const days: { date: string; registros: number; conversiones: number; pagos: number }[] = [];
+        
+        // Iterar por cada día en el rango
+        const currentDate = new Date(start);
+        while (currentDate <= end) {
+            const dayStart = new Date(currentDate);
+            dayStart.setHours(0, 0, 0, 0);
+            
+            const dayEnd = new Date(currentDate);
+            dayEnd.setHours(23, 59, 59, 999);
+
+            const [registros, conversiones, pagos] = await Promise.all([
+                this.prisma.user.count({
+                    where: { createdAt: { gte: dayStart, lte: dayEnd } },
+                }),
+                this.prisma.subscription.count({
+                    where: {
+                        plan: 'PREMIUM',
+                        premiumStartDate: { gte: dayStart, lte: dayEnd },
+                    },
+                }),
+                this.prisma.transaction.count({
+                    where: {
+                        wompiStatus: 'APPROVED',
+                        createdAt: { gte: dayStart, lte: dayEnd },
+                    },
+                }),
+            ]);
+
+            days.push({
+                date: dayStart.toISOString().split('T')[0],
+                registros,
+                conversiones,
+                pagos,
+            });
+
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        return days;
+    }
+
+    /**
+     * Obtiene los usuarios más recientes
+     */
+    async getRecentActivity(limit = 10) {
+        const [recentUsers, recentPayments] = await Promise.all([
+            this.prisma.user.findMany({
+                take: limit,
+                orderBy: { createdAt: 'desc' },
+                select: {
+                    id: true,
+                    name: true,
+                    phone: true,
+                    createdAt: true,
+                    subscription: {
+                        select: { plan: true, status: true },
+                    },
+                },
+            }),
+            this.prisma.transaction.findMany({
+                take: limit,
+                where: { wompiStatus: 'APPROVED' },
+                orderBy: { createdAt: 'desc' },
+                select: {
+                    id: true,
+                    email: true,
+                    amount: true,
+                    createdAt: true,
+                    user: {
+                        select: { name: true, phone: true },
+                    },
+                },
+            }),
+        ]);
+
+        return { recentUsers, recentPayments };
+    }
+
     // ==============================
     // HELPERS
     // ==============================

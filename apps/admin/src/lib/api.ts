@@ -5,6 +5,8 @@ import {
   Subscription,
   Session,
   Stats,
+  DetailedStats,
+  RecentActivity,
   PaginatedResponse,
   LoginCredentials,
   AuthResponse,
@@ -179,6 +181,19 @@ export async function deleteUserSessions(userId: string): Promise<void> {
 
 export async function getStats(): Promise<Stats> {
   const { data } = await api.get<Stats>('/api/admin/stats');
+  return data;
+}
+
+export async function getDetailedStats(startDate?: string, endDate?: string): Promise<DetailedStats> {
+  const params = new URLSearchParams();
+  if (startDate) params.append('startDate', startDate);
+  if (endDate) params.append('endDate', endDate);
+  const { data } = await api.get<DetailedStats>(`/api/admin/stats/detailed?${params.toString()}`);
+  return data;
+}
+
+export async function getRecentActivity(limit = 10): Promise<RecentActivity> {
+  const { data } = await api.get<RecentActivity>(`/api/admin/activity/recent?limit=${limit}`);
   return data;
 }
 

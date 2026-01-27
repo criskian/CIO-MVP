@@ -204,6 +204,33 @@ export class AdminController {
         return this.adminService.getStats();
     }
 
+    /**
+     * GET /api/admin/stats/detailed
+     * Obtiene estadísticas detalladas con filtros de fecha
+     * Query: startDate, endDate (ISO strings)
+     */
+    @Get('stats/detailed')
+    async getDetailedStats(
+        @Query('startDate') startDate?: string,
+        @Query('endDate') endDate?: string,
+    ) {
+        this.logger.log(`📊 Obteniendo estadísticas detalladas`);
+        const start = startDate ? new Date(startDate) : undefined;
+        const end = endDate ? new Date(endDate) : undefined;
+        return this.adminService.getDetailedStats(start, end);
+    }
+
+    /**
+     * GET /api/admin/activity/recent
+     * Obtiene actividad reciente (usuarios y pagos)
+     * Query: limit (number, default 10)
+     */
+    @Get('activity/recent')
+    async getRecentActivity(@Query('limit') limit?: string) {
+        this.logger.log(`📋 Obteniendo actividad reciente`);
+        return this.adminService.getRecentActivity(limit ? parseInt(limit) : 10);
+    }
+
     // ==============================
     // TEST (TEMPORAL)
     // ==============================

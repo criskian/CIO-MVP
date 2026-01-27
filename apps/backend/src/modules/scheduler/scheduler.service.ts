@@ -30,6 +30,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { JobSearchService } from '../job-search/job-search.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
+import { getFirstName } from '../conversation/helpers/input-validators';
 import * as cron from 'node-cron';
 import * as dayjs from 'dayjs';
 import * as utc from 'dayjs/plugin/utc';
@@ -120,7 +121,7 @@ export class SchedulerService implements OnModuleInit {
 
       for (const subscription of usersToRemind) {
         try {
-          const userName = subscription.user?.name;
+          const userName = getFirstName(subscription.user?.name);
           const phone = subscription.user?.phone;
 
           if (!phone) continue;
@@ -544,7 +545,7 @@ export class SchedulerService implements OnModuleInit {
       this.logger.log(`💾 ${searchResult.jobs.length} ofertas guardadas como pendientes para ${userId}`);
 
       // 5. Enviar template de notificación (fuera de ventana 24h)
-      const userName = user.name || 'usuario';
+      const userName = getFirstName(user.name);
       const jobCount = String(searchResult.jobs.length);
       const roleName = user.profile?.role || 'tu perfil';
 
@@ -715,7 +716,7 @@ export class SchedulerService implements OnModuleInit {
 
       if (!user) return;
 
-      const message = `⏰ *Hola${user.name ? ` ${user.name}` : ''}*
+      const message = `⏰ *Hola ${getFirstName(user.name)}*
 
 Tu período de prueba gratuita ha terminado y no puedo seguir enviándote alertas de empleo.
 

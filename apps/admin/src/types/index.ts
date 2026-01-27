@@ -81,6 +81,52 @@ export interface Stats {
   timestamp: string;
 }
 
+export interface DetailedStats {
+  summary: {
+    totalUsers: number;
+    freemiumActive: number;
+    premiumActive: number;
+    freemiumExpired: number;
+    conversionRate: number;
+    totalRevenue: number;
+    totalJobsSent: number;
+    usersWithSearches: number;
+  };
+  period: {
+    startDate: string;
+    endDate: string;
+    newUsers: number;
+    conversions: number;
+    payments: number;
+  };
+  dailyStats: DailyStats[];
+  timestamp: string;
+}
+
+export interface DailyStats {
+  date: string;
+  registros: number;
+  conversiones: number;
+  pagos: number;
+}
+
+export interface RecentActivity {
+  recentUsers: {
+    id: string;
+    name: string | null;
+    phone: string;
+    createdAt: string;
+    subscription: { plan: string; status: string } | null;
+  }[];
+  recentPayments: {
+    id: string;
+    email: string;
+    amount: number;
+    createdAt: string;
+    user: { name: string | null; phone: string } | null;
+  }[];
+}
+
 
 export interface Pagination {
   page: number;

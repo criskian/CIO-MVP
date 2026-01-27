@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { WompiWebhookPayload } from './dto/wompi-webhook.dto';
+import { getFirstName } from '../conversation/helpers/input-validators';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -203,7 +204,7 @@ export class PaymentService {
         this.logger.log(`🎉 Usuario ${user.id} (${user.phone}) activado como PREMIUM automáticamente`);
         try {
             await this.whatsappService.sendBotReply(user.phone, {
-                text: `🎉 *¡Felicidades${user.name ? ', ' + user.name : ''}!*
+                text: `🎉 *¡Felicidades ${getFirstName(user.name)}!*
 
 Tu pago ha sido confirmado exitosamente.
 
@@ -212,11 +213,17 @@ Tu pago ha sido confirmado exitosamente.
 • Alertas personalizadas de empleo
 • Soporte prioritario
 
-💡 _Recuerda: aplicar a vacantes buenas es mejor que aplicar masivamente._
-
-¿Qué te gustaría hacer?
-• Escribe *"buscar"* para encontrar ofertas ahora
-• Escribe *"editar"* para ajustar tus preferencias`,
+💡 _Recuerda: aplicar a vacantes buenas es mejor que aplicar masivamente._`,
+                listTitle: 'Ver opciones',
+                listSections: [
+                    {
+                        title: 'Comandos disponibles',
+                        rows: [
+                            { id: 'cmd_buscar', title: '🔍 Buscar empleos', description: 'Encontrar ofertas ahora' },
+                            { id: 'cmd_editar', title: '✏️ Editar perfil', description: 'Ajustar tus preferencias' },
+                        ],
+                    },
+                ],
             });
             this.logger.log(`📱 Notificación de Premium enviada a ${user.phone}`);
         } catch (error) {
