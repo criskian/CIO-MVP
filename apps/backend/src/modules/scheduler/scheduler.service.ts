@@ -509,7 +509,7 @@ export class SchedulerService implements OnModuleInit {
         this.logger.log(`⏩ Usuario ${userId}: ${usageCheck.reason || 'Sin usos disponibles'}`);
         // Si el plan expiró, opcionalmente notificar al usuario
         if (usageCheck.shouldNotify) {
-          await this.notifyPlanExpired(userId);
+          await this.notifyPlanExpired(userId, usageCheck.plan);
         }
         return;
       }
@@ -706,8 +706,9 @@ export class SchedulerService implements OnModuleInit {
 
   /**
    * Notifica al usuario que su plan expiró
+   * @param expiredPlan - El plan que expiró ('PREMIUM' o 'FREEMIUM')
    */
-  private async notifyPlanExpired(userId: string): Promise<void> {
+  private async notifyPlanExpired(userId: string, expiredPlan?: 'FREEMIUM' | 'PREMIUM'): Promise<void> {
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -716,7 +717,20 @@ export class SchedulerService implements OnModuleInit {
 
       if (!user) return;
 
-      const message = `⏰ *Hola ${getFirstName(user.name)}*
+      // Mensaje diferente según el plan que expiró
+      const isPremiumExpired = expiredPlan === 'PREMIUM';
+
+      const message = isPremiumExpired
+        ? `⏰ *Hola ${getFirstName(user.name)}*
+
+Tu *Plan Premium* ha finalizado después de 30 días.
+
+✨ Para continuar recibiendo ofertas personalizadas, renueva tu *Plan Premium*:
+
+🔗 *Enlace de pago:* ${process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ'}
+
+Una vez realices el pago, escríbeme por este chat para activar tu cuenta.`
+        : `⏰ *Hola ${getFirstName(user.name)}*
 
 Tu período de prueba gratuita ha terminado y no puedo seguir enviándote alertas de empleo.
 
@@ -734,7 +748,7 @@ Una vez realices el pago, escríbeme por este chat para activar tu cuenta.`;
         data: { enabled: false },
       });
 
-      this.logger.log(`📧 Usuario ${userId} notificado de expiración de plan`);
+      this.logger.log(`📧 Usuario ${userId} notificado de expiración de plan ${expiredPlan || 'desconocido'}`);
     } catch (error) {
       this.logger.error(`Error notificando expiración a usuario ${userId}`);
     }
