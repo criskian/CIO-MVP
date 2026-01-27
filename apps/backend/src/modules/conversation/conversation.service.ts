@@ -1493,9 +1493,24 @@ Selecciona qué quieres editar:`,
     if (!subscription) return false;
 
     if (subscription.plan === 'PREMIUM' && subscription.status === 'ACTIVE') {
+      const now = new Date();
+      const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
+
+      // Verificar si el premium expiró por 30 días
+      // CASO 1: Con premiumEndDate
+      if (subscription.premiumEndDate && now > subscription.premiumEndDate) {
+        return false; // Premium expirado
+      }
+      // CASO 2: Sin premiumEndDate pero con premiumStartDate (usuarios antiguos)
+      if (!subscription.premiumEndDate && subscription.premiumStartDate) {
+        const msSinceStart = now.getTime() - subscription.premiumStartDate.getTime();
+        if (msSinceStart > thirtyDaysInMs) {
+          return false; // Premium expirado (usuario antiguo)
+        }
+      }
+
       // Premium activo: verificar si tiene usos o es nueva semana
       const weekStart = subscription.premiumWeekStart;
-      const now = new Date();
       if (!weekStart || this.isNewWeek(weekStart, now)) {
         return true; // Nueva semana = nuevos usos
       }
@@ -1900,8 +1915,10 @@ Selecciona qué quieres editar:`,
     // PLAN PREMIUM
     if (subscription.plan === 'PREMIUM' && subscription.status === 'ACTIVE') {
       const now = new Date();
+      const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
 
       // Verificar si el plan premium expiró (30 días)
+      // CASO 1: Usuarios nuevos con premiumEndDate
       if (subscription.premiumEndDate && now > subscription.premiumEndDate) {
         await this.prisma.subscription.update({
           where: { userId },
@@ -1913,8 +1930,27 @@ Selecciona qué quieres editar:`,
         });
         return {
           allowed: false,
-          message: `⏳ *Tu plan Premium ha expirado.*\n\nHan pasado 30 días desde tu activación.\n\nPara seguir disfrutando de búsquedas ilimitadas, renueva tu plan:\n\n🔗 *Enlace de pago:* ${process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ'}\n\nUna vez realices el pago, escríbeme *"verificar"* para activar tu cuenta.`,
+          message: BotMessages.PREMIUM_EXPIRED,
         };
+      }
+
+      // CASO 2: Usuarios antiguos sin premiumEndDate pero con premiumStartDate
+      if (!subscription.premiumEndDate && subscription.premiumStartDate) {
+        const msSinceStart = now.getTime() - subscription.premiumStartDate.getTime();
+        if (msSinceStart > thirtyDaysInMs) {
+          await this.prisma.subscription.update({
+            where: { userId },
+            data: {
+              status: 'EXPIRED',
+              plan: 'FREEMIUM',
+              freemiumExpired: true,
+            },
+          });
+          return {
+            allowed: false,
+            message: BotMessages.PREMIUM_EXPIRED,
+          };
+        }
       }
 
       // Verificar si es nueva semana (cada 7 días desde premiumWeekStart)

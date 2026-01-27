@@ -58,6 +58,7 @@ export class SchedulerService implements OnModuleInit {
   onModuleInit() {
     this.startJobAlertsCron();
     this.startFreemiumReminderCron();
+    this.startPremiumExpirationCron();
   }
 
   /**
@@ -144,6 +145,111 @@ export class SchedulerService implements OnModuleInit {
       }
     } catch (error) {
       this.logger.error(`❌ Error en sendFreemiumReminders: ${error}`);
+    }
+  }
+
+  /**
+   * Inicia el cron para verificar y expirar usuarios premium que cumplieron 30 días
+   * Se ejecuta 2 veces al día: a medianoche (00:00) y al mediodía (12:00)
+   */
+  private startPremiumExpirationCron() {
+    // Ejecutar a las 00:00 y 12:00 (zona horaria del servidor - Colombia)
+    cron.schedule('0 0,12 * * *', async () => {
+      this.logger.log('⏰ Verificando expiraciones de premium (30 días)...');
+      await this.expirePremiumSubscriptions();
+    });
+
+    this.logger.log('✅ Scheduler de expiración premium iniciado (medianoche y mediodía)');
+  }
+
+  /**
+   * Verifica y expira usuarios premium que cumplieron 30 días desde su activación
+   * Maneja dos casos:
+   * 1. Usuarios nuevos con premiumEndDate poblado
+   * 2. Usuarios antiguos que solo tienen premiumStartDate (sin premiumEndDate)
+   */
+  private async expirePremiumSubscriptions() {
+    try {
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      let totalExpired = 0;
+
+      // CASO 1: Usuarios con premiumEndDate poblado
+      const expiredByEndDate = await this.prisma.subscription.findMany({
+        where: {
+          plan: 'PREMIUM',
+          status: 'ACTIVE',
+          premiumEndDate: {
+            not: null,
+            lte: now,
+          },
+        },
+        include: {
+          user: true,
+        },
+      });
+
+      this.logger.log(`📅 ${expiredByEndDate.length} usuarios con premiumEndDate vencido`);
+
+      for (const subscription of expiredByEndDate) {
+        try {
+          await this.prisma.subscription.update({
+            where: { userId: subscription.userId },
+            data: {
+              status: 'EXPIRED',
+              plan: 'FREEMIUM',
+              freemiumExpired: true,
+            },
+          });
+          totalExpired++;
+          this.logger.log(`⏰ Usuario ${subscription.userId} (${subscription.user?.name}) expirado por premiumEndDate`);
+        } catch (error) {
+          this.logger.error(`❌ Error expirando usuario ${subscription.userId}: ${error}`);
+        }
+      }
+
+      // CASO 2: Usuarios antiguos sin premiumEndDate pero con premiumStartDate > 30 días
+      const expiredByStartDate = await this.prisma.subscription.findMany({
+        where: {
+          plan: 'PREMIUM',
+          status: 'ACTIVE',
+          premiumEndDate: null, // No tienen fecha de expiración
+          premiumStartDate: {
+            not: null,
+            lte: thirtyDaysAgo, // premiumStartDate fue hace más de 30 días
+          },
+        },
+        include: {
+          user: true,
+        },
+      });
+
+      this.logger.log(`📅 ${expiredByStartDate.length} usuarios antiguos sin premiumEndDate (30+ días desde activación)`);
+
+      for (const subscription of expiredByStartDate) {
+        try {
+          await this.prisma.subscription.update({
+            where: { userId: subscription.userId },
+            data: {
+              status: 'EXPIRED',
+              plan: 'FREEMIUM',
+              freemiumExpired: true,
+            },
+          });
+          totalExpired++;
+          this.logger.log(`⏰ Usuario ${subscription.userId} (${subscription.user?.name}) expirado por premiumStartDate (usuario antiguo)`);
+        } catch (error) {
+          this.logger.error(`❌ Error expirando usuario ${subscription.userId}: ${error}`);
+        }
+      }
+
+      if (totalExpired > 0) {
+        this.logger.log(`✅ Se expiraron ${totalExpired} usuarios premium en total`);
+      } else {
+        this.logger.log(`ℹ️ No hay usuarios premium para expirar en este momento`);
+      }
+    } catch (error) {
+      this.logger.error(`❌ Error en expirePremiumSubscriptions: ${error}`);
     }
   }
 

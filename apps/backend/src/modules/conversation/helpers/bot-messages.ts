@@ -410,6 +410,33 @@ Después del pago, solo escríbenos el *correo con el que pagaste* y activamos t
 
 Escríbenos directamente por WhatsApp: *+57 333 239 3280*`,
 
+  // Premium expirado por 30 días
+  PREMIUM_EXPIRED: `*⏰ Tu Plan Premium ha finalizado*
+
+Han pasado 30 días desde la activación de tu Plan Premium.
+
+🚀 *No frenes tu búsqueda ahora.*
+
+Para continuar disfrutando de los beneficios de CIO, renueva tu suscripción:
+
+Por solo *$20.000 COP* tienes acceso por *30 días* a:
+
+✅ Hasta *20 búsquedas de empleo al mes*
+
+✅ *Alertas personalizadas* directo a WhatsApp
+
+✅ Ahorro de horas semanales buscando vacantes
+
+🔐 *Renueva tu Plan Premium aquí por solo $20.000 COP:*
+
+${WOMPI_CHECKOUT_LINK}
+
+Después del pago, solo escríbenos el *correo con el que pagaste* y activamos tu acceso automáticamente.
+
+💬 ¿Tienes dudas o quieres hablar con un humano?
+
+Escríbenos directamente por WhatsApp: *+57 333 239 3280*`,
+
   // Freemium agotado (usuario que vuelve después de cancelar)
   FREEMIUM_EXPIRED_RETURNING_USER: (name?: string | null) => `¡Hola${name ? ` ${name}` : ''}! 👋
 
