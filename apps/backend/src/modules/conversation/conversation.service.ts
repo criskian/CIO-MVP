@@ -483,7 +483,7 @@ export class ConversationService {
 
   /**
    * Estado ASK_LOCATION: Esperando ciudad/ubicación
-   * ACTUALIZADO: Ahora va directamente a READY (sin preguntar jornada ni salario)
+   * ACTUALIZADO: Ahora va a OFFER_ALERTS para preguntar si quiere alertas (antes de poder buscar)
    */
   private async handleAskLocationState(userId: string, text: string): Promise<BotReply> {
     const location = normalizeLocation(text);
@@ -494,21 +494,17 @@ export class ConversationService {
 
     await this.updateUserProfile(userId, { location });
 
-    // [ACTUALIZADO] Flujo: ASK_LOCATION → READY directamente
-    // Ya no se preguntan jornada ni salario (no aportan valor significativo)
-    await this.updateSessionState(userId, ConversationState.READY);
+    // [ACTUALIZADO] Flujo: ASK_LOCATION → OFFER_ALERTS (preguntar si quiere alertas antes de buscar)
+    await this.updateSessionState(userId, ConversationState.OFFER_ALERTS);
 
-    // Obtener usuario para mostrar mensaje de bienvenida
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { name: true },
-    });
-
-    // Mostrar mensaje de onboarding completo con menú interactivo
-    return await this.returnToMainMenu(
-      userId,
-      BotMessages.ONBOARDING_COMPLETE(user?.name || 'usuario'),
-    );
+    // Preguntar si desea recibir alertas con botones interactivos
+    return {
+      text: BotMessages.OFFER_ALERTS,
+      buttons: [
+        { id: 'alerts_yes', title: '✅ Sí, activar' },
+        { id: 'alerts_no', title: '❌ No, gracias' },
+      ],
+    };
   }
 
   // [DESACTIVADO] Handler de ASK_WORK_MODE - Puede reactivarse en el futuro
@@ -659,7 +655,9 @@ export class ConversationService {
 🔔 *Frecuencia:* ${alertFrequencyToText(alertFrequency)}
 ⏰ *Hora:* ${alertTime}
 
-Te enviaré ofertas nuevas directamente a este chat según tu configuración.`;
+Te enviaré ofertas nuevas directamente a este chat según tu configuración.
+
+🎯 *¡Tu perfil está listo!* Ya puedes empezar a buscar ofertas.`;
 
     // Siempre mostrar lista interactiva con comandos
     return {
@@ -892,30 +890,10 @@ Intenta de nuevo más tarde o escribe "reiniciar" para ajustar tus preferencias.
 • Escribir *"editar"* para ajustar tus preferencias y encontrar más opciones`;
       }
 
-      // [NUEVO] Verificar si es la primera búsqueda y no tiene alertas configuradas
-      const alertPreference = await this.prisma.alertPreference.findUnique({
-        where: { userId },
-      });
+      // Tiempo de espera para mensaje retrasado: 10 segundos
+      const DELAY_MS = 10000;
 
-      // Tiempo de espera para mensaje retrasado: 1 minuto = 60000 ms
-      const DELAY_MS = 60000;
-
-      // Si NO tiene alertas configuradas, ofrecer configurarlas después de mostrar resultados
-      if (!alertPreference) {
-        // Cambiar estado a OFFER_ALERTS para preguntar si desea alertas
-        await this.updateSessionState(userId, ConversationState.OFFER_ALERTS);
-
-        // Retornar ofertas ahora, y pregunta de alertas en mensaje retrasado
-        return {
-          text: formattedJobs + exhaustedMessage,
-          delayedMessage: {
-            text: BotMessages.OFFER_ALERTS,
-            delayMs: DELAY_MS,
-          }
-        };
-      }
-
-      // Si ya tiene alertas configuradas, mostrar menú normal en mensaje retrasado
+      // Siempre enviar menú en mensaje retrasado después de mostrar ofertas
       const menuText = `¿Qué quieres hacer ahora?`;
 
       return {
@@ -950,8 +928,8 @@ Por favor intenta de nuevo en unos minutos.`,
   }
 
   /**
-   * Estado OFFER_ALERTS: Pregunta si desea recibir alertas después de primera búsqueda
-   * ACTUALIZADO: Siempre usa botones interactivos
+   * Estado OFFER_ALERTS: Pregunta si desea recibir alertas (durante onboarding)
+   * ACTUALIZADO: Se pregunta antes de la primera búsqueda, no después
    */
   private async handleOfferAlertsState(userId: string, text: string): Promise<BotReply> {
     // Verificar si acepta alertas

@@ -337,24 +337,24 @@ Tu perfil está listo. Puedes:
 
 Escribe el comando que desees.`,
 
-  // Ofrecer alertas después de primera búsqueda
-  OFFER_ALERTS: `¿Te gustaría recibir *alertas automáticas* de empleo? 🔔
+  // Ofrecer alertas durante onboarding (antes de primera búsqueda)
+  OFFER_ALERTS: `¡Ya casi terminamos! 🎯
+
+¿Te gustaría recibir *alertas automáticas* de empleo? 🔔
 
 Si activas las alertas, te enviaré ofertas nuevas directamente a este chat según tus preferencias.
 
 📬 *Beneficios:*
 • No tienes que acordarte de buscar
 • Recibes ofertas frescas automáticamente
-• Puedes elegir la frecuencia (diario, semanal, etc.)
-
-Responde:
-• *"Sí"* o *"Activar"* para configurar alertas
-• *"No"* o *"Sin alertas"* si prefieres buscar manualmente`,
+• Puedes elegir la frecuencia (diario, semanal, etc.)`,
 
   // Confirmación de rechazo de alertas
   ALERTS_DISABLED: `Perfecto, *no activaré las alertas automáticas*. ✅
 
-Puedes buscar ofertas cuando quieras escribiendo *"buscar"*.
+🎯 *¡Tu perfil está listo!*
+
+Ya puedes empezar a buscar ofertas de empleo personalizadas.
 
 _(Si cambias de opinión más adelante, puedes activar las alertas desde el menú de *"editar"*)_`,
 

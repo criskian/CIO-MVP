@@ -1,7 +1,8 @@
 /**
  * Estados de la máquina de conversación
- * Flujo actualizado: NEW → ASK_TERMS → ASK_ROLE → ASK_EXPERIENCE → ASK_LOCATION → READY
- * Después de primera búsqueda: OFFER_ALERTS → (Si acepta) → ASK_ALERT_FREQUENCY → ASK_ALERT_TIME → READY
+ * Flujo de onboarding: NEW → ASK_TERMS → ASK_ROLE → ASK_EXPERIENCE → ASK_LOCATION → OFFER_ALERTS
+ *   → (Si acepta alertas) → ASK_ALERT_FREQUENCY → ASK_ALERT_TIME → READY
+ *   → (Si rechaza alertas) → READY
  * NOTA: ASK_WORK_MODE, ASK_DEVICE, ASK_JOB_TYPE y ASK_MIN_SALARY fueron removidos del flujo
  */
 export enum ConversationState {
@@ -17,8 +18,8 @@ export enum ConversationState {
   // ASK_MIN_SALARY = 'ASK_MIN_SALARY', // [DESACTIVADO] No aporta valor significativo
   READY = 'READY',
   
-  // Estados de configuración de alertas (después de primera búsqueda)
-  OFFER_ALERTS = 'OFFER_ALERTS', // Pregunta si desea recibir alertas después de la primera búsqueda
+  // Estados de configuración de alertas (durante onboarding)
+  OFFER_ALERTS = 'OFFER_ALERTS', // Pregunta si desea recibir alertas (antes de primera búsqueda)
   ASK_ALERT_FREQUENCY = 'ASK_ALERT_FREQUENCY', // Pregunta con qué frecuencia desea alertas
   ASK_ALERT_TIME = 'ASK_ALERT_TIME', // Pregunta a qué hora desea alertas
   

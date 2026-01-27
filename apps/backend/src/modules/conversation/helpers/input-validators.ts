@@ -56,6 +56,8 @@ export function isAcceptance(text: string): boolean {
     's',
     'y',
     'yes',
+    'alerts_yes', // ID de botón para aceptar alertas
+    'accept_alerts', // ID alternativo de botón para aceptar alertas
   ];
 
   return acceptancePatterns.some(
@@ -76,6 +78,8 @@ export function isRejection(text: string): boolean {
     'cancelar',
     'salir',
     'n',
+    'alerts_no', // ID de botón para rechazar alertas
+    'reject_alerts', // ID alternativo de botón para rechazar alertas
   ];
 
   return rejectionPatterns.some(
