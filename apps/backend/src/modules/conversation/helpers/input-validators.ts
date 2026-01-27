@@ -208,7 +208,7 @@ export function detectEditField(
   // | 'modalidad' // [DESACTIVADO] Puede reactivarse en el futuro
   | 'tipo'
   | 'salario'
-  | 'frecuencia'
+  // | 'frecuencia' // [DESACTIVADO] Frecuencia siempre es diaria
   | 'horario'
   | null {
   const normalizedText = text.toLowerCase().trim();
@@ -283,19 +283,11 @@ export function detectEditField(
     return 'salario';
   }
 
-  // Detectar campo "frecuencia de alertas"
-  const frequencyPatterns = [
-    'frecuencia',
-    'cada cuanto',
-    'cada cuánto',
-    'periodicidad',
-    'diario',
-    'semanal',
-    'mensual',
-  ];
-  if (frequencyPatterns.some((pattern) => normalizedText.includes(pattern))) {
-    return 'frecuencia';
-  }
+  // [DESACTIVADO] Detectar campo "frecuencia de alertas" - Frecuencia siempre es diaria
+  // const frequencyPatterns = ['frecuencia', 'cada cuanto', 'cada cuánto', 'periodicidad'];
+  // if (frequencyPatterns.some((pattern) => normalizedText.includes(pattern))) {
+  //   return 'frecuencia';
+  // }
 
   // Detectar campo "horario de alertas"
   const alertTimePatterns = [

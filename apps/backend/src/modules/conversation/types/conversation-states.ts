@@ -1,9 +1,9 @@
 /**
  * Estados de la máquina de conversación
  * Flujo de onboarding: NEW → ASK_TERMS → ASK_ROLE → ASK_EXPERIENCE → ASK_LOCATION → OFFER_ALERTS
- *   → (Si acepta alertas) → ASK_ALERT_FREQUENCY → ASK_ALERT_TIME → READY
+ *   → (Si acepta alertas) → ASK_ALERT_TIME → READY
  *   → (Si rechaza alertas) → READY
- * NOTA: ASK_WORK_MODE, ASK_DEVICE, ASK_JOB_TYPE y ASK_MIN_SALARY fueron removidos del flujo
+ * NOTA: ASK_WORK_MODE, ASK_DEVICE, ASK_JOB_TYPE, ASK_MIN_SALARY y ASK_ALERT_FREQUENCY fueron removidos del flujo
  */
 export enum ConversationState {
   NEW = 'NEW',
@@ -20,7 +20,7 @@ export enum ConversationState {
   
   // Estados de configuración de alertas (durante onboarding)
   OFFER_ALERTS = 'OFFER_ALERTS', // Pregunta si desea recibir alertas (antes de primera búsqueda)
-  ASK_ALERT_FREQUENCY = 'ASK_ALERT_FREQUENCY', // Pregunta con qué frecuencia desea alertas
+  ASK_ALERT_FREQUENCY = 'ASK_ALERT_FREQUENCY', // [NO USADO] Frecuencia siempre es diaria, pero se mantiene por compatibilidad
   ASK_ALERT_TIME = 'ASK_ALERT_TIME', // Pregunta a qué hora desea alertas
   
   // Estados adicionales para flujos especiales
@@ -35,7 +35,7 @@ export enum ConversationState {
   // EDIT_WORK_MODE = 'EDIT_WORK_MODE', // [DESACTIVADO] Editando modalidad (remoto/presencial)
   // EDIT_JOB_TYPE = 'EDIT_JOB_TYPE', // [DESACTIVADO] No aporta valor significativo
   // EDIT_MIN_SALARY = 'EDIT_MIN_SALARY', // [DESACTIVADO] No aporta valor significativo
-  EDIT_ALERT_FREQUENCY = 'EDIT_ALERT_FREQUENCY', // Editando frecuencia de alertas
+  EDIT_ALERT_FREQUENCY = 'EDIT_ALERT_FREQUENCY', // [NO USADO] Frecuencia siempre es diaria
   EDIT_ALERT_TIME = 'EDIT_ALERT_TIME', // Editando horario de alertas
   
   // Estados para sistema de planes (NUEVOS)

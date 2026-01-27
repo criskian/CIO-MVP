@@ -91,15 +91,7 @@ _Luego podrás agregar otros roles o ajustarlo editando tu perfil._`,
 
   ASK_EXPERIENCE: `Genial. Ahora dime:
 
-¿Cuántos años de experiencia tienes en este campo?
-
-1️⃣ Sin experiencia
-2️⃣ Junior (1-2 años)
-3️⃣ Intermedio (3-5 años)
-4️⃣ Senior (5+ años)
-5️⃣ Lead/Expert (7+ años)
-
-Responde con el número o el nombre.`,
+¿Cuántos años de experiencia tienes en este campo?`,
 
   ASK_LOCATION: `Excelente. Ahora dime:
 
@@ -139,16 +131,16 @@ Ejemplo: "Bogotá", "Lima", "Colombia", "Argentina", etc.`,
   //
   // _Si no tienes una preferencia específica, escribe "0"_`,
 
-  ASK_ALERT_FREQUENCY: `¡Ya casi terminamos! 🔔
-
-¿Con qué frecuencia te gustaría recibir recordatorios de búsqueda de empleo?
-
-1️⃣ Diariamente ☀️
-2️⃣ Cada 3 días 📅
-3️⃣ Semanalmente 📆
-4️⃣ Mensualmente 🗓️
-
-Responde con el número o el nombre de la opción.`,
+  // [DESACTIVADO] ASK_ALERT_FREQUENCY - Frecuencia siempre es diaria
+  // ASK_ALERT_FREQUENCY: `¡Ya casi terminamos! 🔔
+  //
+  // ¿Con qué frecuencia te gustaría recibir recordatorios de búsqueda de empleo?
+  //
+  // 1️⃣ Diariamente ☀️
+  // 2️⃣ Cada 3 días 📅
+  // 3️⃣ Semanalmente 📆
+  // 4️⃣ Mensualmente 🗓️`,
+  ASK_ALERT_FREQUENCY: '', // Mantenido por compatibilidad pero no se usa
 
   ASK_ALERT_TIME: `Perfecto. ⏰
 
@@ -201,12 +193,14 @@ Ejemplo: "Bogotá", "Lima", "México", "Colombia", "Perú", etc.`,
   //
   // Ejemplo: "2000000", "2.5 millones", "0"`,
 
-  ERROR_ALERT_FREQUENCY_INVALID: `No entendí tu respuesta. Por favor responde con:
-
-1️⃣ Diariamente ☀️
-2️⃣ Cada 3 días 📅
-3️⃣ Semanalmente 📆
-4️⃣ Mensualmente 🗓️`,
+  // [DESACTIVADO] ERROR_ALERT_FREQUENCY_INVALID - Frecuencia siempre es diaria
+  // ERROR_ALERT_FREQUENCY_INVALID: `No entendí tu respuesta. Por favor responde con:
+  //
+  // 1️⃣ Diariamente ☀️
+  // 2️⃣ Cada 3 días 📅
+  // 3️⃣ Semanalmente 📆
+  // 4️⃣ Mensualmente 🗓️`,
+  ERROR_ALERT_FREQUENCY_INVALID: '', // Mantenido por compatibilidad pero no se usa
 
   ERROR_TIME_INVALID: `Por favor ingresa una hora válida.
 
@@ -224,20 +218,10 @@ Por ahora estoy en fase de pruebas. Pronto podrás:
 ¿Necesitas algo más?`,
 
   // Mensaje cuando no se entiende
-  UNKNOWN_INTENT: `No entendí tu mensaje. 😅
+  UNKNOWN_INTENT: `No entendí tu mensaje. 😅`,
 
-Si necesitas ayuda, escribe "ayuda".`,
-
-  // Mensaje cuando el usuario está en estado READY
-  NOT_READY_YET: `¡Tu perfil está listo! 🎉
-
-_Comandos disponibles:_
-• Escribe *"buscar"* para encontrar ofertas de empleo ahora
-• Escribe *"editar"* para cambiar alguna preferencia
-• Escribe *"reiniciar"* para volver a configurar tu perfil desde cero
-• Escribe *"cancelar"* si deseas dejar de usar el servicio
-
-¿Qué te gustaría hacer?`,
+  // Mensaje cuando el usuario está en estado READY (usado con returnToMainMenu que añade menú)
+  NOT_READY_YET: `¡Tu perfil está listo! 🎉`,
 
   // Mensaje de error general
   ERROR_GENERAL: `Lo siento, ocurrió un error inesperado. 😔
@@ -250,9 +234,7 @@ Por favor intenta de nuevo en unos momentos.`,
   // Mensajes de gestión de cuenta
   CONFIRM_RESTART: `¿Estás seguro que deseas reiniciar tu perfil? 🔄
 
-Esto eliminará toda tu configuración actual y comenzarás desde cero.
-
-Responde *"Sí"* para confirmar o *"No"* para cancelar.`,
+Esto eliminará toda tu configuración actual y comenzarás desde cero.`,
 
   RESTART_CANCELLED: `Perfecto, tu perfil se mantiene como está. 👍`,
 
@@ -260,9 +242,7 @@ Responde *"Sí"* para confirmar o *"No"* para cancelar.`,
 
   CONFIRM_CANCEL_SERVICE: `¿Estás seguro que deseas dejar de usar CIO? 😢
 
-Esto eliminará toda tu información y no recibirás más alertas.
-
-Responde *"Sí"* para confirmar o *"No"* para continuar usando el servicio.`,
+Esto eliminará toda tu información y no recibirás más alertas.`,
 
   SERVICE_CANCELLED: `Entiendo. Tus preferencias de búsqueda han sido eliminadas y ya no recibirás alertas.
 
@@ -272,48 +252,22 @@ Tu cuenta permanece registrada. Si cambias de opinión en el futuro, puedes escr
 
   CANCEL_SERVICE_ABORTED: `¡Me alegra que te quedes! 😊 Tu perfil sigue activo.`,
 
-  // Mensajes de edición de perfil
+  // Mensajes de edición de perfil (ya no se usa, se genera dinámicamente en showProfileForEditing)
   SHOW_CURRENT_PREFERENCES: (profile: {
     role: string;
     location: string;
-    jobType: string;
-    minSalary: string;
-    alertFrequency: string;
     alertTime: string;
   }) => `📝 *Tus preferencias actuales:*
 
 🔹 *Rol:* ${profile.role}
 🔹 *Ubicación:* ${profile.location}
-🔹 *Tipo de empleo:* ${profile.jobType}
-🔹 *Salario ideal:* ${profile.minSalary}
-🔹 *Frecuencia de alertas:* ${profile.alertFrequency}
-🔹 *Horario de alertas:* ${profile.alertTime}
+⏰ *Horario de alertas:* ${profile.alertTime}
 
----
-
-Para editar una preferencia, escribe el *nombre del campo* que quieres cambiar.
-
-*Ejemplos:*
-• Escribe *"rol"* para cambiar tu cargo deseado
-• Escribe *"ubicación"* para cambiar la ciudad
-• Escribe *"tipo"* para cambiar el tipo de empleo
-• Escribe *"salario"* para cambiar tu salario ideal
-• Escribe *"frecuencia"* para cambiar la frecuencia de alertas
-• Escribe *"horario"* para cambiar la hora de alertas
-
-También puedes escribir *"cancelar"* para volver al menú principal.`,
+Selecciona qué quieres editar en la lista.`,
 
   EDIT_FIELD_NOT_FOUND: `No entendí qué campo quieres editar. 😅
 
-Por favor, escribe uno de estos nombres:
-• *"rol"*
-• *"ubicación"*
-• *"tipo"*
-• *"salario"*
-• *"frecuencia"*
-• *"horario"*
-
-O escribe *"cancelar"* para volver.`,
+Por favor, selecciona una opción de la lista.`,
 
   FIELD_UPDATED: (
     fieldName: string,
@@ -342,12 +296,12 @@ Escribe el comando que desees.`,
 
 ¿Te gustaría recibir *alertas automáticas* de empleo? 🔔
 
-Si activas las alertas, te enviaré ofertas nuevas directamente a este chat según tus preferencias.
+Si activas las alertas, te enviaré ofertas nuevas *todos los días* directamente a este chat según tus preferencias.
 
 📬 *Beneficios:*
 • No tienes que acordarte de buscar
 • Recibes ofertas frescas automáticamente
-• Puedes elegir la frecuencia (diario, semanal, etc.)`,
+• Puedes elegir la hora de envío`,
 
   // Confirmación de rechazo de alertas
   ALERTS_DISABLED: `Perfecto, *no activaré las alertas automáticas*. ✅
@@ -508,8 +462,7 @@ Tu pago ha sido *confirmado exitosamente*.
   // Ayuda mientras espera pago
   WAITING_PAYMENT_HELP: `💡 *¿Necesitas ayuda?*
 
-• Escribe *"verificar"* para comprobar si tu pago fue procesado
-• Escribe tu *correo electrónico* si quieres cambiarlo o corregirlo
+También puedes escribir tu *correo electrónico* si quieres cambiarlo o corregirlo.
 
 🔗 *Enlace de pago:* ${WOMPI_CHECKOUT_LINK}`,
 

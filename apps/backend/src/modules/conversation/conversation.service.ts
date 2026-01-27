@@ -100,12 +100,12 @@ export class ConversationService {
         return response;
       }
 
-      // 6. Si no hay texto, no podemos procesar
+      // 6. Si no hay texto, no podemos procesar - mostrar menú de ayuda
       if (!text) {
-        const response = { text: BotMessages.UNKNOWN_INTENT };
+        const response = await this.returnToMainMenu(user.id, BotMessages.UNKNOWN_INTENT);
         await this.chatHistoryService.saveOutboundMessage(
           user.id,
-          response.text,
+          response.text || '',
           session.state,
         );
         return response;
@@ -201,8 +201,9 @@ export class ConversationService {
       // case ConversationState.ASK_MIN_SALARY:
       //   return await this.handleAskMinSalaryState(userId, text);
 
-      case ConversationState.ASK_ALERT_FREQUENCY:
-        return await this.handleAskAlertFrequencyState(userId, text);
+      // [DESACTIVADO] Estado ASK_ALERT_FREQUENCY - Frecuencia siempre es diaria
+      // case ConversationState.ASK_ALERT_FREQUENCY:
+      //   return await this.handleAskAlertFrequencyState(userId, text);
 
       case ConversationState.ASK_ALERT_TIME:
         return await this.handleAskAlertTimeState(userId, text);
@@ -210,12 +211,13 @@ export class ConversationService {
       case ConversationState.READY:
         return await this.handleReadyState(userId, text, intent);
 
-      // [NUEVO] Estado para ofrecer alertas después de primera búsqueda
+      // Estado para ofrecer alertas durante onboarding
       case ConversationState.OFFER_ALERTS:
         return await this.handleOfferAlertsState(userId, text);
 
-      case ConversationState.ASK_ALERT_FREQUENCY:
-        return await this.handleAskAlertFrequencyState(userId, text);
+      // [DESACTIVADO] Estado ASK_ALERT_FREQUENCY - Frecuencia siempre es diaria
+      // case ConversationState.ASK_ALERT_FREQUENCY:
+      //   return await this.handleAskAlertFrequencyState(userId, text);
 
       case ConversationState.ASK_ALERT_TIME:
         return await this.handleAskAlertTimeState(userId, text);
@@ -249,8 +251,9 @@ export class ConversationService {
       // case ConversationState.EDIT_MIN_SALARY:
       //   return await this.handleEditMinSalaryState(userId, text);
 
-      case ConversationState.EDIT_ALERT_FREQUENCY:
-        return await this.handleEditAlertFrequencyState(userId, text);
+      // [DESACTIVADO] Estado EDIT_ALERT_FREQUENCY - Frecuencia siempre es diaria
+      // case ConversationState.EDIT_ALERT_FREQUENCY:
+      //   return await this.handleEditAlertFrequencyState(userId, text);
 
       case ConversationState.EDIT_ALERT_TIME:
         return await this.handleEditAlertTimeState(userId, text);
@@ -269,7 +272,7 @@ export class ConversationService {
 
       default:
         this.logger.warn(`Estado desconocido: ${currentState}`);
-        return { text: BotMessages.UNKNOWN_INTENT };
+        return await this.returnToMainMenu(userId, BotMessages.UNKNOWN_INTENT);
     }
   }
 
@@ -306,6 +309,10 @@ export class ConversationService {
       await this.updateSessionState(userId, ConversationState.FREEMIUM_EXPIRED);
       return {
         text: BotMessages.FREEMIUM_EXPIRED_RETURNING_USER(user?.name),
+        buttons: [
+          { id: 'cmd_pagar', title: 'Quiero pagar' },
+          { id: 'cmd_ofertas', title: 'Ver ofertas gratis' },
+        ],
       };
     }
 
@@ -497,12 +504,12 @@ export class ConversationService {
     // [ACTUALIZADO] Flujo: ASK_LOCATION → OFFER_ALERTS (preguntar si quiere alertas antes de buscar)
     await this.updateSessionState(userId, ConversationState.OFFER_ALERTS);
 
-    // Preguntar si desea recibir alertas con botones interactivos
+    // Preguntar si desea recibir alertas con botones interactivos (sin emojis)
     return {
       text: BotMessages.OFFER_ALERTS,
       buttons: [
-        { id: 'alerts_yes', title: '✅ Sí, activar' },
-        { id: 'alerts_no', title: '❌ No, gracias' },
+        { id: 'alerts_yes', title: 'Sí, activar' },
+        { id: 'alerts_no', title: 'No, gracias' },
       ],
     };
   }
@@ -636,26 +643,17 @@ export class ConversationService {
       };
     }
 
-    // Obtener frecuencia guardada en session.data
-    const session = await this.prisma.session.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    const alertFrequency = (session?.data as any)?.alertFrequency || 'daily';
-
-    // Guardar en AlertPreference
-    await this.upsertAlertPreference(userId, alertTime, alertFrequency);
+    // Guardar en AlertPreference (frecuencia siempre diaria)
+    await this.upsertAlertPreference(userId, alertTime, 'daily');
 
     // Transición: ASK_ALERT_TIME → READY
     await this.updateSessionState(userId, ConversationState.READY);
 
     const confirmationMessage = `¡Perfecto! ✅ Tus alertas están configuradas.
 
-🔔 *Frecuencia:* ${alertFrequencyToText(alertFrequency)}
 ⏰ *Hora:* ${alertTime}
 
-Te enviaré ofertas nuevas directamente a este chat según tu configuración.
+Te enviaré ofertas nuevas *todos los días* directamente a este chat.
 
 🎯 *¡Tu perfil está listo!* Ya puedes empezar a buscar ofertas.`;
 
@@ -929,26 +927,24 @@ Por favor intenta de nuevo en unos minutos.`,
 
   /**
    * Estado OFFER_ALERTS: Pregunta si desea recibir alertas (durante onboarding)
-   * ACTUALIZADO: Se pregunta antes de la primera búsqueda, no después
+   * ACTUALIZADO: Si acepta, va directamente a ASK_ALERT_TIME (frecuencia siempre diaria)
    */
   private async handleOfferAlertsState(userId: string, text: string): Promise<BotReply> {
     // Verificar si acepta alertas
     if (isAcceptance(text) || text.toLowerCase().includes('activar')) {
-      // Usuario quiere activar alertas → Preguntar frecuencia
-      await this.updateSessionState(userId, ConversationState.ASK_ALERT_FREQUENCY);
+      // Usuario quiere activar alertas → Preguntar hora directamente (frecuencia siempre diaria)
+      await this.updateSessionState(userId, ConversationState.ASK_ALERT_TIME);
+
+      // Mostrar lista desplegable con horas comunes
+      const timeOptions = generateTimeOptions();
 
       return {
-        text: BotMessages.ASK_ALERT_FREQUENCY,
-        listTitle: 'Seleccionar',
+        text: BotMessages.ASK_ALERT_TIME_MOBILE,
+        listTitle: 'Seleccionar hora',
         listSections: [
           {
-            title: 'Frecuencia',
-            rows: [
-              { id: 'freq_daily', title: '☀️ Diariamente' },
-              { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
-              { id: 'freq_weekly', title: '📆 Semanalmente' },
-              { id: 'freq_monthly', title: '🗓️ Mensualmente' },
-            ],
+            title: 'Horas comunes',
+            rows: timeOptions,
           },
         ],
       };
@@ -960,7 +956,7 @@ Por favor intenta de nuevo en unos minutos.`,
       await this.prisma.alertPreference.create({
         data: {
           userId,
-          alertFrequency: 'daily', // Valor por defecto (no se usará)
+          alertFrequency: 'daily', // Siempre diaria
           alertTimeLocal: '09:00', // Valor por defecto (no se usará)
           timezone: 'America/Bogota',
           enabled: false, // ⚠️ DESACTIVADO
@@ -973,7 +969,7 @@ Por favor intenta de nuevo en unos minutos.`,
       return await this.returnToMainMenu(userId, BotMessages.ALERTS_DISABLED);
     }
 
-    // No entendió la respuesta, mostrar botones
+    // No entendió la respuesta, mostrar botones (sin emojis)
     return {
       text: `${BotMessages.OFFER_ALERTS}\n\n_Por favor, selecciona una opción:_`,
       buttons: [
@@ -1075,7 +1071,7 @@ Continúa con el proceso manual. 👇`,
     const alertPref = await this.prisma.alertPreference.findUnique({ where: { userId } });
 
     if (!profile) {
-      return { text: BotMessages.NOT_READY_YET };
+      return await this.returnToMainMenu(userId, BotMessages.NOT_READY_YET);
     }
 
     // Formatear valores para mostrar
@@ -1100,7 +1096,6 @@ Continúa con el proceso manual. 👇`,
 🔹 *Rol:* ${formattedProfile.role}
 💡 *Experiencia:* ${formattedProfile.experience}
 📍 *Ubicación:* ${formattedProfile.location}
-🔔 *Frecuencia:* ${formattedProfile.alertFrequency}
 ⏰ *Horario de alertas:* ${formattedProfile.alertTime}
 
 Selecciona qué quieres editar:`,
@@ -1124,12 +1119,7 @@ Selecciona qué quieres editar:`,
               title: '📍 Ubicación',
               description: `Actual: ${formattedProfile.location}`,
             },
-            // [DESACTIVADO] Tipo de empleo y salario - no aportan valor significativo
-            {
-              id: 'edit_frecuencia',
-              title: '🔔 Frecuencia',
-              description: `Actual: ${formattedProfile.alertFrequency}`,
-            },
+            // [DESACTIVADO] Frecuencia - siempre es diaria
             {
               id: 'edit_horario',
               title: '⏰ Horario alertas',
@@ -1223,23 +1213,10 @@ Selecciona qué quieres editar:`,
       //   await this.updateSessionState(userId, ConversationState.EDIT_MIN_SALARY);
       //   return { text: BotMessages.ASK_MIN_SALARY };
 
-      case 'frecuencia':
-        await this.updateSessionState(userId, ConversationState.EDIT_ALERT_FREQUENCY);
-        return {
-          text: BotMessages.ASK_ALERT_FREQUENCY,
-          listTitle: 'Seleccionar',
-          listSections: [
-            {
-              title: 'Frecuencia',
-              rows: [
-                { id: 'freq_daily', title: '☀️ Diariamente' },
-                { id: 'freq_every_3_days', title: '📅 Cada 3 días' },
-                { id: 'freq_weekly', title: '📆 Semanalmente' },
-                { id: 'freq_monthly', title: '🗓️ Mensualmente' },
-              ],
-            },
-          ],
-        };
+      // [DESACTIVADO] Frecuencia - siempre es diaria
+      // case 'frecuencia':
+      //   await this.updateSessionState(userId, ConversationState.EDIT_ALERT_FREQUENCY);
+      //   return { text: BotMessages.ASK_ALERT_FREQUENCY, ... };
 
       case 'horario': {
         await this.updateSessionState(userId, ConversationState.EDIT_ALERT_TIME);
@@ -1569,16 +1546,7 @@ Selecciona qué quieres editar:`,
       
       if (hasUses) {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
-        return {
-          text: `🎉 ¡Hola de nuevo, ${user?.name || 'usuario'}! Tienes búsquedas disponibles.
-
-¿Qué te gustaría hacer?
-
-🔍 *"Buscar"* - Encontrar ofertas de empleo
-✏️ *"Editar perfil"* - Modificar tus preferencias
-🔄 *"Reiniciar"* - Comenzar de nuevo
-❌ *"Cancelar servicio"* - Darte de baja`
-        };
+        return await this.returnToMainMenu(userId, `🎉 ¡Hola de nuevo, ${user?.name || 'usuario'}! Tienes búsquedas disponibles.`);
       } else {
         // Premium sin búsquedas semanales - mostrar mensaje de espera
         const resetDate = new Date(weekStart!.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -1594,16 +1562,7 @@ Selecciona qué quieres editar:`,
         where: { id: userId },
         include: { subscription: true }
       });
-      return {
-        text: `🎉 ¡Buenas noticias, ${user?.name || 'usuario'}! Tienes búsquedas disponibles nuevamente.
-
-¿Qué te gustaría hacer?
-
-🔍 *"Buscar"* - Encontrar ofertas de empleo
-✏️ *"Editar perfil"* - Modificar tus preferencias
-🔄 *"Reiniciar"* - Comenzar de nuevo
-❌ *"Cancelar servicio"* - Darte de baja`
-      };
+      return await this.returnToMainMenu(userId, `🎉 ¡Buenas noticias, ${user?.name || 'usuario'}! Tienes búsquedas disponibles nuevamente.`);
     }
 
     // Solo para usuarios freemium: transición a pedir email
@@ -1630,16 +1589,7 @@ Selecciona qué quieres editar:`,
       
       if (hasUses) {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
-        return {
-          text: `🎉 ¡Hola de nuevo, ${user?.name || 'usuario'}! Tienes búsquedas disponibles.
-
-¿Qué te gustaría hacer?
-
-🔍 *"Buscar"* - Encontrar ofertas de empleo
-✏️ *"Editar perfil"* - Modificar tus preferencias
-🔄 *"Reiniciar"* - Comenzar de nuevo
-❌ *"Cancelar servicio"* - Darte de baja`
-        };
+        return await this.returnToMainMenu(userId, `🎉 ¡Hola de nuevo, ${user?.name || 'usuario'}! Tienes búsquedas disponibles.`);
       } else {
         const resetDate = new Date(weekStart!.getTime() + 7 * 24 * 60 * 60 * 1000);
         return { text: BotMessages.PREMIUM_WEEKLY_LIMIT_REACHED(resetDate) };
@@ -1654,16 +1604,7 @@ Selecciona qué quieres editar:`,
         where: { id: userId },
         include: { subscription: true }
       });
-      return {
-        text: `🎉 ¡Buenas noticias, ${user?.name || 'usuario'}! Tienes búsquedas disponibles nuevamente.
-
-¿Qué te gustaría hacer?
-
-🔍 *"Buscar"* - Encontrar ofertas de empleo
-✏️ *"Editar perfil"* - Modificar tus preferencias
-🔄 *"Reiniciar"* - Comenzar de nuevo
-❌ *"Cancelar servicio"* - Darte de baja`
-      };
+      return await this.returnToMainMenu(userId, `🎉 ¡Buenas noticias, ${user?.name || 'usuario'}! Tienes búsquedas disponibles nuevamente.`);
     }
 
     const email = text.trim().toLowerCase();
@@ -1728,16 +1669,7 @@ Selecciona qué quieres editar:`,
       
       if (hasUses) {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
-        return {
-          text: `🎉 ¡Hola de nuevo, ${user?.name || 'usuario'}! Tienes búsquedas disponibles.
-
-¿Qué te gustaría hacer?
-
-🔍 *"Buscar"* - Encontrar ofertas de empleo
-✏️ *"Editar perfil"* - Modificar tus preferencias
-🔄 *"Reiniciar"* - Comenzar de nuevo
-❌ *"Cancelar servicio"* - Darte de baja`
-        };
+        return await this.returnToMainMenu(userId, `🎉 ¡Hola de nuevo, ${user?.name || 'usuario'}! Tienes búsquedas disponibles.`);
       } else {
         const resetDate = new Date(weekStart!.getTime() + 7 * 24 * 60 * 60 * 1000);
         return { text: BotMessages.PREMIUM_WEEKLY_LIMIT_REACHED(resetDate) };
@@ -1752,16 +1684,7 @@ Selecciona qué quieres editar:`,
         where: { id: userId },
         include: { subscription: true }
       });
-      return {
-        text: `🎉 ¡Buenas noticias, ${user?.name || 'usuario'}! Tienes búsquedas disponibles nuevamente.
-
-¿Qué te gustaría hacer?
-
-🔍 *"Buscar"* - Encontrar ofertas de empleo
-✏️ *"Editar perfil"* - Modificar tus preferencias
-🔄 *"Reiniciar"* - Comenzar de nuevo
-❌ *"Cancelar servicio"* - Darte de baja`
-      };
+      return await this.returnToMainMenu(userId, `🎉 ¡Buenas noticias, ${user?.name || 'usuario'}! Tienes búsquedas disponibles nuevamente.`);
     }
 
     const lower = text.toLowerCase().trim();
@@ -1818,9 +1741,12 @@ Selecciona qué quieres editar:`,
       };
     }
 
-    // Mostrar ayuda
+    // Mostrar ayuda con botón de verificar
     return {
       text: BotMessages.WAITING_PAYMENT_HELP,
+      buttons: [
+        { id: 'cmd_verificar', title: 'Verificar pago' },
+      ],
     };
   }
 
