@@ -267,7 +267,7 @@ export class JobSearchService {
       'republica dominicana': 'Dominican Republic',
       'puerto rico': 'Puerto Rico', // Ya correcto
       'cuba': 'Cuba', // Ya correcto
-      
+
       // Otros países importantes
       'canadá': 'Canada',
       'canada': 'Canada',
@@ -279,7 +279,7 @@ export class JobSearchService {
       'reino unido': 'United Kingdom',
       'inglaterra': 'United Kingdom',
       'portugal': 'Portugal', // Ya correcto
-      
+
       // Ciudades que pueden venir en español
       'nueva york': 'New York',
       'los ángeles': 'Los Angeles',
@@ -306,10 +306,12 @@ export class JobSearchService {
   /**
    * Ejecuta una ÚNICA búsqueda en SerpApi (1 página = ~10 resultados)
    * Retorna también el next_page_token para paginación posterior
+   * Incluye sistema de fallback en cascada para maximizar resultados
    */
   private async searchJobsSinglePage(
     query: JobSearchQuery,
     nextPageToken?: string,
+    fallbackAttempt: number = 0,
   ): Promise<{ jobs: JobPosting[]; nextPageToken?: string }> {
     try {
       const queryString = this.buildQueryString(query);
@@ -361,16 +363,9 @@ export class JobSearchService {
 
       this.logger.log(`✅ Después de eliminar duplicados: ${uniqueJobs.length} ofertas únicas`);
 
-      // Si no hay resultados y el rol tiene múltiples palabras, intentar búsqueda más amplia
-      if (uniqueJobs.length === 0 && query.role.split(' ').length > 1 && !nextPageToken) {
-        this.logger.log(
-          `🔄 No se encontraron resultados con "${query.role}". Intentando búsqueda más amplia...`,
-        );
-
-        const broadRole = query.role.split(' ')[0];
-        const broadQuery = { ...query, role: broadRole };
-
-        return await this.searchJobsSinglePage(broadQuery);
+      // Sistema de fallback en cascada cuando no hay resultados
+      if (uniqueJobs.length === 0 && !nextPageToken && fallbackAttempt < 4) {
+        return await this.tryFallbackSearch(query, fallbackAttempt);
       }
 
       return {
@@ -390,6 +385,69 @@ export class JobSearchService {
         'No pude buscar ofertas en este momento. Por favor intenta de nuevo más tarde.',
       );
     }
+  }
+
+  /**
+   * Sistema de fallback en cascada para maximizar resultados
+   * Intenta diferentes variaciones del query cuando no hay resultados
+   */
+  private async tryFallbackSearch(
+    originalQuery: JobSearchQuery,
+    attempt: number,
+  ): Promise<{ jobs: JobPosting[]; nextPageToken?: string }> {
+    const role = originalQuery.role;
+    const firstWord = role.split(' ')[0];
+
+    // Estrategias de fallback en orden de prioridad
+    const fallbackStrategies: Array<{ description: string; query: JobSearchQuery }> = [
+      {
+        // Estrategia 1: Agregar "tiempo completo" si no tiene jobType
+        description: `"${role} tiempo completo"`,
+        query: {
+          ...originalQuery,
+          jobType: originalQuery.jobType || 'full_time',
+        },
+      },
+      {
+        // Estrategia 2: Solo el rol + "empleo" para ser más genérico
+        description: `"${role} empleo"`,
+        query: {
+          ...originalQuery,
+          role: `${role} empleo`,
+          jobType: undefined, // Quitar restricción de tipo
+        },
+      },
+      {
+        // Estrategia 3: Primera palabra del rol + "tiempo completo"
+        description: `"${firstWord} tiempo completo"`,
+        query: {
+          ...originalQuery,
+          role: firstWord,
+          jobType: 'full_time',
+        },
+      },
+      {
+        // Estrategia 4: Solo la primera palabra (más amplio)
+        description: `"${firstWord}"`,
+        query: {
+          ...originalQuery,
+          role: firstWord,
+          jobType: undefined,
+        },
+      },
+    ];
+
+    // Ya intentamos la búsqueda original (attempt 0), ahora probamos fallbacks
+    if (attempt < fallbackStrategies.length) {
+      const strategy = fallbackStrategies[attempt];
+      this.logger.log(`🔄 Fallback ${attempt + 1}/${fallbackStrategies.length}: Intentando con ${strategy.description}...`);
+
+      return await this.searchJobsSinglePage(strategy.query, undefined, attempt + 1);
+    }
+
+    // Si llegamos aquí, agotamos todos los fallbacks
+    this.logger.warn(`⚠️ Agotados todos los fallbacks para "${role}". No se encontraron resultados.`);
+    return { jobs: [], nextPageToken: undefined };
   }
 
   /**
@@ -850,21 +908,21 @@ export class JobSearchService {
     // [MEJORADO] Sistema de scoring basado en nivel de experiencia
     if (query.experienceKeywords && query.experienceKeywords.length > 0) {
       const contentText = titleLower + ' ' + snippetLower;
-      
+
       // Detectar nivel del usuario
-      const isNoExperience = query.experienceKeywords.some(kw => 
+      const isNoExperience = query.experienceKeywords.some(kw =>
         ['sin experiencia', 'entry level', 'practicante', 'trainee', 'aprendiz'].includes(kw.toLowerCase())
       );
-      const isJunior = query.experienceKeywords.some(kw => 
+      const isJunior = query.experienceKeywords.some(kw =>
         ['junior', 'jr'].includes(kw.toLowerCase())
       );
-      const isMid = query.experienceKeywords.some(kw => 
+      const isMid = query.experienceKeywords.some(kw =>
         ['semi senior', 'mid', 'intermedio'].includes(kw.toLowerCase())
       );
-      const isSenior = query.experienceKeywords.some(kw => 
+      const isSenior = query.experienceKeywords.some(kw =>
         ['senior', 'sr', 'experto', 'especialista'].includes(kw.toLowerCase())
       );
-      const isLead = query.experienceKeywords.some(kw => 
+      const isLead = query.experienceKeywords.some(kw =>
         ['lead', 'líder', 'principal', 'expert', 'arquitecto', 'director'].includes(kw.toLowerCase())
       );
 
@@ -1353,29 +1411,29 @@ export class JobSearchService {
   public cleanJobUrl(url: string): string {
     try {
       const urlObj = new URL(url);
-      
+
       // Obtener todos los parámetros y filtrar los que empiezan con utm_
       const paramsToDelete: string[] = [];
       urlObj.searchParams.forEach((_, key) => {
-        if (key.toLowerCase().startsWith('utm_') || 
-            key.toLowerCase().includes('google') ||
-            key.toLowerCase() === 'source' ||
-            key.toLowerCase() === 'ref') {
+        if (key.toLowerCase().startsWith('utm_') ||
+          key.toLowerCase().includes('google') ||
+          key.toLowerCase() === 'source' ||
+          key.toLowerCase() === 'ref') {
           paramsToDelete.push(key);
         }
       });
-      
+
       // Eliminar los parámetros identificados
       paramsToDelete.forEach(param => urlObj.searchParams.delete(param));
-      
+
       // Reconstruir la URL
       let cleanUrl = urlObj.toString();
-      
+
       // Si la URL termina con '?' sin parámetros, quitarlo
       if (cleanUrl.endsWith('?')) {
         cleanUrl = cleanUrl.slice(0, -1);
       }
-      
+
       return cleanUrl;
     } catch {
       // Si hay error parseando la URL, retornarla tal cual
