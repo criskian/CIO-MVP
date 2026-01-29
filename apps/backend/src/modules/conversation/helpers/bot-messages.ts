@@ -30,14 +30,16 @@ Para usar el *Cazador Inteligente de Ofertas*, primero debes registrarte en nues
 El registro es *gratis* y solo toma unos segundos. Una vez registrado, podrás comenzar a buscar ofertas de empleo personalizadas.`,
 
   // Bienvenida para usuario registrado (primera vez en el chat)
-  WELCOME_REGISTERED: (name: string) => `¡Hola *${name}*! 👋 Bienvenido a CIO, tu Cazador Inteligente de Ofertas.
+  WELCOME_REGISTERED: (name: string) => `¡Hola *${name}*! 👋 Bienvenido a CIO, tu Cazador Inteligente de Ofertas de Almia.
 
-Estás usando la *versión Free*: Estoy aquí para ayudarte a encontrar las *mejores ofertas de empleo en Latam*, de forma rápida y personalizada.
+Con CIO verás oportunidades de empleo relevantes en Latam de manera *rápida y práctica*. 
 
-✨ *Incluye:*
-• 3 búsquedas personalizadas GRATIS
-• Válido por 3 días desde tu registro
-• Alertas de empleo según tus preferencias`,
+💼 Tu versión Free incluye: 
+• 3 búsquedas personalizadas 
+• Alertas diarias según tus preferencias
+• Válido por 3 días
+
+💡 Tip Almia: Planear tu búsqueda con claridad aumenta tus posibilidades de éxito.`,
 
   // Mensaje cuando completa el onboarding
   ONBOARDING_COMPLETE: (name: string) => `¡Perfecto, *${name}*! ✅ Tu perfil está listo.
@@ -55,19 +57,9 @@ Escribe *"buscar"* cuando estés listo y te mostraré las mejores ofertas que en
   // ASK_DEVICE: (eliminado - todos los usuarios se tratan como móvil)
 
   // Términos y condiciones
-  ASK_TERMS: `Antes de comenzar, necesitamos tu autorización. Al seleccionar *"Acepto"*, confirmas que:
+  ASK_TERMS: `Selecciona "Acepto" para continuar ✅
 
-• Tienes *16 años o más*
-• Si eres menor de 18 años, cuentas con autorización de tu padre, madre o representante legal
-• Entiendes que el CIO ofrece una *prueba gratuita de 3 días*. Finalizado este periodo, deberás adquirir un *plan de pago* para continuar usando el servicio
-• Has leído y aceptas los *Términos y Condiciones del servicio*
-• Autorizas el tratamiento de tus datos personales conforme a la *Política de Privacidad* de Almia Consulting S.A.S., de acuerdo con la Ley 1581 de 2012
-
-📄 *Consulta los documentos aquí:*
-
-👉 Términos y Condiciones: ${TERMS_URL}
-
-👉 Política de Privacidad: ${PRIVACY_URL}`,
+📄 Términos y Privacidad: ${TERMS_URL}`,
 
   // Rechazo de términos
   TERMS_REJECTED: `Entiendo. Si cambias de opinión, puedes escribirme de nuevo cuando quieras. ¡Éxito en tu búsqueda de empleo! 👋`,
@@ -87,7 +79,7 @@ Escribe el más importante para ti en este momento.
 • "Diseñador UX"
 • "Ingeniero industrial"
 
-_Luego podrás agregar otros roles o ajustarlo editando tu perfil._`,
+_Después podrás EDITAR tus prerencias de búsquedas si decides cambiar de cargo o profesión._`,
 
   ASK_EXPERIENCE: `Genial. Ahora dime:
 
@@ -454,7 +446,7 @@ Tu pago ha sido *confirmado exitosamente*.
 • Alertas personalizadas de empleo
 • Soporte prioritario
 
-💡 _Recuerda: aplicar a vacantes buenas es mejor que aplicar masivamente._
+💡 _Tip Almia: Aplicar a vacantes buenas es mejor que aplicar masivamente._
 
 ¿Qué te gustaría hacer?
 • Escribe *"buscar"* para encontrar ofertas ahora`,
