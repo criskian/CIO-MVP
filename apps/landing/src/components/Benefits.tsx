@@ -171,7 +171,7 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
                     onClick={handleCTAClick}
                     className="mt-4 w-full py-2.5 bg-white border-2 border-[#9054C6] text-[#9054C6] font-poppins font-semibold rounded-lg hover:bg-[#9054C6] hover:text-white transition-all duration-300 text-sm"
                   >
-                    Caza Ofertas ya!!
+                    ¡Caza Ofertas ya!
                   </button>
                   <p className="text-[10px] text-[#25D366] text-center mt-2 font-medium">
                     *1 semana gratis
@@ -180,6 +180,10 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
 
                 {/* Plan Premium */}
                 <div className="bg-gradient-to-br from-[#9054C6] to-[#7040A8] rounded-2xl p-4 border-2 border-[#B17DD9] shadow-lg relative overflow-hidden flex flex-col transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer">
+                  {/* Badge Popular */}
+                  <div className="absolute top-0 right-0 bg-[#25D366] text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg">
+                    POPULAR
+                  </div>
                   <div className="mb-2">
                     <h3 className="font-poppins font-bold text-white text-base">Plan Premium</h3>
                   </div>
@@ -199,6 +203,10 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
                     <li className="flex items-start gap-2">
                       <span className="text-[#25D366] mt-0.5">✓</span>
                       <span>Búsqueda personalizada según rol</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#25D366] mt-0.5">✓</span>
+                      <span>Mayor cantidad de ofertas en cada búsqueda</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-[#25D366] mt-0.5">✓</span>
