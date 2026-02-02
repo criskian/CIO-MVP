@@ -224,7 +224,7 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
                           Búsquedas Realizadas
                         </dt>
                         <dd className="mt-1 text-sm text-admin-text-primary">
-                          {3 - user.subscription.freemiumUsesLeft} de 3
+                          {5 - user.subscription.freemiumUsesLeft} de 5
                         </dd>
                       </div>
                       <div>
@@ -232,7 +232,7 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
                           Búsquedas Restantes
                         </dt>
                         <dd className="mt-1 text-sm text-admin-text-primary">
-                          {user.subscription.freemiumUsesLeft} de 3
+                          {user.subscription.freemiumUsesLeft} de 5
                         </dd>
                       </div>
                       <div>
@@ -248,7 +248,7 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
                           Fecha de Expiración
                         </dt>
                         <dd className="mt-1 text-sm text-admin-text-primary">
-                          {formatDate(new Date(new Date(user.subscription.freemiumStartDate).getTime() + 3 * 24 * 60 * 60 * 1000).toISOString())}
+                          {formatDate(new Date(new Date(user.subscription.freemiumStartDate).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString())}
                         </dd>
                       </div>
                     </>

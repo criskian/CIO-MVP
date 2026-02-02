@@ -32,6 +32,10 @@ import {
   generateTimeOptions,
   getFirstName,
 } from './helpers/input-validators';
+import {
+  countBusinessDays,
+  isFreemiumExpiredByBusinessDays,
+} from './helpers/date-utils';
 
 /**
  * Servicio de conversación (Orquestador)
@@ -323,7 +327,7 @@ export class ConversationService {
         data: {
           userId,
           plan: 'FREEMIUM',
-          freemiumUsesLeft: 3,
+          freemiumUsesLeft: 5,
           freemiumStartDate: new Date(),
         },
       });
@@ -806,11 +810,11 @@ Te enviaré ofertas nuevas *todos los días* directamente a este chat.
       // SOLO descontar si la búsqueda fue exitosa (no hubo error)
       // Detectamos el error por el mensaje específico de fallo
       const isError = searchResult.text?.includes('Lo siento, no pude buscar ofertas');
-      
+
       if (!isError) {
         // Búsqueda exitosa → descontar uso
         const deduction = await this.deductUsage(userId);
-        
+
         // Agregar info de usos restantes al mensaje
         const subscription = await this.prisma.subscription.findUnique({
           where: { userId },
@@ -869,8 +873,12 @@ Te enviaré ofertas nuevas *todos los días* directamente a este chat.
     try {
       this.logger.log(`🔍 Usuario ${userId} solicitó búsqueda de empleos`);
 
+      // Determinar maxResults según el plan (3 para FREE, 5 para PREMIUM)
+      const subscription = await this.prisma.subscription.findUnique({ where: { userId } });
+      const maxResults = subscription?.plan === 'PREMIUM' ? 5 : 3;
+
       // Ejecutar búsqueda
-      const result = await this.jobSearchService.searchJobsForUser(userId);
+      const result = await this.jobSearchService.searchJobsForUser(userId, maxResults);
 
       // Si no hay ofertas
       if (result.jobs.length === 0) {
@@ -1547,12 +1555,12 @@ Selecciona qué quieres editar:`,
     if (subscription?.plan === 'PREMIUM' && subscription?.status === 'ACTIVE') {
       this.logger.log(`🔄 Usuario premium ${userId} estaba en FREEMIUM_EXPIRED incorrectamente, volviendo a READY`);
       await this.updateSessionState(userId, ConversationState.READY);
-      
+
       // Verificar si tiene búsquedas disponibles o está esperando
       const weekStart = subscription.premiumWeekStart;
       const now = new Date();
       const hasUses = !weekStart || this.isNewWeek(weekStart, now) || subscription.premiumUsesLeft > 0;
-      
+
       if (hasUses) {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
         return await this.returnToMainMenu(userId, `🎉 ¡Hola de nuevo, ${getFirstName(user?.name)}! Tienes búsquedas disponibles.`);
@@ -1591,11 +1599,11 @@ Selecciona qué quieres editar:`,
     if (subscription?.plan === 'PREMIUM' && subscription?.status === 'ACTIVE') {
       this.logger.log(`🔄 Usuario premium ${userId} estaba en ASK_EMAIL incorrectamente, volviendo a READY`);
       await this.updateSessionState(userId, ConversationState.READY);
-      
+
       const weekStart = subscription.premiumWeekStart;
       const now = new Date();
       const hasUses = !weekStart || this.isNewWeek(weekStart, now) || subscription.premiumUsesLeft > 0;
-      
+
       if (hasUses) {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
         return await this.returnToMainMenu(userId, `🎉 ¡Hola de nuevo, ${getFirstName(user?.name)}! Tienes búsquedas disponibles.`);
@@ -1671,11 +1679,11 @@ Selecciona qué quieres editar:`,
     if (subscription?.plan === 'PREMIUM' && subscription?.status === 'ACTIVE') {
       this.logger.log(`🔄 Usuario premium ${userId} estaba en WAITING_PAYMENT incorrectamente, volviendo a READY`);
       await this.updateSessionState(userId, ConversationState.READY);
-      
+
       const weekStart = subscription.premiumWeekStart;
       const now = new Date();
       const hasUses = !weekStart || this.isNewWeek(weekStart, now) || subscription.premiumUsesLeft > 0;
-      
+
       if (hasUses) {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
         return await this.returnToMainMenu(userId, `🎉 ¡Hola de nuevo, ${getFirstName(user?.name)}! Tienes búsquedas disponibles.`);
@@ -1851,11 +1859,10 @@ Selecciona qué quieres editar:`,
     }
 
     // PLAN FREEMIUM
-    const daysSinceStart = Math.floor(
-      (Date.now() - subscription.freemiumStartDate.getTime()) / (1000 * 60 * 60 * 24),
-    );
+    // Verificar si pasaron 5 días hábiles (expiración por tiempo)
+    const businessDays = countBusinessDays(subscription.freemiumStartDate, new Date());
 
-    if (daysSinceStart >= 3 || subscription.freemiumUsesLeft <= 0) {
+    if (businessDays >= 5 || subscription.freemiumUsesLeft <= 0) {
       return { allowed: false, message: BotMessages.FREEMIUM_EXPIRED };
     }
 
@@ -1877,10 +1884,10 @@ Selecciona qué quieres editar:`,
         data: {
           userId,
           plan: 'FREEMIUM',
-          freemiumUsesLeft: 2, // Ya usó 1
+          freemiumUsesLeft: 4, // Ya usó 1 (de 5 totales)
         },
       });
-      return { usesLeft: 2 };
+      return { usesLeft: 4 };
     }
 
     // PLAN PREMIUM
@@ -1935,10 +1942,10 @@ Selecciona qué quieres editar:`,
         data: {
           userId,
           plan: 'FREEMIUM',
-          freemiumUsesLeft: 2, // Ya usó 1
+          freemiumUsesLeft: 4, // Ya usó 1 (de 5 totales)
         },
       });
-      return { allowed: true, usesLeft: 2 };
+      return { allowed: true, usesLeft: 4 };
     }
 
     // PLAN PREMIUM
@@ -2016,12 +2023,10 @@ Selecciona qué quieres editar:`,
     }
 
     // PLAN FREEMIUM
-    // Verificar si pasaron 3 días (expiración por tiempo)
-    const daysSinceStart = Math.floor(
-      (Date.now() - subscription.freemiumStartDate.getTime()) / (1000 * 60 * 60 * 24),
-    );
+    // Verificar si pasaron 5 días hábiles (expiración por tiempo)
+    const businessDays = countBusinessDays(subscription.freemiumStartDate, new Date());
 
-    if (daysSinceStart >= 3 || subscription.freemiumUsesLeft <= 0) {
+    if (businessDays >= 5 || subscription.freemiumUsesLeft <= 0) {
       // Marcar freemium como expirado
       await this.prisma.subscription.update({
         where: { userId },

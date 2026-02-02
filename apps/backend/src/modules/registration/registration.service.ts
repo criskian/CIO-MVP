@@ -16,7 +16,7 @@ import { RegisterUserDto } from './dto/register-user.dto';
 export class RegistrationService {
   private readonly logger = new Logger(RegistrationService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   /**
    * Registra un nuevo usuario con plan freemium
@@ -70,7 +70,7 @@ export class RegistrationService {
         subscription: {
           create: {
             plan: 'FREEMIUM',
-            freemiumUsesLeft: 3,
+            freemiumUsesLeft: 5,
             freemiumStartDate: new Date(),
             freemiumExpired: false,
             status: 'ACTIVE',
@@ -93,8 +93,8 @@ export class RegistrationService {
         phone: user.phone,
         email: user.email,
         plan: 'FREEMIUM',
-        usesLeft: 3,
-        daysLeft: 3,
+        usesLeft: 5,
+        daysLeft: 5, // 5 días hábiles
       },
       whatsappLink: `https://wa.me/573226906461?text=${encodeURIComponent('Hola CIO, quiero buscar trabajo')}`,
     };
@@ -134,7 +134,7 @@ export class RegistrationService {
         data: {
           userId: user.id,
           plan: 'FREEMIUM',
-          freemiumUsesLeft: 3,
+          freemiumUsesLeft: 6,
           freemiumStartDate: new Date(),
           freemiumExpired: false,
           status: 'ACTIVE',
@@ -209,15 +209,13 @@ export class RegistrationService {
 
     const subscription = user.subscription;
 
-    // Calcular días restantes de freemium
+    // Calcular días hábiles restantes de freemium
     let freemiumDaysLeft = 0;
     if (subscription && !subscription.freemiumExpired && subscription.plan === 'FREEMIUM') {
-      const daysSinceStart = Math.floor(
-        (Date.now() - subscription.freemiumStartDate.getTime()) / (1000 * 60 * 60 * 24),
-      );
-      freemiumDaysLeft = Math.max(0, 3 - daysSinceStart);
+      const businessDays = this.countBusinessDays(subscription.freemiumStartDate, new Date());
+      freemiumDaysLeft = Math.max(0, 5 - businessDays);
 
-      // Si pasaron los 3 días, marcar como expirado
+      // Si pasaron los 5 días hábiles, marcar como expirado
       if (freemiumDaysLeft === 0 && !subscription.freemiumExpired) {
         await this.prisma.subscription.update({
           where: { id: subscription.id },
@@ -239,6 +237,28 @@ export class RegistrationService {
       premiumUsesLeft: subscription?.premiumUsesLeft || 0,
       premiumEndDate: subscription?.premiumEndDate || null,
     };
+  }
+
+  /**
+   * Cuenta los días hábiles (lunes a viernes) entre dos fechas
+   */
+  private countBusinessDays(startDate: Date, endDate: Date): number {
+    let count = 0;
+    const current = new Date(startDate);
+    current.setHours(0, 0, 0, 0);
+
+    const end = new Date(endDate);
+    end.setHours(0, 0, 0, 0);
+
+    while (current < end) {
+      const dayOfWeek = current.getDay();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        count++;
+      }
+      current.setDate(current.getDate() + 1);
+    }
+
+    return count;
   }
 }
 

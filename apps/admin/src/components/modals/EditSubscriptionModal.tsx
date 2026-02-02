@@ -21,7 +21,7 @@ export default function EditSubscriptionModal({
 }: EditSubscriptionModalProps) {
   const [plan, setPlan] = useState<PlanType>('FREEMIUM');
   const [status, setStatus] = useState<SubscriptionStatus>('ACTIVE');
-  const [freemiumUsesLeft, setFreemiumUsesLeft] = useState(3);
+  const [freemiumUsesLeft, setFreemiumUsesLeft] = useState(5);
   const [premiumUsesLeft, setPremiumUsesLeft] = useState(5);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -109,7 +109,7 @@ export default function EditSubscriptionModal({
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-almia-purple"
             />
             <p className="mt-1 text-xs text-admin-text-secondary">
-              Normalmente: 3 usos por período de 3 días
+              Normalmente: 5 usos por período de 5 días hábiles (1 semana)
             </p>
           </div>
 

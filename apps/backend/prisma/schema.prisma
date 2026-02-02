@@ -67,8 +67,8 @@ model Subscription {
   // Plan actual
   plan              PlanType           @default(FREEMIUM)
   
-  // Control de usos freemium (3 búsquedas O 3 días)
-  freemiumUsesLeft  Int                @default(3)
+  // Control de usos freemium (5 búsquedas O 5 días hábiles)
+  freemiumUsesLeft  Int                @default(5)
   freemiumStartDate DateTime           @default(now())
   freemiumExpired   Boolean            @default(false)
   

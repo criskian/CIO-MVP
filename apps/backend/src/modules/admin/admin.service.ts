@@ -338,7 +338,7 @@ export class AdminService {
             update: {
                 plan: 'FREEMIUM',
                 status: 'ACTIVE',
-                freemiumUsesLeft: 3,
+                freemiumUsesLeft: 5,
                 freemiumStartDate: new Date(),
                 freemiumExpired: false,
             },
@@ -346,7 +346,7 @@ export class AdminService {
                 userId,
                 plan: 'FREEMIUM',
                 status: 'ACTIVE',
-                freemiumUsesLeft: 3,
+                freemiumUsesLeft: 5,
                 freemiumStartDate: new Date(),
                 freemiumExpired: false,
             },
@@ -421,42 +421,42 @@ export class AdminService {
             freemiumActive,
             premiumActive,
             freemiumExpired,
-            
+
             // Conteos en el período
             newUsersInPeriod,
             conversionsInPeriod,
             paymentsInPeriod,
-            
+
             // Actividad
             usersWithSearches,
             totalJobsSent,
-            
+
             // Ingresos
             totalRevenue,
         ] = await Promise.all([
             // Total usuarios
             this.prisma.user.count(),
-            
+
             // Freemium activos
             this.prisma.subscription.count({
                 where: { plan: 'FREEMIUM', freemiumExpired: false },
             }),
-            
+
             // Premium activos
             this.prisma.subscription.count({
                 where: { plan: 'PREMIUM', status: 'ACTIVE' },
             }),
-            
+
             // Freemium expirados
             this.prisma.subscription.count({
                 where: { freemiumExpired: true },
             }),
-            
+
             // Nuevos usuarios en el período
             this.prisma.user.count({
                 where: { createdAt: { gte: start, lte: end } },
             }),
-            
+
             // Conversiones a premium en el período
             this.prisma.subscription.count({
                 where: {
@@ -464,7 +464,7 @@ export class AdminService {
                     premiumStartDate: { gte: start, lte: end },
                 },
             }),
-            
+
             // Pagos en el período
             this.prisma.transaction.count({
                 where: {
@@ -472,13 +472,13 @@ export class AdminService {
                     createdAt: { gte: start, lte: end },
                 },
             }),
-            
+
             // Usuarios que han buscado (tienen perfil)
             this.prisma.userProfile.count(),
-            
+
             // Total de ofertas enviadas
             this.prisma.sentJob.count(),
-            
+
             // Ingresos totales (transacciones aprobadas)
             this.prisma.transaction.aggregate({
                 where: { wompiStatus: 'APPROVED' },
@@ -487,8 +487,8 @@ export class AdminService {
         ]);
 
         // Calcular tasa de conversión
-        const conversionRate = totalUsers > 0 
-            ? ((premiumActive / totalUsers) * 100).toFixed(1) 
+        const conversionRate = totalUsers > 0
+            ? ((premiumActive / totalUsers) * 100).toFixed(1)
             : '0';
 
         // Obtener series de tiempo para gráficos (últimos 30 días)
@@ -522,13 +522,13 @@ export class AdminService {
      */
     private async getDailyStats(start: Date, end: Date) {
         const days: { date: string; registros: number; conversiones: number; pagos: number }[] = [];
-        
+
         // Iterar por cada día en el rango
         const currentDate = new Date(start);
         while (currentDate <= end) {
             const dayStart = new Date(currentDate);
             dayStart.setHours(0, 0, 0, 0);
-            
+
             const dayEnd = new Date(currentDate);
             dayEnd.setHours(23, 59, 59, 999);
 

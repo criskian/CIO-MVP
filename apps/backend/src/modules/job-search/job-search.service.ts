@@ -71,10 +71,11 @@ export class JobSearchService {
 
   /**
    * Busca empleos para un usuario específico con sistema de caché inteligente
-   * - Primera búsqueda: 1 API call, envía 5, guarda resto + next_page_token
+   * - Primera búsqueda: 1 API call, envía maxResults, guarda resto + next_page_token
    * - Siguientes: usa cache + API si necesario
+   * @param maxResults - Máximo de ofertas a enviar (5 para PREMIUM, 3 para FREE)
    */
-  async searchJobsForUser(userId: string): Promise<JobSearchResult> {
+  async searchJobsForUser(userId: string, maxResults: number = 5): Promise<JobSearchResult> {
     try {
       this.logger.log(`🔍 Iniciando búsqueda de empleos para usuario ${userId}`);
 
@@ -116,39 +117,64 @@ export class JobSearchService {
       let allJobs: JobPosting[] = [];
       let newNextPageToken: string | undefined;
 
-      // 5. Lógica de caché: SIEMPRE combinar cache + nueva página API
+      // 5. Lógica de caché diferenciada por plan:
+      // - FREE: priorizar caché sin llamar API (ahorrar costos)
+      // - PREMIUM: combinar caché + API para mejores resultados
       const isCacheValid = cache && cache.profileHash === profileHash;
+      const isPremium = maxResults >= 5; // PREMIUM usa 5 resultados, FREE usa 3
 
-      if (isCacheValid && cache.nextPageToken) {
-        // Hay cache válido con token de siguiente página
-        // Combinar jobs cacheados + nueva página para tener pool más grande
-        const cachedJobs = cache.cachedJobs || [];
-        this.logger.log(`📦 Combinando ${cachedJobs.length} ofertas del caché con nueva página API...`);
-
-        // Llamar API para obtener siguiente página
-        const nextPageResult = await this.searchJobsSinglePage(searchQuery, cache.nextPageToken);
-
-        // Combinar cache + nuevos resultados
-        allJobs = [...cachedJobs, ...nextPageResult.jobs];
-        newNextPageToken = nextPageResult.nextPageToken;
-
-        this.logger.log(`📊 Pool combinado: ${allJobs.length} ofertas (${cachedJobs.length} cache + ${nextPageResult.jobs.length} nuevas)`);
-      } else {
-        // No hay cache válido o no hay más páginas - búsqueda nueva
-        if (cache && cache.profileHash !== profileHash) {
-          this.logger.log(`🔄 Perfil cambió, iniciando búsqueda nueva...`);
-        } else if (isCacheValid && !cache.nextPageToken) {
-          this.logger.log(`📄 Cache sin más páginas, usando solo cache restante...`);
-          allJobs = cache.cachedJobs || [];
+      if (isPremium) {
+        // === LÓGICA PREMIUM: combinar cache + API para más ofertas ===
+        if (isCacheValid && cache.nextPageToken) {
+          // Hay cache válido con token - combinar cache + nueva página
+          const cachedJobs = cache.cachedJobs || [];
+          this.logger.log(`📦 [PREMIUM] Combinando ${cachedJobs.length} ofertas del caché con nueva página API...`);
+          const nextPageResult = await this.searchJobsSinglePage(searchQuery, cache.nextPageToken);
+          allJobs = [...cachedJobs, ...nextPageResult.jobs];
+          newNextPageToken = nextPageResult.nextPageToken;
+          this.logger.log(`📊 Pool combinado: ${allJobs.length} ofertas`);
+        } else if (isCacheValid && cache.cachedJobs && cache.cachedJobs.length > 0) {
+          // Cache válido sin token - usar solo cache
+          this.logger.log(`📦 [PREMIUM] Usando ${cache.cachedJobs.length} ofertas del caché`);
+          allJobs = cache.cachedJobs;
         } else {
-          this.logger.log(`🆕 Primera búsqueda para este perfil`);
-        }
-
-        // Si no hay jobs del cache o es búsqueda nueva, llamar API
-        if (allJobs.length === 0) {
+          // Sin cache válido - búsqueda nueva
+          if (cache && cache.profileHash !== profileHash) {
+            this.logger.log(`🔄 [PREMIUM] Perfil cambió, iniciando búsqueda nueva...`);
+          } else {
+            this.logger.log(`🆕 [PREMIUM] Primera búsqueda para este perfil`);
+          }
           const result = await this.searchJobsSinglePage(searchQuery);
           allJobs = result.jobs;
           newNextPageToken = result.nextPageToken;
+        }
+      } else {
+        // === LÓGICA FREE: priorizar cache SIN llamar API (ahorrar créditos) ===
+        if (isCacheValid && cache.cachedJobs && cache.cachedJobs.length > 0) {
+          // Hay cache válido CON ofertas - usar cache primero (SIN llamar API)
+          this.logger.log(`📦 [FREE] Usando ${cache.cachedJobs.length} ofertas del caché (sin API call)`);
+          allJobs = cache.cachedJobs;
+          newNextPageToken = cache.nextPageToken; // Mantener token para cuando se agote
+        } else if (isCacheValid && cache.nextPageToken && (!cache.cachedJobs || cache.cachedJobs.length === 0)) {
+          // Cache vacío pero hay más páginas - cargar siguiente página
+          this.logger.log(`📄 [FREE] Cache vacío, cargando siguiente página...`);
+          const nextPageResult = await this.searchJobsSinglePage(searchQuery, cache.nextPageToken);
+          allJobs = nextPageResult.jobs;
+          newNextPageToken = nextPageResult.nextPageToken;
+        } else if (!isCacheValid || !cache) {
+          // Sin cache válido o perfil cambió - búsqueda nueva
+          if (cache && cache.profileHash !== profileHash) {
+            this.logger.log(`🔄 [FREE] Perfil cambió, iniciando búsqueda nueva...`);
+          } else {
+            this.logger.log(`🆕 [FREE] Primera búsqueda para este perfil`);
+          }
+          const result = await this.searchJobsSinglePage(searchQuery);
+          allJobs = result.jobs;
+          newNextPageToken = result.nextPageToken;
+        } else {
+          // Cache válido pero sin ofertas ni token - ofertas agotadas
+          this.logger.log(`⚠️ [FREE] Sin ofertas disponibles para este perfil`);
+          allJobs = [];
         }
       }
 
@@ -163,9 +189,9 @@ export class JobSearchService {
       // 7. Filtrar ofertas ya enviadas
       const filteredJobs = await this.filterAlreadySentJobs(userId, allJobs);
 
-      // 8. Separar: 5 para enviar, resto para cache
-      const jobsToSend = filteredJobs.slice(0, 5);
-      const jobsToCache = filteredJobs.slice(5);
+      // 8. Separar: maxResults para enviar, resto para cache
+      const jobsToSend = filteredJobs.slice(0, maxResults);
+      const jobsToCache = filteredJobs.slice(maxResults);
 
       // Detectar si se agotaron las ofertas
       const offersExhausted = jobsToCache.length === 0 && !newNextPageToken;

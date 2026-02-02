@@ -674,12 +674,10 @@ export class SchedulerService implements OnModuleInit {
       };
     }
 
-    // Verificar si pasaron 3 días
-    const daysSinceStart = Math.floor(
-      (Date.now() - subscription.freemiumStartDate.getTime()) / (1000 * 60 * 60 * 24),
-    );
+    // Verificar si pasaron 5 días hábiles
+    const businessDays = this.countBusinessDays(subscription.freemiumStartDate, new Date());
 
-    if (daysSinceStart >= 3 || subscription.freemiumUsesLeft <= 0) {
+    if (businessDays >= 5 || subscription.freemiumUsesLeft <= 0) {
       // Marcar freemium como expirado
       await this.prisma.subscription.update({
         where: { userId },
@@ -769,6 +767,29 @@ Una vez realices el pago, escríbeme por este chat para activar tu cuenta.`;
    */
   private getWeekStart(date: Date): Date {
     return new Date(date);
+  }
+
+  /**
+   * Cuenta los días hábiles (lunes a viernes) entre dos fechas
+   */
+  private countBusinessDays(startDate: Date, endDate: Date): number {
+    let count = 0;
+    const current = new Date(startDate);
+    current.setHours(0, 0, 0, 0);
+
+    const end = new Date(endDate);
+    end.setHours(0, 0, 0, 0);
+
+    while (current < end) {
+      const dayOfWeek = current.getDay();
+      // 0 = Domingo, 6 = Sábado
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        count++;
+      }
+      current.setDate(current.getDate() + 1);
+    }
+
+    return count;
   }
 }
 
