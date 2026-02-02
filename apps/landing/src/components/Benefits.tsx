@@ -8,9 +8,38 @@ interface BenefitsProps {
   whatsappLink: string;
 }
 
+type Currency = 'COP' | 'USD' | 'MXN';
+
+interface PriceData {
+  premium: { amount: string; period: string };
+  pro: { amount: string; period: string };
+}
+
+const prices: Record<Currency, PriceData> = {
+  COP: {
+    premium: { amount: '$20.000', period: '/ mes' },
+    pro: { amount: '$54.000', period: '/ 3 meses' },
+  },
+  USD: {
+    premium: { amount: '$6', period: '/ mes' },
+    pro: { amount: '$15', period: '/ 3 meses' },
+  },
+  MXN: {
+    premium: { amount: '$95', period: '/ mes' },
+    pro: { amount: '$257', period: '/ 3 meses' },
+  },
+};
+
+const currencyFlags: Record<Currency, string> = {
+  COP: '🇨🇴',
+  USD: '🇺🇸',
+  MXN: '🇲🇽',
+};
+
 export default function Benefits({ whatsappLink }: BenefitsProps) {
   const [isDesktop, setIsDesktop] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currency, setCurrency] = useState<Currency>('COP');
 
   useEffect(() => {
     const checkDesktop = () => {
@@ -20,6 +49,11 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
     window.addEventListener('resize', checkDesktop);
     return () => window.removeEventListener('resize', checkDesktop);
   }, []);
+
+  const handleCTAClick = () => {
+    setIsModalOpen(true);
+  };
+
   return (
     <section className="-mt-6 md:-mt-0 lg:-mt-[240px] pb-32 lg:pb-0 px-6 md:px-4 bg-white overflow-hidden">
       <div className="max-w-[1440px] mx-auto">
@@ -70,7 +104,7 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
             </div>
 
             {/* Sección de Beneficios */}
-            <div className="mt-1 md:mt-3 text-center lg:text-left lg:ml-[-90px]" style={{ transform: isDesktop ? 'translateY(30px)' : 'translateY(40px)' }}>
+            <div className="mt-1 md:mt-3 text-center lg:text-left lg:ml-[-90px]" style={{ transform: isDesktop ? 'translateY(60px)' : 'translateY(50px)' }}>
               {/* Título */}
               <h2
                 className="font-poppins font-bold text-[#2C2C2C] mb-2 md:mb-3 text-[26px] md:text-[34px] xl:text-[40px] leading-[1]"
@@ -81,83 +115,149 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
 
               {/* Texto con enlace */}
               <p
-                className="font-poppins text-[#2C2C2C] text-[14px] md:text-[16px] xl:text-[18px] leading-relaxed font-normal mb-6"
+                className="font-poppins text-[#2C2C2C] text-[14px] md:text-[16px] xl:text-[18px] leading-relaxed font-normal mb-4"
                 style={{ textShadow: '0px 2px 4px rgba(0, 0, 0, 0.18)' }}
               >
                 ¿Qué esperas para encontrar tu nueva oportunidad laboral? Empieza tu busqueda.
               </p>
 
-              {/* Pricing Cards */}
-              <div className="w-full flex flex-col sm:flex-row gap-4 mb-8">
+              {/* Currency Selector */}
+              <div className="flex flex-col items-center lg:items-start mb-4">
+                <div className="inline-flex bg-gray-100 rounded-full p-1 gap-1">
+                  {(['COP', 'USD', 'MXN'] as Currency[]).map((curr) => (
+                    <button
+                      key={curr}
+                      onClick={() => setCurrency(curr)}
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${currency === curr
+                        ? 'bg-[#9054C6] text-white shadow-md'
+                        : 'text-gray-600 hover:bg-gray-200'
+                        }`}
+                    >
+                      <span>{currencyFlags[curr]}</span>
+                      <span>{curr}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  * Los precios son referenciales. El cargo final se muestra en COP.
+                </p>
+              </div>
+
+              {/* Pricing Cards - 3 columns */}
+              <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
                 {/* Plan Free */}
-                <div className="flex-1 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-5 border border-gray-200 shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-xl hover:border-[#9054C6]/50 cursor-pointer">
-                  <div className="flex items-center gap-2 mb-3">
-                    <h3 className="font-poppins font-bold text-[#2C2C2C] text-lg">Plan Free</h3>
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-4 border border-gray-200 shadow-sm flex flex-col transition-all duration-300 hover:scale-105 hover:shadow-xl hover:border-[#9054C6]/50 cursor-pointer">
+                  <div className="mb-2">
+                    <h3 className="font-poppins font-bold text-[#2C2C2C] text-base">Plan Free</h3>
                   </div>
-                  <p className="font-poppins text-[#9054C6] font-bold text-2xl mb-3">$0 <span className="text-sm font-normal text-gray-500">/ 3 días</span></p>
-                  <ul className="space-y-2 text-sm text-gray-600">
-                    <li className="flex items-center gap-2">
-                      <span className="text-[#25D366]">✓</span>
-                      3 búsquedas personalizadas
+                  <p className="font-poppins text-[#9054C6] font-bold text-xl mb-3">
+                    $0 <span className="text-xs font-normal text-gray-500">/ Una semana</span>
+                  </p>
+                  <ul className="space-y-1.5 text-xs text-gray-600 flex-grow">
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#25D366] mt-0.5">✓</span>
+                      <span>1 semana cazando las mejores ofertas</span>
                     </li>
-                    <li className="flex items-center gap-2">
-                      <span className="text-[#25D366]">✓</span>
-                      Alertas de empleo diarias
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#25D366] mt-0.5">✓</span>
+                      <span>Alertas de empleo diarias</span>
                     </li>
-                    <li className="flex items-center gap-2">
-                      <span className="text-[#25D366]">✓</span>
-                      Perfil de búsqueda
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#25D366] mt-0.5">✓</span>
+                      <span>Búsqueda personalizada según preferencias</span>
                     </li>
                   </ul>
+                  <button
+                    onClick={handleCTAClick}
+                    className="mt-4 w-full py-2.5 bg-white border-2 border-[#9054C6] text-[#9054C6] font-poppins font-semibold rounded-lg hover:bg-[#9054C6] hover:text-white transition-all duration-300 text-sm"
+                  >
+                    Caza Ofertas ya!!
+                  </button>
+                  <p className="text-[10px] text-[#25D366] text-center mt-2 font-medium">
+                    *1 semana gratis
+                  </p>
                 </div>
 
                 {/* Plan Premium */}
-                <div className="flex-1 bg-gradient-to-br from-[#9054C6] to-[#7040A8] rounded-2xl p-5 border-2 border-[#B17DD9] shadow-lg relative overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:from-[#A060D8] hover:to-[#8050B8] cursor-pointer">
-                  {/* Badge Popular */}
-                  <div className="absolute top-0 right-0 bg-[#25D366] text-white text-xs font-bold px-3 py-1 rounded-bl-lg">
-                    POPULAR
+                <div className="bg-gradient-to-br from-[#9054C6] to-[#7040A8] rounded-2xl p-4 border-2 border-[#B17DD9] shadow-lg relative overflow-hidden flex flex-col transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer">
+                  <div className="mb-2">
+                    <h3 className="font-poppins font-bold text-white text-base">Plan Premium</h3>
                   </div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <h3 className="font-poppins font-bold text-white text-lg">Plan Premium</h3>
-                  </div>
-                  <p className="font-poppins text-white font-bold text-2xl mb-3">
-                    $20.000 <span className="text-sm font-normal text-white/70">COP / mes</span>
+                  <p className="font-poppins text-white font-bold text-xl mb-3">
+                    {prices[currency].premium.amount}{' '}
+                    <span className="text-xs font-normal text-white/70">{prices[currency].premium.period}</span>
                   </p>
-                  <ul className="space-y-2 text-sm text-white/90">
-                    <li className="flex items-center gap-2">
-                      <span className="text-[#25D366]">✓</span>
-                      5 búsquedas semanales (20/mes)
+                  <ul className="space-y-1.5 text-xs text-white/90 flex-grow">
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#25D366] mt-0.5">✓</span>
+                      <span>1 mes cazando las mejores ofertas</span>
                     </li>
-                    <li className="flex items-center gap-2">
-                      <span className="text-[#25D366]">✓</span>
-                      Alertas de empleo diarias
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#25D366] mt-0.5">✓</span>
+                      <span>Alertas de empleo diarias</span>
                     </li>
-                    <li className="flex items-center gap-2">
-                      <span className="text-[#25D366]">✓</span>
-                      Soporte prioritario
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#25D366] mt-0.5">✓</span>
+                      <span>Búsqueda personalizada según rol</span>
                     </li>
-                    <li className="flex items-center gap-2">
-                      <span className="text-[#25D366]">✓</span>
-                      Cancela cuando quieras
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#25D366] mt-0.5">✓</span>
+                      <span>Soporte de mentor Almia para ajustar tu búsqueda</span>
                     </li>
                   </ul>
+                  <button
+                    onClick={handleCTAClick}
+                    className="mt-4 w-full py-2.5 bg-white text-[#9054C6] font-poppins font-semibold rounded-lg hover:bg-gray-100 transition-all duration-300 text-sm"
+                  >
+                    Comenzar ahora
+                  </button>
+                </div>
+
+                {/* Plan Pro */}
+                <div className="bg-gradient-to-br from-[#2C2C2C] to-[#1a1a1a] rounded-2xl p-4 border-2 border-[#9054C6] shadow-lg relative overflow-hidden flex flex-col transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer">
+                  {/* Badge Descuento */}
+                  <div className="absolute top-0 right-0 bg-[#25D366] text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg">
+                    -10%
+                  </div>
+                  <div className="mb-2">
+                    <h3 className="font-poppins font-bold text-white text-base">Plan Pro</h3>
+                  </div>
+                  <p className="font-poppins text-[#9054C6] font-bold text-xl mb-3">
+                    {prices[currency].pro.amount}{' '}
+                    <span className="text-xs font-normal text-gray-400">{prices[currency].pro.period}</span>
+                  </p>
+                  <ul className="space-y-1.5 text-xs text-gray-300 flex-grow">
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#25D366] mt-0.5">✓</span>
+                      <span>3 meses cazando las mejores ofertas</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#25D366] mt-0.5">✓</span>
+                      <span>Alertas de empleo diarias</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#25D366] mt-0.5">✓</span>
+                      <span>Búsqueda personalizada según rol</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#25D366] mt-0.5">✓</span>
+                      <span>Soporte de mentor Almia</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-[#9054C6] mt-0.5">★</span>
+                      <span>Acceso a GPT Almia Career Advisor para ajustar tu CV</span>
+                    </li>
+                  </ul>
+                  <button
+                    onClick={handleCTAClick}
+                    className="mt-4 w-full py-2.5 bg-[#9054C6] text-white font-poppins font-semibold rounded-lg hover:bg-[#A060D8] transition-all duration-300 text-sm"
+                  >
+                    Obtener Pro
+                  </button>
                 </div>
               </div>
 
-              {/* Botón */}
-              <div className="w-full flex flex-col gap-3 items-center lg:items-start">
-                {/* Botón principal - Empieza Ahora */}
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  className="font-poppins inline-flex items-center justify-center gap-3 px-12 md:px-16 lg:px-20 py-2.5 md:py-3 bg-[#25D366] text-white font-normal rounded-lg border-2 border-[#25D366] hover:bg-white hover:text-[#25D366] transition-all duration-300 shadow-lg"
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-                  </svg>
-                  <span>Empieza Gratis</span>
-                </button>
-                <p className="text-xs text-gray-500">Comienza con el Plan Free, actualiza cuando quieras</p>
-              </div>
+
             </div>
           </div>
         </div>
@@ -171,4 +271,3 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
     </section>
   );
 }
-
