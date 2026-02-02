@@ -118,7 +118,7 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
                 className="font-poppins text-[#2C2C2C] text-[14px] md:text-[16px] xl:text-[18px] leading-relaxed font-normal mb-4"
                 style={{ textShadow: '0px 2px 4px rgba(0, 0, 0, 0.18)' }}
               >
-                ¿Qué esperas para encontrar tu nueva oportunidad laboral? Empieza tu busqueda.
+                ¿Qué esperas para encontrar tu nueva oportunidad laboral? Empieza tu búsqueda.
               </p>
 
               {/* Currency Selector */}
@@ -139,7 +139,7 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
                   ))}
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  * Los precios son referenciales. El cargo final se muestra en COP.
+                  * Para dólar (USD) y peso mexicano (MXN) los precios son referenciales. El cargo final se muestra en la pasarela de pago.
                 </p>
               </div>
 
@@ -214,7 +214,7 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
                 </div>
 
                 {/* Plan Pro */}
-                <div className="bg-gradient-to-br from-[#2C2C2C] to-[#1a1a1a] rounded-2xl p-4 border-2 border-[#9054C6] shadow-lg relative overflow-hidden flex flex-col transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer">
+                <div className="bg-gradient-to-br from-[#646363] to-[#1a1a1a] rounded-2xl p-4 border-2 border-[#a6a6a6] shadow-lg relative overflow-hidden flex flex-col transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer">
                   {/* Badge Descuento */}
                   <div className="absolute top-0 right-0 bg-[#25D366] text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg">
                     -10%
@@ -222,7 +222,7 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
                   <div className="mb-2">
                     <h3 className="font-poppins font-bold text-white text-base">Plan Pro</h3>
                   </div>
-                  <p className="font-poppins text-[#9054C6] font-bold text-xl mb-3">
+                  <p className="font-poppins text-white font-bold text-xl mb-3">
                     {prices[currency].pro.amount}{' '}
                     <span className="text-xs font-normal text-gray-400">{prices[currency].pro.period}</span>
                   </p>
@@ -250,7 +250,7 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
                   </ul>
                   <button
                     onClick={handleCTAClick}
-                    className="mt-4 w-full py-2.5 bg-[#9054C6] text-white font-poppins font-semibold rounded-lg hover:bg-[#A060D8] transition-all duration-300 text-sm"
+                    className="mt-4 w-full py-2.5 bg-white text-[#2c2c2c] font-poppins font-semibold rounded-lg hover:bg-[#e6e6e6] transition-all duration-300 text-sm"
                   >
                     Obtener Pro
                   </button>
