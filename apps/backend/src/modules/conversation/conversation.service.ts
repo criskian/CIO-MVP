@@ -654,13 +654,17 @@ export class ConversationService {
     // Transición: ASK_ALERT_TIME → READY
     await this.updateSessionState(userId, ConversationState.READY);
 
-    const confirmationMessage = `¡Perfecto! ✅ Tus alertas están configuradas.
-
+    const confirmationMessage = `¡Listo! ✅
+Tus alertas están activadas 🔔
 ⏰ *Hora:* ${alertTime}
 
-Te enviaré ofertas nuevas *todos los días* directamente a este chat.
+Cuando recibas una alerta, te avisaré que hay nuevas ofertas y podrás tocar "Buscar empleos" para verlas.
 
-🎯 *¡Tu perfil está listo!* Ya puedes empezar a buscar ofertas.`;
+ℹ️ *Ten en cuenta:*
+Cada vez que presionas "Buscar empleos", se consume 1 búsqueda de tu plan.
+📅 *Plan Free:* 5 búsquedas por semana. Cada búsqueda trae hasta 7 ofertas ideales para ti.
+
+👆 *¿Qué quieres hacer ahora?*`;
 
     // Siempre mostrar lista interactiva con comandos
     return {
@@ -804,29 +808,16 @@ Te enviaré ofertas nuevas *todos los días* directamente a este chat.
         return { text: usageCheck.message || BotMessages.FREEMIUM_EXPIRED };
       }
 
-      // Ejecutar búsqueda
-      const searchResult = await this.performJobSearch(userId);
+      // Descontar uso PRIMERO para obtener el usesLeft correcto
+      const deduction = await this.deductUsage(userId);
 
-      // SOLO descontar si la búsqueda fue exitosa (no hubo error)
-      // Detectamos el error por el mensaje específico de fallo
+      // Ejecutar búsqueda con el usesLeft actualizado
+      const searchResult = await this.performJobSearch(userId, deduction.usesLeft);
+
+      // Si hubo error en la búsqueda, el uso ya fue descontado (comportamiento esperado)
       const isError = searchResult.text?.includes('Lo siento, no pude buscar ofertas');
-
-      if (!isError) {
-        // Búsqueda exitosa → descontar uso
-        const deduction = await this.deductUsage(userId);
-
-        // Agregar info de usos restantes al mensaje
-        const subscription = await this.prisma.subscription.findUnique({
-          where: { userId },
-        });
-
-        if (subscription?.plan === 'PREMIUM') {
-          searchResult.text += BotMessages.USES_REMAINING_PREMIUM(deduction.usesLeft);
-        } else {
-          searchResult.text += BotMessages.USES_REMAINING_FREEMIUM(deduction.usesLeft);
-        }
-      } else {
-        this.logger.log(`⚠️ Búsqueda falló para usuario ${userId}, no se descuenta uso`);
+      if (isError) {
+        this.logger.log(`⚠️ Búsqueda falló para usuario ${userId}, pero el uso ya fue descontado`);
       }
 
       return searchResult;
@@ -869,7 +860,7 @@ Te enviaré ofertas nuevas *todos los días* directamente a este chat.
   /**
    * Ejecuta búsqueda de empleos y devuelve resultados formateados
    */
-  private async performJobSearch(userId: string): Promise<BotReply> {
+  private async performJobSearch(userId: string, usesLeftAfterDeduction?: number): Promise<BotReply> {
     try {
       this.logger.log(`🔍 Usuario ${userId} solicitó búsqueda de empleos`);
 
@@ -908,8 +899,19 @@ Intenta de nuevo más tarde o escribe "reiniciar" para ajustar tus preferencias.
       // Tiempo de espera para mensaje retrasado: 10 segundos
       const DELAY_MS = 10000;
 
-      // Siempre enviar menú en mensaje retrasado después de mostrar ofertas
-      const menuText = `¿Qué quieres hacer ahora?`;
+      // Usar usesLeft pasado como parámetro (ya descontado) o consultar DB
+      const usesLeft = usesLeftAfterDeduction ?? subscription?.freemiumUsesLeft ?? 0;
+      const isPremium = subscription?.plan === 'PREMIUM';
+
+      // Construir mensaje retrasado con info de búsquedas
+      const planLabel = isPremium ? 'Plan Premium' : 'Plan Free';
+      const menuText = `ℹ️ *Búsquedas restantes esta semana:* ${usesLeft} (${planLabel})
+
+Si estas ofertas no se ajustan del todo a lo que buscas, puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
+
+⚠️ Recuerda: mañana recibirás nuevas alertas y podrás volver a buscar ofertas.
+
+¿Qué quieres hacer ahora?`;
 
       return {
         text: formattedJobs + exhaustedMessage,
@@ -1268,7 +1270,11 @@ Selecciona qué quieres editar:`,
     await this.updateUserProfile(userId, { role });
     await this.updateSessionState(userId, ConversationState.READY);
 
-    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('rol', role));
+    // Obtener nombre del usuario para mensaje personalizado
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    const firstName = user?.name ? getFirstName(user.name) : null;
+
+    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('cargo', role, firstName));
   }
 
   /**

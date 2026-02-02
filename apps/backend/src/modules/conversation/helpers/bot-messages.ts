@@ -35,11 +35,14 @@ El registro es *gratis* y solo toma unos segundos. Una vez registrado, podrás c
 Con CIO verás oportunidades de empleo relevantes en Latam de manera *rápida y práctica*. 
 
 💼 Tu versión Free incluye: 
-• 3 búsquedas personalizadas 
-• Alertas diarias según tus preferencias
-• Válido por 3 días
 
-💡 Tip Almia: Planear tu búsqueda con claridad aumenta tus posibilidades de éxito.`,
+🗓️ 1 semana cazando las mejores ofertas
+
+🔔 Alertas de empleo diarias
+
+🎯 Búsqueda personalizada según tus preferencias
+
+Yo me encargo de buscar oportunidades alineadas a tu perfil, para que tú inviertas tu energía en aplicar mejor ✨`,
 
   // Mensaje cuando completa el onboarding
   ONBOARDING_COMPLETE: (name: string) => `¡Perfecto, *${name}*! ✅ Tu perfil está listo.
@@ -65,25 +68,23 @@ Escribe *"buscar"* cuando estés listo y te mostraré las mejores ofertas que en
   TERMS_REJECTED: `Entiendo. Si cambias de opinión, puedes escribirme de nuevo cuando quieras. ¡Éxito en tu búsqueda de empleo! 👋`,
 
   // Preguntas del onboarding
-  ASK_ROLE: `¡Perfecto! Comencemos 🎯
+  ASK_ROLE: `¡Genial! 🎯
 
-*¿Cuál es el cargo o rol PRINCIPAL en el que te gustaría trabajar ahora?*
+*¿Cuál es el cargo o profesión PRINCIPAL en el que te gustaría trabajar ahora?*
 
-Escribe el más importante para ti en este momento.
+👉 Escribe solo UNO para que la búsqueda sea más acertada.
 
-*Ejemplos:*
-• "Vendedor"
-• "Marketing"
-• "Analista de datos"
-• "Asistente administrativo"
-• "Diseñador UX"
-• "Ingeniero industrial"
+*Ejemplos:* Asesor Comercial - Marketing - Analista de datos - Auxiliar Administrativo - Ingeniero Industrial - Desarrollador de software
 
-_Después podrás EDITAR tus prerencias de búsquedas si decides cambiar de cargo o profesión._`,
+Después podrás EDITAR tus prerencias de búsquedas si decides cambiar de cargo o profesión.
 
-  ASK_EXPERIENCE: `Genial. Ahora dime:
+💡 _Tip: si buscas trabajo remoto, escribe el cargo y al final agrega la palabra “remoto”_
+_Ejemplo: Analista de datos remoto_`,
 
-¿Cuántos años de experiencia tienes en este campo?`,
+  ASK_EXPERIENCE: `¡Perfecto! Ahora dime tu nivel de experiencia en este rol: 
+Elige una opción 👇
+
+💡 _Tip Almia: Conocer tu nivel te permite enfocar tu desarrollo y aprovechar mejor las oportunidades_`,
 
   ASK_LOCATION: `Excelente. Ahora dime:
 
@@ -236,11 +237,11 @@ Esto eliminará toda tu configuración actual y comenzarás desde cero.`,
 
 Esto eliminará toda tu información y no recibirás más alertas.`,
 
-  SERVICE_CANCELLED: `Entiendo. Tus preferencias de búsqueda han sido eliminadas y ya no recibirás alertas.
+  SERVICE_CANCELLED: `Listo ✅ 
 
-Tu cuenta permanece registrada. Si cambias de opinión en el futuro, puedes escribirme nuevamente para reconfigurar tus preferencias.
+Tus preferencias se han eliminado y ya no recibirás alertas. Tu cuenta sigue activa, así que puedes volver cuando quieras. 
 
-¡Mucha suerte en tu búsqueda de empleo! 🍀`,
+💡 _Tip Almia: Aprovecha este tiempo para reforzar tu CV y LinkedIn; pequeñas mejoras hoy pueden abrir grandes oportunidades mañana._`,
 
   CANCEL_SERVICE_ABORTED: `¡Me alegra que te quedes! 😊 Tu perfil sigue activo.`,
 
@@ -255,7 +256,14 @@ Tu cuenta permanece registrada. Si cambias de opinión en el futuro, puedes escr
 🔹 *Ubicación:* ${profile.location}
 ⏰ *Horario de alertas:* ${profile.alertTime}
 
-Selecciona qué quieres editar en la lista.`,
+Selecciona qué quieres editar en la lista.
+
+💡 _Tips rápidos_
+
+📍 Ubicación: si estás abierto/a, escribe solo el país (ej: Colombia).
+Para remoto, escribe el país desde donde te gustaría trabajar.
+
+🎯 Cargo: si no hay resultados, prueba con áreas (Tecnología, Ventas, Marketing) o habilidades (Power BI, IA, Excel).`,
 
   EDIT_FIELD_NOT_FOUND: `No entendí qué campo quieres editar. 😅
 
@@ -264,7 +272,8 @@ Por favor, selecciona una opción de la lista.`,
   FIELD_UPDATED: (
     fieldName: string,
     newValue: string,
-  ) => `✅ Perfecto! Tu *${fieldName}* ha sido actualizado a: *${newValue}*
+    name?: string | null,
+  ) => `✅ Perfecto${name ? ` ${name}` : ''}! Tu *${fieldName}* ha sido actualizado a: *${newValue}*
 
 Tu perfil está listo. Puedes:
 • Escribir *"buscar"* para encontrar ofertas ahora
@@ -286,14 +295,14 @@ Escribe el comando que desees.`,
   // Ofrecer alertas durante onboarding (antes de primera búsqueda)
   OFFER_ALERTS: `¡Ya casi terminamos! 🎯
 
-¿Te gustaría recibir *alertas automáticas* de empleo? 🔔
+¿Quieres que te envíe alertas automáticas diarias de empleo? 🔔
 
-Si activas las alertas, te enviaré ofertas nuevas *todos los días* directamente a este chat según tus preferencias.
+✨ *Beneficios:*
+• No tienes que estar buscando
+• Recibes ofertas actualizadas diarias según tu perfil
+• Tú eliges la hora de envío
 
-📬 *Beneficios:*
-• No tienes que acordarte de buscar
-• Recibes ofertas frescas automáticamente
-• Puedes elegir la hora de envío`,
+👆 Elige una opción:`,
 
   // Confirmación de rechazo de alertas
   ALERTS_DISABLED: `Perfecto, *no activaré las alertas automáticas*. ✅

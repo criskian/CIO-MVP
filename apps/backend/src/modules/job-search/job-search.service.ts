@@ -1508,8 +1508,6 @@ Intenta de nuevo más tarde o ajusta tus preferencias.`;
       })
       .join('\n');
 
-    const footer = `\n_Tip: Click en los enlaces para ver más detalles y aplicar._ 🚀`;
-
-    return header + jobsText + footer;
+    return header + jobsText;
   }
 }
