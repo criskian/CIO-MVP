@@ -90,7 +90,7 @@ Elige una opción 👇
 
 ¿En qué ciudad estás buscando empleo?
 
-_(Si no tienes una ciudad específica, dinos al menos el país de preferencia, es necesario para la búsqueda)_
+⚠️ *Escribe solo UNA ubicación* (ciudad o país)
 
 Ejemplo: "Bogotá", "Lima", "Colombia", "Argentina", etc.`,
 
@@ -163,6 +163,12 @@ Ejemplo: "Vendedor", "Marketing", "Analista", "Diseñador", etc.`,
   ERROR_LOCATION_INVALID: `Por favor, ingresa una ciudad o país válido.
 
 Ejemplo: "Bogotá", "Lima", "México", "Colombia", "Perú", etc.`,
+
+  ERROR_LOCATION_TOO_VAGUE: `Esa ubicación es muy amplia para buscar ofertas. 🌎
+
+Por favor escribe una *ciudad* o *país* específico.
+
+Ejemplo: "Colombia", "México", "Bogotá", "Lima", etc.`,
 
   // [DESACTIVADO] Mensajes de error para modalidad de trabajo
   // Puede reactivarse en el futuro si se requiere
@@ -339,31 +345,30 @@ _(Si cambias de opinión más adelante, puedes activar las alertas desde el men�
   // ==========================================
 
   // Freemium agotado (primera vez)
-  FREEMIUM_EXPIRED: `*⏳ Tu acceso gratuito a CIO ha finalizado*
+  FREEMIUM_EXPIRED: `⏳ *Se acabaron tus búsquedas del Plan Free*
 
-Ya usaste tus 3 alertas gratuitas o han pasado 3 días desde tu registro.
+No frenes tu búsqueda ahora 💪
+Con CIO Premium sigues recibiendo ofertas reales y alineadas a tu perfil, sin perder tiempo.
 
-🚀 *No frenes tu búsqueda ahora.*
+🎉 *CIO Premium – $20.000 COP / mes*
+Incluye:
 
-Con *CIO Premium* sigues recibiendo *ofertas reales y alineadas a tu perfil*, sin perder tiempo buscando manualmente.
+🔍 Cazar ofertas durante todo el mes
 
-Por solo *$20.000 COP* tienes acceso por *30 días* a:
+* Mayor cantidad de ofertas por búsqueda
 
-✅ Hasta *20 búsquedas de empleo al mes*
+🤝 Soporte de un mentor Almia para ajustar tu búsqueda
 
-✅ *Alertas personalizadas* directo a WhatsApp
+🔔 Alertas diarias por WhatsApp
 
-✅ Ahorro de horas semanales buscando vacantes
+🎯 Búsqueda personalizada según tu cargo
 
-🔐 *Activa tu Plan Premium aquí por solo $20.000 COP:*
-
+👉 *Activa tu plan aquí:*
 ${WOMPI_CHECKOUT_LINK}
 
-Después del pago, solo escríbenos el *correo con el que pagaste* y activamos tu acceso automáticamente.
+Después del pago, escríbenos el correo con el que pagaste y activamos tu acceso de inmediato ⚡
 
-💬 ¿Tienes dudas o quieres hablar con un humano?
-
-Escríbenos directamente por WhatsApp: *+57 333 239 3280*`,
+💬 ¿Tienes dudas? Escríbenos +57 3332393280 y te ayudamos.`,
 
   // Premium expirado por 30 días
   PREMIUM_EXPIRED: `*⏰ Tu Plan Premium ha finalizado*

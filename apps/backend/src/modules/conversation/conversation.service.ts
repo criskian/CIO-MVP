@@ -23,6 +23,7 @@ import {
   normalizeRole,
   normalizeExperienceLevel,
   normalizeLocation,
+  validateAndNormalizeLocation,
   // normalizeWorkMode, // [DESACTIVADO] Función comentada
   normalizeJobType,
   normalizeSalary,
@@ -300,10 +301,9 @@ export class ConversationService {
       this.logger.log(`👑 Usuario premium ${userId}`);
       await this.updateSessionState(userId, ConversationState.ASK_TERMS);
       return {
-        text: `${BotMessages.WELCOME_BACK_PREMIUM(getFirstName(user.name))}\n\n${BotMessages.ASK_TERMS}`,
+        text: BotMessages.WELCOME_BACK_PREMIUM(getFirstName(user.name)),
         buttons: [
-          { id: 'accept_terms', title: 'Acepto' },
-          { id: 'reject_terms', title: 'No acepto' },
+          { id: 'continue', title: 'Continuar' },
         ],
       };
     }
@@ -333,15 +333,14 @@ export class ConversationService {
       });
     }
 
-    // CASO 4: Usuario freemium activo → dar bienvenida e ir directo a términos
+    // CASO 4: Usuario freemium activo → dar bienvenida con botón Continuar
     this.logger.log(`🆕 Usuario ${userId} iniciando onboarding`);
     await this.updateSessionState(userId, ConversationState.ASK_TERMS);
 
     return {
-      text: `${BotMessages.WELCOME_REGISTERED(getFirstName(user?.name))}\n\n${BotMessages.ASK_TERMS}`,
+      text: BotMessages.WELCOME_REGISTERED(getFirstName(user?.name)),
       buttons: [
-        { id: 'accept_terms', title: 'Acepto' },
-        { id: 'reject_terms', title: 'No acepto' },
+        { id: 'continue', title: 'Continuar' },
       ],
     };
   }
@@ -351,34 +350,23 @@ export class ConversationService {
   // private async handleAskDeviceState(userId: string, text: string): Promise<BotReply> { ... }
 
   /**
-   * Estado ASK_TERMS: Esperando aceptación de términos
-   * ACTUALIZADO: Siempre usa botones interactivos
+   * Estado ASK_TERMS: Esperando que el usuario presione Continuar
+   * ACTUALIZADO: Ya no pide aceptar términos, solo un botón para continuar
    */
   private async handleAskTermsState(
     userId: string,
     text: string,
     intent: UserIntent,
   ): Promise<BotReply> {
-    if (isAcceptance(text) || intent === UserIntent.ACCEPT) {
-      // Usuario aceptó términos
+    // Cualquier interacción (botón o texto) avanza al siguiente paso
+    if (isAcceptance(text) || intent === UserIntent.ACCEPT || text.toLowerCase().includes('continu')) {
       await this.updateSessionState(userId, ConversationState.ASK_ROLE);
       return { text: BotMessages.ASK_ROLE };
     }
 
-    if (isRejection(text) || intent === UserIntent.REJECT) {
-      // Usuario rechazó términos
-      await this.updateSessionState(userId, ConversationState.NEW); // Volver a NEW
-      return { text: BotMessages.TERMS_REJECTED };
-    }
-
-    // No entendió la respuesta, repetir pregunta con botones
-    return {
-      text: `${BotMessages.ASK_TERMS}\n\n_Por favor, selecciona una opción:_`,
-      buttons: [
-        { id: 'accept_terms', title: 'Acepto' },
-        { id: 'reject_terms', title: 'No acepto' },
-      ],
-    };
+    // Si el usuario escribe cualquier cosa, también continuar
+    await this.updateSessionState(userId, ConversationState.ASK_ROLE);
+    return { text: BotMessages.ASK_ROLE };
   }
 
   /**
@@ -498,13 +486,18 @@ export class ConversationService {
    * ACTUALIZADO: Ahora va a OFFER_ALERTS para preguntar si quiere alertas (antes de poder buscar)
    */
   private async handleAskLocationState(userId: string, text: string): Promise<BotReply> {
-    const location = normalizeLocation(text);
+    const validation = validateAndNormalizeLocation(text);
 
-    if (!location) {
+    // Verificar si es una ubicación demasiado vaga
+    if (validation.errorType === 'too_vague') {
+      return { text: BotMessages.ERROR_LOCATION_TOO_VAGUE };
+    }
+
+    if (!validation.isValid || !validation.location) {
       return { text: BotMessages.ERROR_LOCATION_INVALID };
     }
 
-    await this.updateUserProfile(userId, { location });
+    await this.updateUserProfile(userId, { location: validation.location });
 
     // [ACTUALIZADO] Flujo: ASK_LOCATION → OFFER_ALERTS (preguntar si quiere alertas antes de buscar)
     await this.updateSessionState(userId, ConversationState.OFFER_ALERTS);
@@ -662,7 +655,7 @@ Cuando recibas una alerta, te avisaré que hay nuevas ofertas y podrás tocar "B
 
 ℹ️ *Ten en cuenta:*
 Cada vez que presionas "Buscar empleos", se consume 1 búsqueda de tu plan.
-📅 *Plan Free:* 5 búsquedas por semana. Cada búsqueda trae hasta 7 ofertas ideales para ti.
+📅 *Plan Free:* 5 búsquedas por semana. Cada búsqueda trae hasta 3 ofertas ideales para ti.
 
 👆 *¿Qué quieres hacer ahora?*`;
 
@@ -1000,20 +993,16 @@ Por favor intenta de nuevo en unos minutos.`,
 
   /**
    * Estado CONFIRM_RESTART: Confirmando reinicio de perfil
-   * ACTUALIZADO: Siempre usa botones interactivos y va a ASK_TERMS con botones
+   * ACTUALIZADO: Va directamente a ASK_ROLE (sin términos)
    */
   private async handleConfirmRestartState(userId: string, text: string): Promise<BotReply> {
     if (isAcceptance(text)) {
       // Usuario confirmó reinicio
       await this.restartUserProfile(userId);
-      await this.updateSessionState(userId, ConversationState.ASK_TERMS);
-      // Mostrar términos con botones después de reiniciar
+      await this.updateSessionState(userId, ConversationState.ASK_ROLE);
+      // Ir directamente a preguntar rol
       return {
-        text: `${BotMessages.RESTARTED}\n\n${BotMessages.ASK_TERMS}`,
-        buttons: [
-          { id: 'accept_terms', title: 'Acepto' },
-          { id: 'reject_terms', title: 'No acepto' },
-        ],
+        text: `${BotMessages.RESTARTED}\n\n${BotMessages.ASK_ROLE}`,
       };
     }
 
@@ -1317,18 +1306,23 @@ Selecciona qué quieres editar:`,
    * Estado EDIT_LOCATION: Editando ubicación
    */
   private async handleEditLocationState(userId: string, text: string): Promise<BotReply> {
-    const location = normalizeLocation(text);
+    const validation = validateAndNormalizeLocation(text);
 
-    if (!location) {
+    // Verificar si es una ubicación demasiado vaga
+    if (validation.errorType === 'too_vague') {
+      return { text: BotMessages.ERROR_LOCATION_TOO_VAGUE };
+    }
+
+    if (!validation.isValid || !validation.location) {
       return { text: BotMessages.ERROR_LOCATION_INVALID };
     }
 
     await this.updateUserProfile(userId, {
-      location,
+      location: validation.location,
     });
     await this.updateSessionState(userId, ConversationState.READY);
 
-    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('ubicación', location));
+    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('ubicación', validation.location));
   }
 
   // [DESACTIVADO] Handler de EDIT_WORK_MODE - Puede reactivarse en el futuro

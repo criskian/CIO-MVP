@@ -587,16 +587,306 @@ export function normalizeSalary(text: string): number | null {
   return null;
 }
 
-//Valida que un texto sea una ubicación válida (ciudad o país, cualquier texto > 2 caracteres)
-export function normalizeLocation(text: string): string | null {
-  const normalizedText = text.trim();
+// ===== VALIDACIÓN DE UBICACIÓN =====
 
-  if (normalizedText.length >= 2) {
-    // Capitalizar primera letra
-    return normalizedText.charAt(0).toUpperCase() + normalizedText.slice(1).toLowerCase();
+/**
+ * Diccionario de ubicaciones válidas en LATAM
+ * Mapea variantes (incluyendo typos comunes) a la forma correcta
+ */
+const KNOWN_LOCATIONS: Record<string, string> = {
+  // Colombia - Ciudades principales
+  'bogota': 'Bogotá',
+  'bogotá': 'Bogotá',
+  'medellin': 'Medellín',
+  'medellín': 'Medellín',
+  'cali': 'Cali',
+  'barranquilla': 'Barranquilla',
+  'cartagena': 'Cartagena',
+  'bucaramanga': 'Bucaramanga',
+  'pereira': 'Pereira',
+  'manizales': 'Manizales',
+  'cucuta': 'Cúcuta',
+  'cúcuta': 'Cúcuta',
+  'ibague': 'Ibagué',
+  'ibagué': 'Ibagué',
+  'santa marta': 'Santa Marta',
+  'villavicencio': 'Villavicencio',
+  'pasto': 'Pasto',
+  'monteria': 'Montería',
+  'montería': 'Montería',
+  'neiva': 'Neiva',
+  'armenia': 'Armenia',
+  'popayan': 'Popayán',
+  'popayán': 'Popayán',
+  'palmira': 'Palmira',
+  'valledupar': 'Valledupar',
+  'tunja': 'Tunja',
+  'floridablanca': 'Floridablanca',
+  'soledad': 'Soledad',
+  'soacha': 'Soacha',
+  'envigado': 'Envigado',
+  'bello': 'Bello',
+  'itagui': 'Itagüí',
+  'itagüí': 'Itagüí',
+
+  // Colombia - Typos comunes
+  'coilombia': 'Colombia',
+  'colomgia': 'Colombia',
+  'colmbia': 'Colombia',
+  'colomba': 'Colombia',
+  'bogta': 'Bogotá',
+  'bogot': 'Bogotá',
+  'medelín': 'Medellín',
+  'medelin': 'Medellín',
+  'barranqilla': 'Barranquilla',
+  'baranquilla': 'Barranquilla',
+
+  // Países LATAM
+  'colombia': 'Colombia',
+  'mexico': 'México',
+  'méxico': 'México',
+  'argentina': 'Argentina',
+  'peru': 'Perú',
+  'perú': 'Perú',
+  'chile': 'Chile',
+  'ecuador': 'Ecuador',
+  'venezuela': 'Venezuela',
+  'bolivia': 'Bolivia',
+  'uruguay': 'Uruguay',
+  'paraguay': 'Paraguay',
+  'panama': 'Panamá',
+  'panamá': 'Panamá',
+  'costa rica': 'Costa Rica',
+  'guatemala': 'Guatemala',
+  'honduras': 'Honduras',
+  'el salvador': 'El Salvador',
+  'nicaragua': 'Nicaragua',
+  'republica dominicana': 'República Dominicana',
+  'república dominicana': 'República Dominicana',
+  'puerto rico': 'Puerto Rico',
+  'cuba': 'Cuba',
+
+  // México - Ciudades principales
+  'cdmx': 'Ciudad de México',
+  'ciudad de mexico': 'Ciudad de México',
+  'ciudad de méxico': 'Ciudad de México',
+  'guadalajara': 'Guadalajara',
+  'monterrey': 'Monterrey',
+  'puebla': 'Puebla',
+  'tijuana': 'Tijuana',
+  'leon': 'León',
+  'león': 'León',
+  'juarez': 'Juárez',
+  'juárez': 'Juárez',
+  'merida': 'Mérida',
+  'mérida': 'Mérida',
+  'cancun': 'Cancún',
+  'cancún': 'Cancún',
+  'queretaro': 'Querétaro',
+  'querétaro': 'Querétaro',
+
+  // Argentina - Ciudades principales
+  'buenos aires': 'Buenos Aires',
+  'cordoba': 'Córdoba',
+  'córdoba': 'Córdoba',
+  'rosario': 'Rosario',
+  'mendoza': 'Mendoza',
+  'tucuman': 'Tucumán',
+  'tucumán': 'Tucumán',
+  'la plata': 'La Plata',
+  'mar del plata': 'Mar del Plata',
+
+  // Perú - Ciudades principales
+  'lima': 'Lima',
+  'arequipa': 'Arequipa',
+  'trujillo': 'Trujillo',
+  'chiclayo': 'Chiclayo',
+  'cusco': 'Cusco',
+  'cuzco': 'Cusco',
+
+  // Chile - Ciudades principales
+  'santiago': 'Santiago',
+  'valparaiso': 'Valparaíso',
+  'valparaíso': 'Valparaíso',
+  'concepcion': 'Concepción',
+  'concepción': 'Concepción',
+  'viña del mar': 'Viña del Mar',
+
+  // Otros países - Capitales
+  'quito': 'Quito',
+  'guayaquil': 'Guayaquil',
+  'caracas': 'Caracas',
+  'la paz': 'La Paz',
+  'montevideo': 'Montevideo',
+  'asuncion': 'Asunción',
+  'asunción': 'Asunción',
+  'ciudad de panama': 'Ciudad de Panamá',
+  'san jose': 'San José',
+  'san josé': 'San José',
+
+  // Remoto
+  'remoto': 'Remoto',
+  'remote': 'Remoto',
+  'trabajo remoto': 'Remoto',
+};
+
+/**
+ * Ubicaciones inválidas (demasiado vagas para buscar)
+ */
+const INVALID_LOCATIONS = [
+  'latinoamerica', 'latinoamérica', 'latam', 'latin america',
+  'sudamerica', 'sudamérica', 'suramerica', 'surámerica', 'south america',
+  'centroamerica', 'centroamérica', 'central america',
+  'norteamerica', 'norteamérica', 'north america',
+  'america', 'américa', 'americas', 'américas',
+  'mundial', 'global', 'internacional', 'world',
+  'cualquier', 'cualquiera', 'donde sea', 'anywhere',
+  'no importa', 'da igual', 'todo', 'todos', 'todas',
+];
+
+/**
+ * Calcula la distancia de Levenshtein entre dos strings
+ */
+function levenshteinDistance(a: string, b: string): number {
+  const matrix: number[][] = [];
+
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
   }
 
-  return null;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+
+  return matrix[b.length][a.length];
+}
+
+/**
+ * Detecta si la ubicación es demasiado vaga para buscar
+ */
+export function isInvalidLocation(text: string): boolean {
+  const normalized = text.toLowerCase().trim();
+  return INVALID_LOCATIONS.some(loc => normalized.includes(loc));
+}
+
+/**
+ * Extrae la primera ubicación de un texto con múltiples ubicaciones
+ * Ej: "Cali o Palmira" -> "Cali"
+ * Ej: "Bogotá, Medellín, Cali" -> "Bogotá"
+ */
+export function extractFirstLocation(text: string): string {
+  // Separadores comunes
+  const separators = /[,\-\/;]|\s+o\s+|\s+y\s+|\s+u\s+/i;
+  const parts = text.split(separators);
+
+  // Retornar la primera parte válida (>= 3 caracteres, sin ser solo números)
+  for (const part of parts) {
+    const cleaned = part.trim();
+    if (cleaned.length >= 3 && !/^\d+$/.test(cleaned)) {
+      return cleaned;
+    }
+  }
+
+  return text.trim();
+}
+
+/**
+ * Intenta corregir typos usando el diccionario y fuzzy matching
+ */
+export function correctLocationTypo(text: string): string {
+  const normalized = text.toLowerCase().trim();
+
+  // Búsqueda exacta en diccionario
+  if (KNOWN_LOCATIONS[normalized]) {
+    return KNOWN_LOCATIONS[normalized];
+  }
+
+  // Fuzzy matching - buscar la ubicación más parecida
+  let bestMatch: string | null = null;
+  let bestDistance = Infinity;
+  const maxDistance = Math.max(2, Math.floor(normalized.length * 0.3)); // Max 30% de diferencia
+
+  for (const [key, value] of Object.entries(KNOWN_LOCATIONS)) {
+    const distance = levenshteinDistance(normalized, key);
+    if (distance < bestDistance && distance <= maxDistance) {
+      bestDistance = distance;
+      bestMatch = value;
+    }
+  }
+
+  if (bestMatch) {
+    return bestMatch;
+  }
+
+  // Si no hay match, capitalizar la primera letra
+  return text.trim().charAt(0).toUpperCase() + text.trim().slice(1).toLowerCase();
+}
+
+/**
+ * Resultado de la validación de ubicación
+ */
+export interface LocationValidationResult {
+  isValid: boolean;
+  location: string | null;
+  errorType?: 'too_short' | 'too_vague' | 'multiple_extracted';
+  originalInput?: string;
+  wasMultiple?: boolean;
+  wasCorrected?: boolean;
+}
+
+/**
+ * Valida y normaliza una ubicación con corrección de typos y extracción
+ */
+export function validateAndNormalizeLocation(text: string): LocationValidationResult {
+  const originalInput = text.trim();
+
+  // Mínimo 2 caracteres
+  if (originalInput.length < 2) {
+    return { isValid: false, location: null, errorType: 'too_short' };
+  }
+
+  // Detectar ubicaciones vagas
+  if (isInvalidLocation(originalInput)) {
+    return { isValid: false, location: null, errorType: 'too_vague', originalInput };
+  }
+
+  // Extraer primera ubicación si hay múltiples
+  const extracted = extractFirstLocation(originalInput);
+  const wasMultiple = extracted !== originalInput;
+
+  // Corregir typos
+  const corrected = correctLocationTypo(extracted);
+  const wasCorrected = corrected.toLowerCase() !== extracted.toLowerCase();
+
+  return {
+    isValid: true,
+    location: corrected,
+    originalInput,
+    wasMultiple,
+    wasCorrected,
+  };
+}
+
+/**
+ * Función simple de normalización (retrocompatibilidad)
+ * Ahora usa el sistema de validación completo
+ */
+export function normalizeLocation(text: string): string | null {
+  const result = validateAndNormalizeLocation(text);
+  return result.location;
 }
 
 // [DESACTIVADO] Normaliza la modalidad de trabajo
