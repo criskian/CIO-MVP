@@ -82,9 +82,7 @@ Después podrás EDITAR tus prerencias de búsquedas si decides cambiar de cargo
 _Ejemplo: Analista de datos remoto_`,
 
   ASK_EXPERIENCE: `¡Perfecto! Ahora dime tu nivel de experiencia en este rol: 
-Elige una opción 👇
-
-💡 _Tip Almia: Conocer tu nivel te permite enfocar tu desarrollo y aprovechar mejor las oportunidades_`,
+Elige una opción 👇`,
 
   ASK_LOCATION: `Excelente. Ahora dime:
 
