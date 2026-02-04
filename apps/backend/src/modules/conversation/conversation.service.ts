@@ -83,37 +83,17 @@ export class ConversationService {
       // 4. Obtener o crear sesión activa
       const session = await this.getOrCreateSession(user.id);
 
-      // 💾 GUARDAR MENSAJE ENTRANTE EN HISTORIAL
-      if (text) {
-        await this.chatHistoryService.saveInboundMessage(
-          user.id,
-          text,
-          session.state,
-          undefined, // intent se detecta después
-          message.messageId,
-        );
-      }
+      // NOTA: Los mensajes entrantes y salientes se guardan centralizadamente en WhatsappService
 
       // 5. Si hay media (documento/imagen), podría ser un CV
       if (mediaUrl && messageType === 'document') {
         const response = await this.handleCVUpload(user.id, mediaUrl);
-        // Guardar respuesta
-        await this.chatHistoryService.saveOutboundMessage(
-          user.id,
-          response.text || '',
-          session.state,
-        );
         return response;
       }
 
       // 6. Si no hay texto, no podemos procesar - mostrar menú de ayuda
       if (!text) {
         const response = await this.returnToMainMenu(user.id, BotMessages.UNKNOWN_INTENT);
-        await this.chatHistoryService.saveOutboundMessage(
-          user.id,
-          response.text || '',
-          session.state,
-        );
         return response;
       }
 
@@ -122,26 +102,11 @@ export class ConversationService {
 
       // 8. Manejar comandos especiales independientes del estado
       if (intent === UserIntent.HELP) {
-        const response = { text: BotMessages.HELP_MESSAGE };
-        await this.chatHistoryService.saveOutboundMessage(
-          user.id,
-          response.text,
-          session.state,
-        );
-        return response;
+        return { text: BotMessages.HELP_MESSAGE };
       }
 
       // 9. Procesar según el estado actual
       const response = await this.handleStateTransition(user.id, session.state, text, intent);
-
-      // 💾 GUARDAR RESPUESTA DEL BOT EN HISTORIAL
-      if (response.text) {
-        await this.chatHistoryService.saveOutboundMessage(
-          user.id,
-          response.text,
-          session.state,
-        );
-      }
 
       return response;
     } catch (error) {

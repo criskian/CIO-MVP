@@ -15,6 +15,14 @@ interface ChatMessage {
   isError: boolean;
   errorMessage: string | null;
   createdAt: string;
+  metadata?: {
+    type?: 'text' | 'template' | 'delayed' | 'interactive';
+    source?: 'conversation' | 'scheduler' | 'admin';
+    buttons?: Array<{ id: string; title: string }>;
+    listTitle?: string;
+    listSections?: Array<{ title: string; rows: Array<{ id: string; title: string; description?: string }> }>;
+    templateName?: string;
+  };
 }
 
 interface UserInfo {
@@ -35,7 +43,7 @@ export default function ConversacionDetailPage() {
   const params = useParams();
   const router = useRouter();
   const userId = params?.userId as string;
-  
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -56,7 +64,7 @@ export default function ConversacionDetailPage() {
   const fetchData = async () => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      
+
       // Cargar mensajes y estadísticas
       const [messagesRes, statsRes] = await Promise.all([
         fetch(`${API_URL}/chat-history/user/${userId}?limit=500`),
@@ -69,7 +77,7 @@ export default function ConversacionDetailPage() {
 
       const messagesData = await messagesRes.json();
       const statsData = await statsRes.json();
-      
+
       setMessages(messagesData);
       setStats(statsData);
 
@@ -90,9 +98,9 @@ export default function ConversacionDetailPage() {
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleTimeString('es-CO', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    return date.toLocaleTimeString('es-CO', {
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
@@ -107,17 +115,17 @@ export default function ConversacionDetailPage() {
     } else if (date.toDateString() === yesterday.toDateString()) {
       return 'Ayer';
     } else {
-      return date.toLocaleDateString('es-CO', { 
-        day: '2-digit', 
-        month: 'short', 
-        year: 'numeric' 
+      return date.toLocaleDateString('es-CO', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
       });
     }
   };
 
   const groupMessagesByDate = () => {
     const groups: { [key: string]: ChatMessage[] } = {};
-    
+
     messages.forEach((msg) => {
       const dateKey = new Date(msg.createdAt).toDateString();
       if (!groups[dateKey]) {
@@ -221,23 +229,61 @@ export default function ConversacionDetailPage() {
                       className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
-                        className={`max-w-[70%] rounded-lg px-4 py-2 shadow-sm ${
-                          msg.isError
+                        className={`max-w-[70%] rounded-lg px-4 py-2 shadow-sm ${msg.isError
                             ? 'bg-red-100 border border-red-200'
                             : msg.direction === 'outbound'
-                            ? 'bg-green-500 text-white'
-                            : 'bg-white text-gray-900'
-                        }`}
+                              ? 'bg-green-500 text-white'
+                              : 'bg-white text-gray-900'
+                          }`}
                       >
                         <div className="whitespace-pre-wrap break-words text-sm">
                           {msg.content}
                         </div>
-                        
-                        <div className={`flex items-center justify-between gap-2 mt-1 text-xs ${
-                          msg.direction === 'outbound' && !msg.isError
+
+                        {/* Renderizar botones si existen en metadata */}
+                        {msg.metadata?.buttons && msg.metadata.buttons.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-white/20">
+                            {msg.metadata.buttons.map((btn, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-block px-3 py-1 text-xs font-medium bg-white/20 rounded-full border border-white/30"
+                              >
+                                {btn.title}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Renderizar listas si existen en metadata */}
+                        {msg.metadata?.listTitle && msg.metadata?.listSections && (
+                          <div className="mt-2 pt-2 border-t border-white/20">
+                            <div className="text-xs font-medium opacity-80 mb-1">
+                              ≡ {msg.metadata.listTitle}
+                            </div>
+                            {msg.metadata.listSections.map((section, sIdx) => (
+                              <div key={sIdx} className="text-xs opacity-70">
+                                {section.rows.map((row, rIdx) => (
+                                  <div key={rIdx} className="ml-2">• {row.title}</div>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Indicador de tipo de mensaje */}
+                        {msg.metadata?.type && msg.metadata.type !== 'text' && (
+                          <div className={`text-[10px] mt-1 italic opacity-60 ${msg.direction === 'outbound' && !msg.isError ? 'text-green-100' : 'text-gray-500'
+                            }`}>
+                            {msg.metadata.type === 'template' && '📨 Template'}
+                            {msg.metadata.type === 'delayed' && '⏰ Mensaje programado'}
+                            {msg.metadata.type === 'interactive' && '🔘 Interactivo'}
+                          </div>
+                        )}
+
+                        <div className={`flex items-center justify-between gap-2 mt-1 text-xs ${msg.direction === 'outbound' && !msg.isError
                             ? 'text-green-100'
                             : 'text-gray-500'
-                        }`}>
+                          }`}>
                           <span>{formatTime(msg.createdAt)}</span>
                           {msg.conversationState && (
                             <span className="text-[10px] opacity-70 uppercase">
