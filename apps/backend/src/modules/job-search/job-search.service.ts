@@ -149,12 +149,25 @@ export class JobSearchService {
           newNextPageToken = result.nextPageToken;
         }
       } else {
-        // === LÓGICA FREE: priorizar cache SIN llamar API (ahorrar créditos) ===
-        if (isCacheValid && cache.cachedJobs && cache.cachedJobs.length > 0) {
-          // Hay cache válido CON ofertas - usar cache primero (SIN llamar API)
+        // === LÓGICA FREE: priorizar cache, pero buscar más si quedan < 3 ofertas ===
+        if (isCacheValid && cache.cachedJobs && cache.cachedJobs.length >= 3) {
+          // Suficientes ofertas en cache (3+) - usar cache sin API
           this.logger.log(`📦 [FREE] Usando ${cache.cachedJobs.length} ofertas del caché (sin API call)`);
           allJobs = cache.cachedJobs;
           newNextPageToken = cache.nextPageToken; // Mantener token para cuando se agote
+        } else if (isCacheValid && cache.cachedJobs && cache.cachedJobs.length > 0 && cache.cachedJobs.length < 3 && cache.nextPageToken) {
+          // Pocas ofertas en cache (1-2) y hay más páginas - combinar cache + nueva búsqueda
+          const cachedJobs = cache.cachedJobs;
+          this.logger.log(`📦 [FREE] Solo ${cachedJobs.length} ofertas en caché, complementando con API...`);
+          const nextPageResult = await this.searchJobsSinglePage(searchQuery, cache.nextPageToken);
+          allJobs = [...cachedJobs, ...nextPageResult.jobs];
+          newNextPageToken = nextPageResult.nextPageToken;
+          this.logger.log(`📦 [FREE] Resultado: ${cachedJobs.length} del caché + ${nextPageResult.jobs.length} de API = ${allJobs.length} ofertas`);
+        } else if (isCacheValid && cache.cachedJobs && cache.cachedJobs.length > 0) {
+          // Pocas ofertas en cache pero sin más páginas disponibles - usar lo que hay
+          this.logger.log(`📦 [FREE] Solo ${cache.cachedJobs.length} ofertas disponibles (sin más páginas)`);
+          allJobs = cache.cachedJobs;
+          newNextPageToken = undefined;
         } else if (isCacheValid && cache.nextPageToken && (!cache.cachedJobs || cache.cachedJobs.length === 0)) {
           // Cache vacío pero hay más páginas - cargar siguiente página
           this.logger.log(`📄 [FREE] Cache vacío, cargando siguiente página...`);
