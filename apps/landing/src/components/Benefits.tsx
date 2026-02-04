@@ -54,6 +54,10 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
     setIsModalOpen(true);
   };
 
+  // Links de checkout de Wompi
+  const wompiPremiumLink = 'https://checkout.wompi.co/l/xTJSuZ';
+  const wompiProLink = 'https://checkout.wompi.co/l/3XLQMl';
+
   return (
     <section className="-mt-6 md:-mt-0 lg:-mt-[240px] pb-32 lg:pb-0 px-6 md:px-4 bg-white overflow-hidden">
       <div className="max-w-[1440px] mx-auto">
@@ -213,12 +217,14 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
                       <span>Soporte de mentor Almia para ajustar tu búsqueda</span>
                     </li>
                   </ul>
-                  <button
-                    onClick={handleCTAClick}
-                    className="mt-4 w-full py-2.5 bg-white text-[#9054C6] font-poppins font-semibold rounded-lg hover:bg-gray-100 transition-all duration-300 text-sm"
+                  <a
+                    href={wompiPremiumLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 w-full py-2.5 bg-white text-[#9054C6] font-poppins font-semibold rounded-lg hover:bg-gray-100 transition-all duration-300 text-sm text-center block"
                   >
                     Comenzar ahora
-                  </button>
+                  </a>
                 </div>
 
                 {/* Plan Pro */}
@@ -256,12 +262,14 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
                       <span>Acceso a GPT Almia Career Advisor para ajustar tu CV</span>
                     </li>
                   </ul>
-                  <button
-                    onClick={handleCTAClick}
-                    className="mt-4 w-full py-2.5 bg-white text-[#2c2c2c] font-poppins font-semibold rounded-lg hover:bg-[#e6e6e6] transition-all duration-300 text-sm"
+                  <a
+                    href={wompiProLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 w-full py-2.5 bg-white text-[#2c2c2c] font-poppins font-semibold rounded-lg hover:bg-[#e6e6e6] transition-all duration-300 text-sm text-center block"
                   >
                     Obtener Pro
-                  </button>
+                  </a>
                 </div>
               </div>
 
