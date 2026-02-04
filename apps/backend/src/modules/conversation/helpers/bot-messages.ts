@@ -402,6 +402,7 @@ Veo que ya agotaste tu período de prueba gratuita anteriormente.
 
 Para continuar usando CIO, necesitas activar el *Plan Premium*.
 
+💰 *Precio:* $20.000 COP / mes
 🔗 *Enlace de pago:* ${WOMPI_CHECKOUT_LINK}
 
 Una vez realices el pago, ingresa el *correo electrónico* que usaste para pagar.`,
