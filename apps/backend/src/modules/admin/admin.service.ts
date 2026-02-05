@@ -327,6 +327,58 @@ export class AdminService {
     }
 
     /**
+     * Activa plan PRO manualmente (90 días)
+     */
+    async activatePro(userId: string) {
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (!user) throw new NotFoundException('Usuario no encontrado');
+
+        const now = new Date();
+        const proEndDate = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000); // 90 días
+
+        const subscription = await this.prisma.subscription.upsert({
+            where: { userId },
+            update: {
+                plan: 'PRO',
+                status: 'ACTIVE',
+                premiumStartDate: now,
+                premiumEndDate: proEndDate,
+                premiumUsesLeft: 5,
+                premiumWeekStart: now,
+                freemiumExpired: true,
+            },
+            create: {
+                userId,
+                plan: 'PRO',
+                status: 'ACTIVE',
+                premiumStartDate: now,
+                premiumEndDate: proEndDate,
+                premiumUsesLeft: 5,
+                premiumWeekStart: now,
+                freemiumUsesLeft: 0,
+                freemiumStartDate: now,
+                freemiumExpired: true,
+            },
+        });
+
+        // Reactivar alertas si el usuario las tenía configuradas
+        const alertPref = await this.prisma.alertPreference.findUnique({
+            where: { userId }
+        });
+
+        if (alertPref && !alertPref.enabled) {
+            await this.prisma.alertPreference.update({
+                where: { userId },
+                data: { enabled: true }
+            });
+            this.logger.log(`🔔 Alertas reactivadas para usuario ${userId}`);
+        }
+
+        this.logger.log(`🌟 PRO activado para usuario: ${userId} (expira: ${proEndDate.toISOString()})`);
+        return subscription;
+    }
+
+    /**
      * Reinicia freemium
      */
     async resetFreemium(userId: string) {

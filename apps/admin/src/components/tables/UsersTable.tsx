@@ -68,7 +68,13 @@ export default function UsersTable({ users, onEdit, onDelete }: UsersTableProps)
               <td className="px-6 py-4 whitespace-nowrap">
                 {user.subscription ? (
                   <Badge
-                    variant={user.subscription.plan === 'PREMIUM' ? 'purple' : 'gray'}
+                    variant={
+                      user.subscription.plan === 'PRO'
+                        ? 'warning'
+                        : user.subscription.plan === 'PREMIUM'
+                          ? 'purple'
+                          : 'gray'
+                    }
                   >
                     {getPlanLabel(user.subscription.plan)}
                   </Badge>

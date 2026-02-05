@@ -78,6 +78,7 @@ export default function EditSubscriptionModal({
             >
               <option value="FREEMIUM">Freemium</option>
               <option value="PREMIUM">Premium</option>
+              <option value="PRO">Pro</option>
             </select>
           </div>
 

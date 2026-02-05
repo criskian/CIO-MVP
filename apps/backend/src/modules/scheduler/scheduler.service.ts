@@ -164,9 +164,11 @@ export class SchedulerService implements OnModuleInit {
   }
 
   /**
-   * Verifica y expira usuarios premium que cumplieron 30 días desde su activación
+   * Verifica y expira suscripciones pagadas (PREMIUM y PRO) que cumplieron su período
+   * - PREMIUM: 30 días
+   * - PRO: 90 días
    * Maneja dos casos:
-   * 1. Usuarios nuevos con premiumEndDate poblado
+   * 1. Usuarios con premiumEndDate poblado
    * 2. Usuarios antiguos que solo tienen premiumStartDate (sin premiumEndDate)
    */
   private async expirePremiumSubscriptions() {
@@ -175,10 +177,10 @@ export class SchedulerService implements OnModuleInit {
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       let totalExpired = 0;
 
-      // CASO 1: Usuarios con premiumEndDate poblado
+      // CASO 1: Usuarios con premiumEndDate poblado (incluye PREMIUM y PRO)
       const expiredByEndDate = await this.prisma.subscription.findMany({
         where: {
-          plan: 'PREMIUM',
+          plan: { in: ['PREMIUM', 'PRO'] },
           status: 'ACTIVE',
           premiumEndDate: {
             not: null,
@@ -190,7 +192,7 @@ export class SchedulerService implements OnModuleInit {
         },
       });
 
-      this.logger.log(`📅 ${expiredByEndDate.length} usuarios con premiumEndDate vencido`);
+      this.logger.log(`📅 ${expiredByEndDate.length} usuarios (PREMIUM/PRO) con premiumEndDate vencido`);
 
       for (const subscription of expiredByEndDate) {
         try {
@@ -203,13 +205,13 @@ export class SchedulerService implements OnModuleInit {
             },
           });
           totalExpired++;
-          this.logger.log(`⏰ Usuario ${subscription.userId} (${subscription.user?.name}) expirado por premiumEndDate`);
+          this.logger.log(`⏰ Usuario ${subscription.userId} (${subscription.user?.name}) - ${subscription.plan} expirado por premiumEndDate`);
         } catch (error) {
           this.logger.error(`❌ Error expirando usuario ${subscription.userId}: ${error}`);
         }
       }
 
-      // CASO 2: Usuarios antiguos sin premiumEndDate pero con premiumStartDate > 30 días
+      // CASO 2: Usuarios antiguos sin premiumEndDate pero con premiumStartDate > 30 días (solo PREMIUM antiguo)
       const expiredByStartDate = await this.prisma.subscription.findMany({
         where: {
           plan: 'PREMIUM',
@@ -225,7 +227,7 @@ export class SchedulerService implements OnModuleInit {
         },
       });
 
-      this.logger.log(`📅 ${expiredByStartDate.length} usuarios antiguos sin premiumEndDate (30+ días desde activación)`);
+      this.logger.log(`📅 ${expiredByStartDate.length} usuarios PREMIUM antiguos sin premiumEndDate (30+ días desde activación)`);
 
       for (const subscription of expiredByStartDate) {
         try {
@@ -238,16 +240,16 @@ export class SchedulerService implements OnModuleInit {
             },
           });
           totalExpired++;
-          this.logger.log(`⏰ Usuario ${subscription.userId} (${subscription.user?.name}) expirado por premiumStartDate (usuario antiguo)`);
+          this.logger.log(`⏰ Usuario ${subscription.userId} (${subscription.user?.name}) PREMIUM expirado por premiumStartDate (usuario antiguo)`);
         } catch (error) {
           this.logger.error(`❌ Error expirando usuario ${subscription.userId}: ${error}`);
         }
       }
 
       if (totalExpired > 0) {
-        this.logger.log(`✅ Se expiraron ${totalExpired} usuarios premium en total`);
+        this.logger.log(`✅ Se expiraron ${totalExpired} usuarios (PREMIUM/PRO) en total`);
       } else {
-        this.logger.log(`ℹ️ No hay usuarios premium para expirar en este momento`);
+        this.logger.log(`ℹ️ No hay usuarios PREMIUM/PRO para expirar en este momento`);
       }
     } catch (error) {
       this.logger.error(`❌ Error en expirePremiumSubscriptions: ${error}`);

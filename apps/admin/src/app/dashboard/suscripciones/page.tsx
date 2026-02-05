@@ -83,6 +83,7 @@ export default function SuscripcionesPage() {
     total: users.length,
     freemium: users.filter((u) => u.subscription?.plan === 'FREEMIUM').length,
     premium: users.filter((u) => u.subscription?.plan === 'PREMIUM').length,
+    pro: users.filter((u) => u.subscription?.plan === 'PRO').length,
     active: users.filter((u) => u.subscription?.status === 'ACTIVE').length,
     expired: users.filter((u) => u.subscription?.freemiumExpired).length,
   };
@@ -124,6 +125,12 @@ export default function SuscripcionesPage() {
           </Card>
           <Card>
             <div className="text-center">
+              <p className="text-sm text-admin-text-secondary mb-1">Pro</p>
+              <p className="text-2xl font-bold text-amber-500">{stats.pro}</p>
+            </div>
+          </Card>
+          <Card>
+            <div className="text-center">
               <p className="text-sm text-admin-text-secondary mb-1">Expirados</p>
               <p className="text-2xl font-bold text-yellow-600">{stats.expired}</p>
             </div>
@@ -147,6 +154,7 @@ export default function SuscripcionesPage() {
               <option value="ALL">Todos los planes</option>
               <option value="FREEMIUM">Freemium</option>
               <option value="PREMIUM">Premium</option>
+              <option value="PRO">Pro</option>
             </select>
 
             <select
@@ -214,7 +222,11 @@ export default function SuscripcionesPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge
                           variant={
-                            user.subscription?.plan === 'PREMIUM' ? 'purple' : 'gray'
+                            user.subscription?.plan === 'PRO'
+                              ? 'warning'
+                              : user.subscription?.plan === 'PREMIUM'
+                                ? 'purple'
+                                : 'gray'
                           }
                         >
                           {getPlanLabel(user.subscription!.plan)}
@@ -226,8 +238,8 @@ export default function SuscripcionesPage() {
                             user.subscription?.status === 'ACTIVE'
                               ? 'success'
                               : user.subscription?.status === 'EXPIRED'
-                              ? 'warning'
-                              : 'danger'
+                                ? 'warning'
+                                : 'danger'
                           }
                         >
                           {getStatusLabel(user.subscription!.status)}

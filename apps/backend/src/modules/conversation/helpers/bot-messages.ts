@@ -4,6 +4,7 @@
 
 // CONFIGURACIÓN DE LINKS
 const WOMPI_CHECKOUT_LINK = process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ';
+const WOMPI_CHECKOUT_LINK_PRO = process.env.WOMPI_CHECKOUT_LINK_PRO || 'https://checkout.wompi.co/l/3XLQMl';
 const LANDING_URL = 'https://cio-stg.almia.com.co';
 const TERMS_URL = `${LANDING_URL}/terms-of-service`;
 const PRIVACY_URL = `${LANDING_URL}/privacy-policy`;
@@ -346,79 +347,77 @@ _(Si cambias de opinión más adelante, puedes activar las alertas desde el men�
   FREEMIUM_EXPIRED: `⏳ *Se acabaron tus búsquedas del Plan Free*
 
 No frenes tu búsqueda ahora 💪
-Con CIO Premium sigues recibiendo ofertas reales y alineadas a tu perfil, sin perder tiempo.
+Con CIO sigues recibiendo ofertas reales y alineadas a tu perfil, sin perder tiempo.
 
-🎉 *CIO Premium – $20.000 COP / mes*
-Incluye:
+*Elige tu plan:*
 
-🔍 Cazar ofertas durante todo el mes
+🎉 *CIO Premium – $20.000 COP / 30 días*
+👉 Activa aquí: ${WOMPI_CHECKOUT_LINK}
 
-* Mayor cantidad de ofertas por búsqueda
+🌟 *CIO Pro – $54.000 COP / 90 días* _(Mejor valor)_
+👉 Activa aquí: ${WOMPI_CHECKOUT_LINK_PRO}
 
-🤝 Soporte de un mentor Almia para ajustar tu búsqueda
-
+*Ambos planes incluyen:*
+🔍 Cazar ofertas durante todo tu plan
+✨ Mayor cantidad de ofertas por búsqueda
 🔔 Alertas diarias por WhatsApp
-
 🎯 Búsqueda personalizada según tu cargo
-
-👉 *Activa tu plan aquí:*
-${WOMPI_CHECKOUT_LINK}
+🤝 Soporte de un mentor Almia
 
 Después del pago, escríbenos el correo con el que pagaste y activamos tu acceso de inmediato ⚡
 
 💬 ¿Tienes dudas? Escríbenos +57 3332393280 y te ayudamos.`,
 
-  // Premium expirado por 30 días
-  PREMIUM_EXPIRED: `*⏰ Tu Plan Premium ha finalizado*
-
-Han pasado 30 días desde la activación de tu Plan Premium.
+  // Plan pagado expirado (Premium o Pro)
+  PREMIUM_EXPIRED: `*⏰ Tu Plan ha finalizado*
 
 🚀 *No frenes tu búsqueda ahora.*
 
 Para continuar disfrutando de los beneficios de CIO, renueva tu suscripción:
 
-Por solo *$20.000 COP* tienes acceso por *30 días* a:
+*Elige tu plan:*
 
-✅ Hasta *20 búsquedas de empleo al mes*
+🎉 *CIO Premium* – $20.000 COP / 30 días
+👉 ${WOMPI_CHECKOUT_LINK}
 
-✅ *Alertas personalizadas* directo a WhatsApp
+🌟 *CIO Pro* – $54.000 COP / 90 días _(Mejor valor)_
+👉 ${WOMPI_CHECKOUT_LINK_PRO}
 
-✅ Ahorro de horas semanales buscando vacantes
+Después del pago, escríbenos el *correo con el que pagaste* y activamos tu acceso automáticamente.
 
-🔐 *Renueva tu Plan Premium aquí por solo $20.000 COP:*
-
-${WOMPI_CHECKOUT_LINK}
-
-Después del pago, solo escríbenos el *correo con el que pagaste* y activamos tu acceso automáticamente.
-
-💬 ¿Tienes dudas o quieres hablar con un humano?
-
-Escríbenos directamente por WhatsApp: *+57 333 239 3280*`,
+💬 ¿Dudas? Escríbenos por WhatsApp: *+57 333 239 3280*`,
 
   // Freemium agotado (usuario que vuelve después de cancelar)
   FREEMIUM_EXPIRED_RETURNING_USER: (name?: string | null) => `¡Hola${name ? ` ${name}` : ''}! 👋
 
-Veo que ya agotaste tu período de prueba gratuita anteriormente.
+Veo que ya agotaste tu período de prueba gratuita.
 
-Para continuar usando CIO, necesitas activar el *Plan Premium*.
+Para continuar usando CIO, elige tu plan:
 
-💰 *Precio:* $20.000 COP / mes
-🔗 *Enlace de pago:* ${WOMPI_CHECKOUT_LINK}
+🎉 *CIO Premium* – $20.000 COP / 30 días
+👉 ${WOMPI_CHECKOUT_LINK}
+
+🌟 *CIO Pro* – $54.000 COP / 90 días _(Mejor valor)_
+👉 ${WOMPI_CHECKOUT_LINK_PRO}
 
 Una vez realices el pago, ingresa el *correo electrónico* que usaste para pagar.`,
 
   // Recordatorio de freemium expirado (23 horas después)
   FREEMIUM_REMINDER: (name?: string | null) => `Hola${name ? ` ${name}` : ''} 👋
 
-Veo que aún no has activado *Premium*.
+Veo que aún no has activado un plan.
 
 Recuerda: _las oportunidades no llegan solas, hay que salir a cazarlas con foco._
 
 Yo busco y filtro ofertas según tu perfil y te las envío directo a WhatsApp, para ahorrarte tiempo y ruido.
 
-🚀 *CIO Premium* → $20.000 COP / 30 días
+*Elige tu plan:*
 
-🔗 *Activa aquí:* ${WOMPI_CHECKOUT_LINK}
+🚀 *CIO Premium* → $20.000 COP / 30 días
+👉 ${WOMPI_CHECKOUT_LINK}
+
+🌟 *CIO Pro* → $54.000 COP / 90 días _(Mejor valor)_
+👉 ${WOMPI_CHECKOUT_LINK_PRO}
 
 Mira cómo funciona:
 🔗 https://www.instagram.com/p/DTghZbMDS3O/

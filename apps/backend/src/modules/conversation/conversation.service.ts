@@ -261,9 +261,9 @@ export class ConversationService {
       include: { subscription: true },
     });
 
-    // CASO 1: Usuario premium activo
-    if (user?.subscription?.plan === 'PREMIUM' && user.subscription.status === 'ACTIVE') {
-      this.logger.log(`👑 Usuario premium ${userId}`);
+    // CASO 1: Usuario pagado activo (PREMIUM o PRO)
+    if ((user?.subscription?.plan === 'PREMIUM' || user?.subscription?.plan === 'PRO') && user?.subscription?.status === 'ACTIVE') {
+      this.logger.log(`👑 Usuario pagado ${userId}`);
       await this.updateSessionState(userId, ConversationState.ASK_TERMS);
       return {
         text: BotMessages.WELCOME_BACK_PREMIUM(getFirstName(user.name)),
@@ -745,9 +745,9 @@ Cada vez que presionas "Buscar empleos", se consume 1 búsqueda de tu plan.
           where: { userId },
         });
 
-        if (subscription?.plan === 'PREMIUM' && subscription?.status === 'ACTIVE') {
-          // Usuario premium que alcanzó límite semanal: NO cambiar estado
-          this.logger.log(`⏳ Usuario premium ${userId} alcanzó límite semanal, mostrando mensaje de espera`);
+        if ((subscription?.plan === 'PREMIUM' || subscription?.plan === 'PRO') && subscription?.status === 'ACTIVE') {
+          // Usuario pagado que alcanzó límite semanal: NO cambiar estado
+          this.logger.log(`⏳ Usuario pagado ${userId} alcanzó límite semanal, mostrando mensaje de espera`);
           return { text: usageCheck.message || 'Has alcanzado tu límite semanal de búsquedas.' };
         }
 
@@ -822,9 +822,9 @@ Cada vez que presionas "Buscar empleos", se consume 1 búsqueda de tu plan.
     try {
       this.logger.log(`🔍 Usuario ${userId} solicitó búsqueda de empleos`);
 
-      // Determinar maxResults según el plan (3 para FREE, 5 para PREMIUM)
+      // Determinar maxResults según el plan (3 para FREE, 5 para PREMIUM/PRO)
       const subscription = await this.prisma.subscription.findUnique({ where: { userId } });
-      const maxResults = subscription?.plan === 'PREMIUM' ? 5 : 3;
+      const maxResults = (subscription?.plan === 'PREMIUM' || subscription?.plan === 'PRO') ? 5 : 3;
 
       // Ejecutar búsqueda
       const result = await this.jobSearchService.searchJobsForUser(userId, maxResults);
@@ -859,10 +859,10 @@ Intenta de nuevo más tarde o escribe "reiniciar" para ajustar tus preferencias.
 
       // Usar usesLeft pasado como parámetro (ya descontado) o consultar DB
       const usesLeft = usesLeftAfterDeduction ?? subscription?.freemiumUsesLeft ?? 0;
-      const isPremium = subscription?.plan === 'PREMIUM';
+      const isPremium = subscription?.plan === 'PREMIUM' || subscription?.plan === 'PRO';
 
       // Construir mensaje retrasado con info de búsquedas
-      const planLabel = isPremium ? 'Plan Premium' : 'Plan Free';
+      const planLabel = isPremium ? (subscription?.plan === 'PRO' ? 'Plan Pro' : 'Plan Premium') : 'Plan Free';
       const menuText = `ℹ️ *Búsquedas restantes esta semana:* ${usesLeft} (${planLabel})
 
 Si estas ofertas no se ajustan del todo a lo que buscas, puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
@@ -1429,7 +1429,7 @@ Selecciona qué quieres editar:`,
 
     if (!subscription) return false;
 
-    if (subscription.plan === 'PREMIUM' && subscription.status === 'ACTIVE') {
+    if ((subscription.plan === 'PREMIUM' || subscription.plan === 'PRO') && subscription.status === 'ACTIVE') {
       const now = new Date();
       const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
 
@@ -1516,9 +1516,9 @@ Selecciona qué quieres editar:`,
       where: { userId },
     });
 
-    // Si es usuario PREMIUM activo, NO debería estar aquí - devolverlo a READY
-    if (subscription?.plan === 'PREMIUM' && subscription?.status === 'ACTIVE') {
-      this.logger.log(`🔄 Usuario premium ${userId} estaba en FREEMIUM_EXPIRED incorrectamente, volviendo a READY`);
+    // Si es usuario pagado activo (PREMIUM/PRO), NO debería estar aquí - devolverlo a READY
+    if ((subscription?.plan === 'PREMIUM' || subscription?.plan === 'PRO') && subscription?.status === 'ACTIVE') {
+      this.logger.log(`🔄 Usuario pagado ${userId} estaba en FREEMIUM_EXPIRED incorrectamente, volviendo a READY`);
       await this.updateSessionState(userId, ConversationState.READY);
 
       // Verificar si tiene búsquedas disponibles o está esperando
@@ -1561,8 +1561,8 @@ Selecciona qué quieres editar:`,
       where: { userId },
     });
 
-    if (subscription?.plan === 'PREMIUM' && subscription?.status === 'ACTIVE') {
-      this.logger.log(`🔄 Usuario premium ${userId} estaba en ASK_EMAIL incorrectamente, volviendo a READY`);
+    if ((subscription?.plan === 'PREMIUM' || subscription?.plan === 'PRO') && subscription?.status === 'ACTIVE') {
+      this.logger.log(`🔄 Usuario pagado ${userId} estaba en ASK_EMAIL incorrectamente, volviendo a READY`);
       await this.updateSessionState(userId, ConversationState.READY);
 
       const weekStart = subscription.premiumWeekStart;
@@ -1641,8 +1641,8 @@ Selecciona qué quieres editar:`,
       where: { userId },
     });
 
-    if (subscription?.plan === 'PREMIUM' && subscription?.status === 'ACTIVE') {
-      this.logger.log(`🔄 Usuario premium ${userId} estaba en WAITING_PAYMENT incorrectamente, volviendo a READY`);
+    if ((subscription?.plan === 'PREMIUM' || subscription?.plan === 'PRO') && subscription?.status === 'ACTIVE') {
+      this.logger.log(`🔄 Usuario pagado ${userId} estaba en WAITING_PAYMENT incorrectamente, volviendo a READY`);
       await this.updateSessionState(userId, ConversationState.READY);
 
       const weekStart = subscription.premiumWeekStart;
@@ -1790,8 +1790,8 @@ Selecciona qué quieres editar:`,
       return { allowed: true, currentUses: 3 };
     }
 
-    // PLAN PREMIUM
-    if (subscription.plan === 'PREMIUM' && subscription.status === 'ACTIVE') {
+    // PLAN PAGADO (PREMIUM/PRO)
+    if ((subscription.plan === 'PREMIUM' || subscription.plan === 'PRO') && subscription.status === 'ACTIVE') {
       const now = new Date();
       const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
 
@@ -1855,8 +1855,8 @@ Selecciona qué quieres editar:`,
       return { usesLeft: 4 };
     }
 
-    // PLAN PREMIUM
-    if (subscription.plan === 'PREMIUM' && subscription.status === 'ACTIVE') {
+    // PLAN PAGADO (PREMIUM/PRO)
+    if ((subscription.plan === 'PREMIUM' || subscription.plan === 'PRO') && subscription.status === 'ACTIVE') {
       const now = new Date();
       const weekStart = subscription.premiumWeekStart;
 
@@ -1913,8 +1913,8 @@ Selecciona qué quieres editar:`,
       return { allowed: true, usesLeft: 4 };
     }
 
-    // PLAN PREMIUM
-    if (subscription.plan === 'PREMIUM' && subscription.status === 'ACTIVE') {
+    // PLAN PAGADO (PREMIUM/PRO)
+    if ((subscription.plan === 'PREMIUM' || subscription.plan === 'PRO') && subscription.status === 'ACTIVE') {
       const now = new Date();
       const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
 

@@ -34,6 +34,8 @@ export interface WompiTransaction {
     customer_data?: {
         full_name?: string;
         phone_number?: string;
+        legal_id?: string;        // Cédula/documento
+        legal_id_type?: string;   // CC, CE, NIT, etc
     };
 }
 

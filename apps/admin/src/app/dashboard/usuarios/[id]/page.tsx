@@ -6,6 +6,7 @@ import { ArrowLeft, Crown, RotateCcw, Trash2, Edit, MessageCircle } from 'lucide
 import {
   getUserById,
   activatePremium,
+  activatePro,
   resetFreemium,
   deleteUser,
 } from '@/lib/api';
@@ -61,6 +62,21 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
       alert('Premium activado exitosamente');
     } catch (err) {
       alert('Error al activar Premium');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleActivatePro = async () => {
+    if (!confirm('¿Activar plan PRO (90 días) para este usuario?')) return;
+
+    try {
+      setActionLoading(true);
+      await activatePro(params.id);
+      await loadUser();
+      alert('Plan PRO activado exitosamente');
+    } catch (err) {
+      alert('Error al activar PRO');
     } finally {
       setActionLoading(false);
     }
@@ -195,7 +211,13 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
                 <div className="flex items-center justify-between">
                   <CardTitle>Suscripción</CardTitle>
                   <Badge
-                    variant={user.subscription.plan === 'PREMIUM' ? 'purple' : 'gray'}
+                    variant={
+                      user.subscription.plan === 'PRO'
+                        ? 'warning'
+                        : user.subscription.plan === 'PREMIUM'
+                          ? 'purple'
+                          : 'gray'
+                    }
                   >
                     {getPlanLabel(user.subscription.plan)}
                   </Badge>
@@ -254,7 +276,7 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
                     </>
                   )}
 
-                  {user.subscription.plan === 'PREMIUM' && (
+                  {(user.subscription.plan === 'PREMIUM' || user.subscription.plan === 'PRO') && (
                     <>
                       <div>
                         <dt className="text-sm font-medium text-admin-text-secondary">
@@ -304,7 +326,16 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
                     className="w-full"
                   >
                     <Crown size={16} className="mr-2" />
-                    Activar Premium
+                    Activar Premium (30 días)
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={handleActivatePro}
+                    isLoading={actionLoading}
+                    className="w-full bg-amber-500 hover:bg-amber-600"
+                  >
+                    <Crown size={16} className="mr-2" />
+                    Activar Pro (90 días)
                   </Button>
                   <Button
                     variant="secondary"

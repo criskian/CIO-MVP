@@ -36,7 +36,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       logout();
     }
-    
+
     const errorMessage = error.response?.data || {};
     const safeError = {
       ...error,
@@ -48,7 +48,7 @@ api.interceptors.response.use(
         },
       },
     };
-    
+
     return Promise.reject(safeError);
   }
 );
@@ -67,7 +67,7 @@ export async function getUsers(
     page: page.toString(),
     limit: limit.toString(),
   });
-  
+
   if (search) {
     params.append('search', search);
   }
@@ -93,7 +93,7 @@ export async function createUser(userData: {
   name: string;
   email?: string;
   createSubscription?: boolean;
-  plan?: 'FREEMIUM' | 'PREMIUM';
+  plan?: 'FREEMIUM' | 'PREMIUM' | 'PRO';
 }): Promise<User> {
   const { data } = await api.post<User>('/api/admin/users', userData);
   return data;
@@ -128,7 +128,7 @@ export async function getSubscription(userId: string): Promise<Subscription> {
 export async function updateSubscription(
   userId: string,
   subscriptionData: {
-    plan?: 'FREEMIUM' | 'PREMIUM';
+    plan?: 'FREEMIUM' | 'PREMIUM' | 'PRO';
     status?: 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
     freemiumUsesLeft?: number;
     freemiumExpired?: boolean;
@@ -149,6 +149,13 @@ export async function activatePremium(userId: string): Promise<Subscription> {
   return data;
 }
 
+export async function activatePro(userId: string): Promise<Subscription> {
+  const { data } = await api.post<Subscription>(
+    `/api/admin/subscriptions/${userId}/activate-pro`
+  );
+  return data;
+}
+
 export async function resetFreemium(userId: string): Promise<Subscription> {
   const { data } = await api.post<Subscription>(
     `/api/admin/subscriptions/${userId}/reset-freemium`
@@ -159,7 +166,7 @@ export async function resetFreemium(userId: string): Promise<Subscription> {
 export async function addUses(
   userId: string,
   uses: number,
-  planType: 'FREEMIUM' | 'PREMIUM'
+  planType: 'FREEMIUM' | 'PREMIUM' | 'PRO'
 ): Promise<Subscription> {
   const { data } = await api.post<Subscription>(
     `/api/admin/subscriptions/${userId}/add-uses`,

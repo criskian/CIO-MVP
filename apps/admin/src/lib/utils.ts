@@ -34,10 +34,15 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-export function getPlanColor(plan: 'FREEMIUM' | 'PREMIUM'): string {
-  return plan === 'PREMIUM'
-    ? 'bg-almia-purple text-white'
-    : 'bg-gray-200 text-gray-700';
+export function getPlanColor(plan: 'FREEMIUM' | 'PREMIUM' | 'PRO'): string {
+  switch (plan) {
+    case 'PRO':
+      return 'bg-amber-500 text-white';
+    case 'PREMIUM':
+      return 'bg-almia-purple text-white';
+    default:
+      return 'bg-gray-200 text-gray-700';
+  }
 }
 
 export function getStatusColor(status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED'): string {
@@ -53,8 +58,15 @@ export function getStatusColor(status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED'): stri
   }
 }
 
-export function getPlanLabel(plan: 'FREEMIUM' | 'PREMIUM'): string {
-  return plan === 'PREMIUM' ? 'Premium' : 'Freemium';
+export function getPlanLabel(plan: 'FREEMIUM' | 'PREMIUM' | 'PRO'): string {
+  switch (plan) {
+    case 'PRO':
+      return 'Pro';
+    case 'PREMIUM':
+      return 'Premium';
+    default:
+      return 'Freemium';
+  }
 }
 
 export function getStatusLabel(status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED'): string {

@@ -27,7 +27,7 @@ export interface UserProfile {
 }
 
 
-export type PlanType = 'FREEMIUM' | 'PREMIUM';
+export type PlanType = 'FREEMIUM' | 'PREMIUM' | 'PRO';
 export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
 
 export interface Subscription {

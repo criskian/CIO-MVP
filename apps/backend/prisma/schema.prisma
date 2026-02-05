@@ -17,6 +17,7 @@ datasource db {
 enum PlanType {
   FREEMIUM
   PREMIUM
+  PRO
 }
 
 enum SubscriptionStatus {
@@ -113,6 +114,7 @@ model Transaction {
   currency        String    @default("COP")
   paymentMethod   String?                          // PSE, CARD, NEQUI, BANCOLOMBIA, etc.
   email           String                           // Email usado en el pago
+  planType        PlanType  @default(PREMIUM)      // Tipo de plan comprado (PREMIUM o PRO)
   
   // Vinculación con usuario
   linkedAt        DateTime?                        // Fecha cuando se vinculó al usuario

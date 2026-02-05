@@ -156,6 +156,16 @@ export class AdminController {
     }
 
     /**
+     * POST /api/admin/subscriptions/:userId/activate-pro
+     * Activa plan PRO manualmente para un usuario (90 días)
+     */
+    @Post('subscriptions/:userId/activate-pro')
+    async activatePro(@Param('userId') userId: string) {
+        this.logger.log(`🌟 Activando PRO para usuario: ${userId}`);
+        return this.adminService.activatePro(userId);
+    }
+
+    /**
      * POST /api/admin/subscriptions/:userId/reset-freemium
      * Reinicia el freemium de un usuario (3 usos, 3 días)
      */

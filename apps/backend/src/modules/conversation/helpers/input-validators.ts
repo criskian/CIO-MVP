@@ -11,6 +11,13 @@ export function getFirstName(fullName: string | null | undefined): string {
   return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
 }
 
+/**
+ * Verifica si un plan es de pago (PREMIUM o PRO)
+ */
+export function isPaidPlan(plan: string | undefined | null): boolean {
+  return plan === 'PREMIUM' || plan === 'PRO';
+}
+
 // Detecta si el usuario está en móvil/celular
 export function isMobileDevice(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
