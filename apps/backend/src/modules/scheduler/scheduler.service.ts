@@ -600,7 +600,7 @@ export class SchedulerService implements OnModuleInit {
     allowed: boolean;
     reason?: string;
     usesLeft?: number;
-    plan?: 'FREEMIUM' | 'PREMIUM';
+    plan?: 'FREEMIUM' | 'PREMIUM' | 'PRO';
     shouldNotify?: boolean;
   }> {
     const subscription = await this.prisma.subscription.findUnique({
@@ -612,11 +612,11 @@ export class SchedulerService implements OnModuleInit {
       return { allowed: false, reason: 'Sin suscripción' };
     }
 
-    // PLAN PREMIUM
-    if (subscription.plan === 'PREMIUM' && subscription.status === 'ACTIVE') {
+    // PLAN PAGADO (PREMIUM o PRO)
+    if ((subscription.plan === 'PREMIUM' || subscription.plan === 'PRO') && subscription.status === 'ACTIVE') {
       const now = new Date();
 
-      // Verificar si el plan premium expiró (30 días)
+      // Verificar si el plan expiró (basado en premiumEndDate)
       if (subscription.premiumEndDate && now > subscription.premiumEndDate) {
         await this.prisma.subscription.update({
           where: { userId },
@@ -628,8 +628,8 @@ export class SchedulerService implements OnModuleInit {
         });
         return {
           allowed: false,
-          reason: 'Plan Premium expirado (30 días)',
-          plan: 'PREMIUM',
+          reason: `Plan ${subscription.plan} expirado`,
+          plan: subscription.plan as 'PREMIUM' | 'PRO',
           shouldNotify: true,
         };
       }
@@ -646,7 +646,7 @@ export class SchedulerService implements OnModuleInit {
             premiumWeekStart: now, // Nueva semana empieza desde ahora
           },
         });
-        return { allowed: true, usesLeft: 4, plan: 'PREMIUM' };
+        return { allowed: true, usesLeft: 4, plan: subscription.plan as 'PREMIUM' | 'PRO' };
       }
 
       if (subscription.premiumUsesLeft > 0) {
@@ -655,13 +655,13 @@ export class SchedulerService implements OnModuleInit {
           where: { userId },
           data: { premiumUsesLeft: newUsesLeft },
         });
-        return { allowed: true, usesLeft: newUsesLeft, plan: 'PREMIUM' };
+        return { allowed: true, usesLeft: newUsesLeft, plan: subscription.plan as 'PREMIUM' | 'PRO' };
       }
 
       return {
         allowed: false,
-        reason: 'Límite semanal premium alcanzado',
-        plan: 'PREMIUM',
+        reason: `Límite semanal ${subscription.plan} alcanzado`,
+        plan: subscription.plan as 'PREMIUM' | 'PRO',
       };
     }
 
@@ -706,9 +706,9 @@ export class SchedulerService implements OnModuleInit {
 
   /**
    * Notifica al usuario que su plan expiró
-   * @param expiredPlan - El plan que expiró ('PREMIUM' o 'FREEMIUM')
+   * @param expiredPlan - El plan que expiró ('PREMIUM', 'PRO' o 'FREEMIUM')
    */
-  private async notifyPlanExpired(userId: string, expiredPlan?: 'FREEMIUM' | 'PREMIUM'): Promise<void> {
+  private async notifyPlanExpired(userId: string, expiredPlan?: 'FREEMIUM' | 'PREMIUM' | 'PRO'): Promise<void> {
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -718,27 +718,36 @@ export class SchedulerService implements OnModuleInit {
       if (!user) return;
 
       // Mensaje diferente según el plan que expiró
-      const isPremiumExpired = expiredPlan === 'PREMIUM';
+      const isPaidPlanExpired = expiredPlan === 'PREMIUM' || expiredPlan === 'PRO';
+      const planName = expiredPlan === 'PRO' ? 'Pro' : 'Premium';
 
-      const message = isPremiumExpired
+      const message = isPaidPlanExpired
         ? `⏰ *Hola ${getFirstName(user.name)}*
 
-Tu *Plan Premium* ha finalizado después de 30 días.
+Tu *Plan ${planName}* ha finalizado.
 
-✨ Para continuar recibiendo ofertas personalizadas, renueva tu *Plan Premium*:
+🚀 *No frenes tu búsqueda ahora.*
 
-🔗 *Enlace de pago:* ${process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ'}
-💰 *Precio:* $20.000 COP / mes
+*Elige tu plan para continuar:*
+
+🎉 *CIO Premium* – $20.000 COP / 30 días
+👉 ${process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ'}
+
+🌟 *CIO Pro* – $54.000 COP / 90 días _(Mejor valor)_
+👉 ${process.env.WOMPI_CHECKOUT_LINK_PRO || 'https://checkout.wompi.co/l/3XLQMl'}
 
 Una vez realices el pago, escríbeme por este chat para activar tu cuenta.`
         : `⏰ *Hola ${getFirstName(user.name)}*
 
 Tu período de prueba gratuita ha terminado y no puedo seguir enviándote alertas de empleo.
 
-✨ Para continuar recibiendo ofertas personalizadas, activa el *Plan Premium*:
+*Elige tu plan para continuar:*
 
-🔗 *Enlace de pago:* ${process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ'}
-💰 *Precio:* $20.000 COP / mes
+🎉 *CIO Premium* – $20.000 COP / 30 días
+👉 ${process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ'}
+
+🌟 *CIO Pro* – $54.000 COP / 90 días _(Mejor valor)_
+👉 ${process.env.WOMPI_CHECKOUT_LINK_PRO || 'https://checkout.wompi.co/l/3XLQMl'}
 
 Una vez realices el pago, escríbeme por este chat para activar tu cuenta.`;
 
