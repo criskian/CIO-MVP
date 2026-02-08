@@ -5,7 +5,7 @@
 // CONFIGURACIÓN DE LINKS
 const WOMPI_CHECKOUT_LINK = process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ';
 const WOMPI_CHECKOUT_LINK_PRO = process.env.WOMPI_CHECKOUT_LINK_PRO || 'https://checkout.wompi.co/l/3XLQMl';
-const LANDING_URL = 'https://cio-stg.almia.com.co';
+const LANDING_URL = 'https://cio.almia.com.co';
 const TERMS_URL = `${LANDING_URL}/terms-of-service`;
 const PRIVACY_URL = `${LANDING_URL}/privacy-policy`;
 
@@ -26,7 +26,7 @@ Estás usando la *versión Free*: Estoy aquí para ayudarte a encontrar las *mej
 
 Para usar el *Cazador Inteligente de Ofertas*, primero debes registrarte en nuestra página web:
 
-🔗 *Regístrate aquí:* https://cio-stg.almia.com.co
+🔗 *Regístrate aquí:* https://cio.almia.com.co
 
 El registro es *gratis* y solo toma unos segundos. Una vez registrado, podrás comenzar a buscar ofertas de empleo personalizadas.`,
 

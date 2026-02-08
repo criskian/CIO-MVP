@@ -14,7 +14,7 @@ async function bootstrap() {
     'http://localhost:3000',
     'http://localhost:3001',
     'http://localhost:3002',
-    'https://cio-stg.almia.com.co',
+    'https://cio.almia.com.co',
     'https://admin.cio.almia.com.co',
   ];
 
