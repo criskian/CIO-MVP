@@ -2,7 +2,7 @@ import { User } from '@/types';
 import { formatPhone, formatDate, getPlanLabel, getStatusLabel } from './utils';
 
 /**
- * Exporta usuarios a CSV con datos completos incluyendo perfil y preferencias
+ * Exporta usuarios a CSV con datos esenciales
  * Usa punto y coma (;) como delimitador para compatibilidad con Excel en español
  */
 export function exportUsersToCSV(users: User[]): void {
@@ -15,13 +15,10 @@ export function exportUsersToCSV(users: User[]): void {
     'Estado Suscripción',
     'Usos Restantes',
     'Fecha Registro',
-    // Datos del perfil
+    // Datos del perfil (activos)
     'Rol/Cargo',
     'Nivel Experiencia',
     'Ubicación',
-    'Acepta Remoto',
-    'Tipo Empleo',
-    'Salario Mínimo',
     // Suscripción detallada
     'Inicio Freemium',
     'Freemium Expirado',
@@ -50,9 +47,6 @@ export function exportUsersToCSV(users: User[]): void {
       profile?.role || '-',
       profile?.experienceLevel || '-',
       profile?.location || '-',
-      profile?.acceptsRemote ? 'Sí' : 'No',
-      profile?.jobType?.join(', ') || '-',
-      profile?.minSalary ? `$${profile.minSalary.toLocaleString()}` : '-',
       // Suscripción detallada
       subscription?.freemiumStartDate ? formatDate(subscription.freemiumStartDate) : '-',
       subscription?.freemiumExpired ? 'Sí' : 'No',
@@ -107,7 +101,6 @@ export function exportSubscriptionsToCSV(users: User[]): void {
     'Rol/Cargo',
     'Nivel Experiencia',
     'Ubicación',
-    'Acepta Remoto',
   ];
 
   const rows = users
@@ -134,7 +127,6 @@ export function exportSubscriptionsToCSV(users: User[]): void {
         profile?.role || '-',
         profile?.experienceLevel || '-',
         profile?.location || '-',
-        profile?.acceptsRemote ? 'Sí' : 'No',
       ];
     });
 

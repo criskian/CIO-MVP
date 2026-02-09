@@ -71,6 +71,21 @@ export class AdminService {
     }
 
     /**
+     * Obtiene todos los usuarios para exportación CSV (sin paginación)
+     */
+    async getAllUsersForExport() {
+        const users = await this.prisma.user.findMany({
+            include: {
+                subscription: true,
+                profile: true,
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        return { users, total: users.length };
+    }
+
+    /**
      * Obtiene usuario por ID
      */
     async getUserById(id: string) {

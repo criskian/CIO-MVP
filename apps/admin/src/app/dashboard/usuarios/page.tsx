@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Search, Download } from 'lucide-react';
-import { getUsers, deleteUser } from '@/lib/api';
+import { getUsers, deleteUser, getAllUsersForExport } from '@/lib/api';
 import { User } from '@/types';
 import Header from '@/components/layout/Header';
 import Card from '@/components/ui/Card';
@@ -28,7 +28,7 @@ export default function UsuariosPage() {
 
   useEffect(() => {
     loadUsers(currentPage, searchTerm);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage]);
 
   const loadUsers = async (page: number, search?: string) => {
@@ -61,8 +61,14 @@ export default function UsuariosPage() {
     loadUsers(currentPage, searchTerm);
   };
 
-  const handleExport = () => {
-    exportUsersToCSV(users);
+  const handleExport = async () => {
+    try {
+      const data = await getAllUsersForExport();
+      exportUsersToCSV(data.users);
+    } catch (err) {
+      console.error('Error exportando usuarios:', err);
+      alert('Error al exportar usuarios');
+    }
   };
 
   const handleDelete = async (userId: string) => {

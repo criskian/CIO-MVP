@@ -78,6 +78,14 @@ export async function getUsers(
   return data;
 }
 
+/**
+ * Obtiene todos los usuarios para exportación CSV (sin paginación)
+ */
+export async function getAllUsersForExport(): Promise<{ users: User[]; total: number }> {
+  const { data } = await api.get<{ users: User[]; total: number }>('/api/admin/users/export');
+  return data;
+}
+
 export async function getUserById(id: string): Promise<User> {
   const { data } = await api.get<User>(`/api/admin/users/${id}`);
   return data;

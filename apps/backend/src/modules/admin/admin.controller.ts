@@ -56,6 +56,16 @@ export class AdminController {
     }
 
     /**
+     * GET /api/admin/users/export
+     * Obtiene todos los usuarios para exportación CSV (sin paginación)
+     */
+    @Get('users/export')
+    async getAllUsersForExport() {
+        this.logger.log(`📥 Exportando todos los usuarios para CSV`);
+        return this.adminService.getAllUsersForExport();
+    }
+
+    /**
      * GET /api/admin/users/:id
      * Obtiene un usuario por ID con todos sus datos
      */
