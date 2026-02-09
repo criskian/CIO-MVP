@@ -13,7 +13,7 @@ export function exportUsersToCSV(users: User[]): void {
     'Teléfono',
     'Plan',
     'Estado Suscripción',
-    'Usos Restantes',
+    'Usos Restantes (semana)',
     'Fecha Registro',
     // Datos del perfil (activos)
     'Rol/Cargo',
@@ -39,8 +39,8 @@ export function exportUsersToCSV(users: User[]): void {
       subscription ? getStatusLabel(subscription.status) : '-',
       subscription
         ? subscription.plan === 'FREEMIUM'
-          ? `${subscription.freemiumUsesLeft}/3`
-          : `${subscription.premiumUsesLeft}/5`
+          ? `${subscription.freemiumUsesLeft} de 3`
+          : `${subscription.premiumUsesLeft} de 5`
         : '-',
       formatDate(user.createdAt),
       // Datos del perfil
@@ -117,8 +117,8 @@ export function exportSubscriptionsToCSV(users: User[]): void {
         getPlanLabel(sub.plan),
         getStatusLabel(sub.status),
         sub.plan === 'FREEMIUM'
-          ? `${sub.freemiumUsesLeft}/3`
-          : `${sub.premiumUsesLeft}/5`,
+          ? `${sub.freemiumUsesLeft} de 3`
+          : `${sub.premiumUsesLeft} de 5`,
         formatDate(sub.freemiumStartDate),
         sub.premiumStartDate ? formatDate(sub.premiumStartDate) : '-',
         sub.premiumEndDate ? formatDate(sub.premiumEndDate) : '-',
