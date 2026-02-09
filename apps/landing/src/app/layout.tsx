@@ -28,7 +28,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <head>
-        {/* Meta Pixel Code - Facebook/Instagram Ads Tracking */}
+        {/* Meta Pixel Code - Facebook/Instagram Ads Tracking - Pixel ID: 1548507996412660 */}
         <Script
           id="meta-pixel"
           strategy="afterInteractive"
