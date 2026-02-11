@@ -1,4 +1,5 @@
 import Hero from '@/components/Hero';
+import Testimonials from '@/components/Testimonials';
 import WhatIsCIO from '@/components/WhatIsCIO';
 import Benefits from '@/components/Benefits';
 import HowItWorks from '@/components/HowItWorks';
@@ -15,6 +16,9 @@ export default function Home() {
     <main className="min-h-screen">
       {/* Hero Section */}
       <Hero whatsappLink={whatsappLink} />
+
+      {/* Testimonials Section */}
+      <Testimonials />
 
       {/* What is CIO Section */}
       <WhatIsCIO />

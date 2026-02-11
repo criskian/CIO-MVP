@@ -69,7 +69,7 @@ export default function WhatIsCIO() {
   };
 
   return (
-    <section className="pt-10 md:pt-16 pb-16 md:pb-24 xl:pb-8 px-6 md:px-8 lg:px-12 xl:px-8 bg-white relative overflow-hidden">
+    <section className="pt-4 md:pt-8 pb-16 md:pb-24 xl:pb-8 px-6 md:px-8 lg:px-12 xl:px-8 bg-white relative overflow-hidden">
       <div className="max-w-4xl mx-auto relative z-10">
         {/* Ícono de click izquierdo */}
         <div
