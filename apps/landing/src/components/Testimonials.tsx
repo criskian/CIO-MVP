@@ -43,7 +43,7 @@ export default function Testimonials() {
                             <div
                                 className={`
                   relative h-full rounded-xl p-5
-                  bg-white/80 backdrop-blur-sm
+                  bg-purple-100 backdrop-blur-sm
                   border-2 border-gray-100
                   transition-all duration-300 ease-out
                   ${hoveredCard === testimonial.id

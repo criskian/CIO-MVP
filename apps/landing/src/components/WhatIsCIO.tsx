@@ -112,7 +112,7 @@ export default function WhatIsCIO() {
         </div>
         {/* Título */}
         <h2 className="text-2xl md:text-3xl lg:text-3xl xl:text-4xl font-bold text-gray-900 text-center mb-6">
-          Existen más de 2.000 ofertas nuevas cada día.
+          Buscar trabajo no tiene que ser desgastante
         </h2>
 
         {/* Descripción principal */}
