@@ -6,20 +6,20 @@ import * as path from 'path';
 
 @Injectable()
 export class NotificationsService {
-    private resend: Resend;
-    private readonly logger = new Logger(NotificationsService.name);
+  private resend: Resend;
+  private readonly logger = new Logger(NotificationsService.name);
 
-    constructor(private configService: ConfigService) {
-        const apiKey = this.configService.get<string>('RESEND_API_KEY');
-        if (!apiKey) {
-            this.logger.warn('RESEND_API_KEY is not defined in env variables');
-        }
-        this.resend = new Resend(apiKey);
+  constructor(private configService: ConfigService) {
+    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+    if (!apiKey) {
+      this.logger.warn('RESEND_API_KEY is not defined in env variables');
     }
+    this.resend = new Resend(apiKey);
+  }
 
-    async sendWelcomeEmail(to: string, name: string) {
-        try {
-            const htmlContent = `
+  async sendWelcomeEmail(to: string, name: string) {
+    try {
+      const htmlContent = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -56,23 +56,23 @@ export class NotificationsService {
 </html>
       `;
 
-            const data = await this.resend.emails.send({
-                from: 'CIO <onboarding@resend.dev>', // Update this with your verified domain in production
-                to: [to],
-                subject: 'Bienvenido a CIO - Tu Cazador de Oportunidades',
-                html: htmlContent,
-            });
+      const data = await this.resend.emails.send({
+        from: 'CIO <contacto@almia.com.co>',
+        to: [to],
+        subject: 'Bienvenido a CIO - Tu Cazador de Oportunidades',
+        html: htmlContent,
+      });
 
-            if (data.error) {
-                this.logger.error(`Error sending email to ${to}: ${data.error.message}`);
-                throw new Error(data.error.message);
-            }
+      if (data.error) {
+        this.logger.error(`Error sending email to ${to}: ${data.error.message}`);
+        throw new Error(data.error.message);
+      }
 
-            this.logger.log(`Email sent to ${to}: ${data.data?.id}`);
-            return data;
-        } catch (error) {
-            this.logger.error(`Error sending email to ${to}`, error);
-            throw error;
-        }
+      this.logger.log(`Email sent to ${to}: ${data.data?.id}`);
+      return data;
+    } catch (error) {
+      this.logger.error(`Error sending email to ${to}`, error);
+      throw error;
     }
+  }
 }
