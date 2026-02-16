@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
@@ -38,6 +39,7 @@ import { AppController } from './app.controller';
     RegistrationModule,
     AdminModule,
     PaymentModule,
+    NotificationsModule,
     AuthModule,
   ],
   providers: [
@@ -47,4 +49,4 @@ import { AppController } from './app.controller';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }
