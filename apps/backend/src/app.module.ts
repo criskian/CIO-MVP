@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
@@ -40,7 +42,12 @@ import { AppController } from './app.controller';
     AdminModule,
     PaymentModule,
     NotificationsModule,
+    NotificationsModule,
     AuthModule,
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'public'),
+      serveRoot: '/',
+    }),
   ],
   providers: [
     {
