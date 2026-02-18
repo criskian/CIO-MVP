@@ -6,20 +6,19 @@ import * as path from 'path';
 
 @Injectable()
 export class NotificationsService {
-  private resend: Resend;
-  private readonly logger = new Logger(NotificationsService.name);
+    private resend: Resend;
+    private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(private configService: ConfigService) {
-    const apiKey = this.configService.get<string>('RESEND_API_KEY');
-    if (!apiKey) {
-      this.logger.warn('RESEND_API_KEY is not defined in env variables');
+    constructor(private configService: ConfigService) {
+        const apiKey = this.configService.get<string>('RESEND_API_KEY');
+        if (!apiKey) {
+            this.logger.warn('RESEND_API_KEY is not defined in env variables');
+        }
+        this.resend = new Resend(apiKey);
     }
-    this.resend = new Resend(apiKey);
-  }
 
-  async sendWelcomeEmail(to: string, name: string) {
-    try {
-      const htmlContent = `
+    getWelcomeEmailHtml(name: string): string {
+        return `
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -232,25 +231,30 @@ export class NotificationsService {
     </table>
 </body>
 </html>
-      `;
-
-      const data = await this.resend.emails.send({
-        from: 'CIO <onboarding@resend.dev>',
-        to: [to],
-        subject: 'Bienvenido a CIO - Tu Cazador de Oportunidades',
-        html: htmlContent,
-      });
-
-      if (data.error) {
-        this.logger.error(`Error sending email to ${to}: ${data.error.message}`);
-        throw new Error(data.error.message);
-      }
-
-      this.logger.log(`Email sent to ${to}: ${data.data?.id}`);
-      return data;
-    } catch (error) {
-      this.logger.error(`Error sending email to ${to}`, error);
-      throw error;
+    `;
     }
-  }
+
+    async sendWelcomeEmail(to: string, name: string) {
+        try {
+            const htmlContent = this.getWelcomeEmailHtml(name);
+
+            const data = await this.resend.emails.send({
+                from: 'CIO <contacto@almia.com.co>',
+                to: [to],
+                subject: 'Bienvenido a CIO - Tu Cazador de Oportunidades',
+                html: htmlContent,
+            });
+
+            if (data.error) {
+                this.logger.error(`Error sending email to ${to}: ${data.error.message}`);
+                throw new Error(data.error.message);
+            }
+
+            this.logger.log(`Email sent to ${to}: ${data.data?.id}`);
+            return data;
+        } catch (error) {
+            this.logger.error(`Error sending email to ${to}`, error);
+            throw error;
+        }
+    }
 }
