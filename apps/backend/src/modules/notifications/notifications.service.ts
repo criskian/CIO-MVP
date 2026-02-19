@@ -285,4 +285,219 @@ export class NotificationsService {
             throw error;
         }
     }
+
+    getOnboardingEmailHtml(name: string): string {
+        const backendUrl = process.env.NODE_ENV === 'production'
+            ? 'https://api.cio.almia.com.co'
+            : 'http://localhost:3001';
+
+        return `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¡A cazar ofertas!</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap');
+        body { font-family: 'Poppins', Arial, sans-serif; margin: 0; padding: 0; background-color: #f0f0f0; }
+        a { color: inherit; }
+        @media only screen and (max-width: 600px) {
+            .email-wrapper { width: 100% !important; }
+            .card-row td { display: block !important; width: 100% !important; padding-left: 0 !important; }
+        }
+    </style>
+</head>
+<body>
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f0f0f0;">
+    <tr>
+        <td align="center" style="padding: 20px 10px;">
+            <table class="email-wrapper" border="0" cellpadding="0" cellspacing="0" width="520" style="max-width: 520px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+
+                <!-- HEADER -->
+                <tr>
+                    <td align="center" style="background-color: #7c3aed; padding: 24px 20px 18px 20px;">
+                        <img src="${backendUrl}/assets/images/AlmiaLogoBlanco.svg" alt="almia" width="90" style="display: block; margin: 0 auto 6px auto;">
+                        <p style="margin: 0; color: #ffffff; font-size: 13px; font-weight: 400; letter-spacing: 0.5px;">Cazador Inteligente de Ofertas</p>
+                    </td>
+                </tr>
+
+                <!-- TEAL BANNER -->
+                <tr>
+                    <td align="center" style="background-color: #10b981; padding: 14px 24px;">
+                        <p style="margin: 0; color: #ffffff; font-size: 15px; font-weight: 700;">🚀 ¡Ahora sí, a cazar ofertas de forma inteligente!</p>
+                    </td>
+                </tr>
+
+                <!-- BODY -->
+                <tr>
+                    <td style="padding: 28px 28px 0 28px; background-color: #ffffff;">
+                        <p style="margin: 0 0 4px 0; font-size: 15px; color: #222222;">Hola,</p>
+                        <p style="margin: 0 0 14px 0; font-size: 15px; color: #222222; font-weight: 700;">¡Gracias por registrarte en CIO – Cazador Inteligente de Ofertas!</p>
+                        <p style="margin: 0 0 22px 0; font-size: 14px; color: #444444;">Ahora sí... es momento de cazar ofertas de forma inteligente 🐱‍👤🎯</p>
+
+                        <!-- Tips header -->
+                        <p style="margin: 0 0 16px 0; font-size: 15px; font-weight: 700; color: #222222;">🎯 Para que tus resultados sean efectivos:</p>
+
+                        <!-- Card 1: Cargo -->
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f3efff; border-radius: 10px; margin-bottom: 12px;">
+                            <tr>
+                                <td width="50" valign="top" style="padding: 16px 0 16px 16px;">
+                                    <table border="0" cellpadding="0" cellspacing="0"><tr><td align="center" valign="middle" style="width: 36px; height: 36px; background-color: #7c3aed; border-radius: 8px;">
+                                        <span style="color: #ffffff; font-size: 18px;">💼</span>
+                                    </td></tr></table>
+                                </td>
+                                <td style="padding: 16px 16px 12px 12px;" valign="top">
+                                    <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 700; color: #222222;">Cargo</p>
+                                    <p style="margin: 0 0 8px 0; font-size: 13px; color: #444444; line-height: 1.5;">Escribe solo una o dos palabras clave (ej. "Asistente administrativo", "Data analyst").</p>
+                                    <p style="margin: 0; font-size: 12px; color: #e67e22; font-style: italic;">⚠️ Si escribes demasiadas palabras, la búsqueda puede no ser efectiva.</p>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Card 2: Trabajo remoto -->
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f3efff; border-radius: 10px; margin-bottom: 12px;">
+                            <tr>
+                                <td width="50" valign="top" style="padding: 16px 0 16px 16px;">
+                                    <table border="0" cellpadding="0" cellspacing="0"><tr><td align="center" valign="middle" style="width: 36px; height: 36px; background-color: #7c3aed; border-radius: 8px;">
+                                        <span style="color: #ffffff; font-size: 18px;">📶</span>
+                                    </td></tr></table>
+                                </td>
+                                <td style="padding: 16px 16px 12px 12px;" valign="top">
+                                    <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 700; color: #222222;">Trabajo remoto</p>
+                                    <p style="margin: 0 0 8px 0; font-size: 13px; color: #444444; line-height: 1.5;">Si quieres recibir ofertas remotas, agrega la palabra "remoto" al final de tu cargo.</p>
+                                    <p style="margin: 0; font-size: 12px; color: #e67e22; font-style: italic;">⚠️ Puede que aparezcan menos resultados si es un rol que usualmente no es remoto.</p>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Card 3: Ubicación -->
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f3efff; border-radius: 10px; margin-bottom: 24px;">
+                            <tr>
+                                <td width="50" valign="top" style="padding: 16px 0 16px 16px;">
+                                    <table border="0" cellpadding="0" cellspacing="0"><tr><td align="center" valign="middle" style="width: 36px; height: 36px; background-color: #7c3aed; border-radius: 8px;">
+                                        <span style="color: #ffffff; font-size: 18px;">📍</span>
+                                    </td></tr></table>
+                                </td>
+                                <td style="padding: 16px 16px 12px 12px;" valign="top">
+                                    <p style="margin: 0 0 4px 0; font-size: 14px; font-weight: 700; color: #222222;">Ubicación</p>
+                                    <p style="margin: 0 0 8px 0; font-size: 13px; color: #444444; line-height: 1.5;">Escribe una ciudad o un país (ej. Cali, Colombia, México).</p>
+                                    <p style="margin: 0; font-size: 12px; color: #e67e22; font-style: italic;">⚠️ Si colocas "Latam", "USA" o una palabra poco clara, la búsqueda no será efectiva.</p>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- CTA Button -->
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 28px;">
+                            <tr>
+                                <td align="center" style="background-color: #7c3aed; border-radius: 8px; padding: 16px 24px;">
+                                    <a href="https://wa.me/573226906461" style="color: #ffffff; font-size: 15px; font-weight: 700; text-decoration: none; display: block;">Ir a configurar mi búsqueda &nbsp;›</a>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Separator -->
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td style="border-top: 1px solid #eeeeee; padding-bottom: 22px;"></td></tr></table>
+
+                        <!-- WhatsApp section -->
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 16px;">
+                            <tr>
+                                <td width="44" valign="middle" style="padding-right: 12px;">
+                                    <table border="0" cellpadding="0" cellspacing="0"><tr><td align="center" valign="middle" style="width: 40px; height: 40px; background-color: #25d366; border-radius: 50%;">
+                                        <span style="color: #ffffff; font-size: 20px;">💬</span>
+                                    </td></tr></table>
+                                </td>
+                                <td valign="middle">
+                                    <p style="margin: 0 0 2px 0; font-size: 13px; color: #444444;">Si tienes cualquier <strong>duda</strong>, escríbenos directamente a WhatsApp.</p>
+                                    <p style="margin: 0; font-size: 14px; font-weight: 700; color: #222222;">+57 333 2393280</p>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- WhatsApp button -->
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 28px;">
+                            <tr>
+                                <td align="center" style="background-color: #10b981; border-radius: 8px; padding: 14px 24px;">
+                                    <a href="https://wa.me/573226906461" style="color: #ffffff; font-size: 15px; font-weight: 700; text-decoration: none; display: block;">💬 Hablar por WhatsApp</a>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Separator -->
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td style="border-top: 1px solid #eeeeee; padding-bottom: 22px;"></td></tr></table>
+
+                        <!-- Sign-off -->
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 28px;">
+                            <tr>
+                                <td width="70" valign="middle" style="padding-right: 14px;">
+                                    <img src="${backendUrl}/assets/images/personas-felices2.png" alt="Karen" width="60" height="60" style="border-radius: 8px; display: block; object-fit: cover;">
+                                </td>
+                                <td valign="middle">
+                                    <p style="margin: 0 0 4px 0; font-size: 14px; color: #222222;">¡Vamos con toda por esas oportunidades! 💼🔥</p>
+                                    <p style="margin: 0; font-size: 14px; font-weight: 600; color: #222222;">Karen</p>
+                                    <p style="margin: 0; font-size: 14px; font-weight: 700; color: #7c3aed;">Almia</p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <!-- FOOTER -->
+                <tr>
+                    <td style="padding: 24px 28px; border-top: 1px solid #eeeeee; background-color: #ffffff;" align="center">
+                        <img src="${backendUrl}/assets/images/AlmiaLogoBlanco.svg" alt="almia" width="70" style="display: block; margin: 0 auto 6px auto; filter: invert(1) sepia(1) saturate(5) hue-rotate(220deg) brightness(0.6);">
+                        <p style="margin: 0 0 14px 0; font-size: 11px; color: #888888;">El cazador de ofertas de empleo más grande de LATAM</p>
+                        <!-- Social icons (text-based fallback) -->
+                        <table border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto 12px auto;">
+                            <tr>
+                                <td style="padding: 0 8px;">
+                                    <a href="https://instagram.com/almialatam" style="text-decoration: none; color: #888888; font-size: 18px;">📷</a>
+                                </td>
+                                <td style="padding: 0 8px;">
+                                    <a href="https://almia.com.co" style="text-decoration: none; color: #888888; font-size: 18px;">🌐</a>
+                                </td>
+                                <td style="padding: 0 8px;">
+                                    <a href="tel:+573135064977" style="text-decoration: none; color: #888888; font-size: 18px;">📞</a>
+                                </td>
+                            </tr>
+                        </table>
+                        <p style="margin: 0 0 10px 0; font-size: 11px; color: #aaaaaa;">
+                            @almialatam &nbsp;•&nbsp; almia.com.co &nbsp;•&nbsp; +57 3135064977
+                        </p>
+                        <p style="margin: 0; font-size: 10px; color: #cccccc;">© 2025 Almia. Todos los derechos reservados.</p>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>
+        `;
+    }
+
+    async sendOnboardingEmail(to: string, name: string) {
+        try {
+            const htmlContent = this.getOnboardingEmailHtml(name);
+
+            const data = await this.resend.emails.send({
+                from: 'CIO <contacto@almia.com.co>',
+                to: [to],
+                subject: '¡Ahora sí, a cazar ofertas de forma inteligente! 🚀',
+                html: htmlContent,
+            });
+
+            if (data.error) {
+                this.logger.error(`Error sending onboarding email to ${to}: ${data.error.message}`);
+                throw new Error(data.error.message);
+            }
+
+            this.logger.log(`Onboarding email sent to ${to}: ${data.data?.id}`);
+            return data;
+        } catch (error) {
+            this.logger.error(`Error sending onboarding email to ${to}`, error);
+            throw error;
+        }
+    }
 }
