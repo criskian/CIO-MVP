@@ -317,7 +317,7 @@ export class NotificationsService {
                 <!-- HEADER -->
                 <tr>
                     <td align="center" style="background-color: #7c3aed; padding: 24px 20px 18px 20px;">
-                        <img src="${backendUrl}/assets/images/AlmiaLogoBlanco.svg" alt="almia" width="90" style="display: block; margin: 0 auto 6px auto;">
+                        <img src="${backendUrl}/assets/images/AlmiaLogoBlanco.png" alt="almia" width="90" style="display: block; margin: 0 auto 6px auto;">
                         <p style="margin: 0; color: #ffffff; font-size: 13px; font-weight: 400; letter-spacing: 0.5px;">Cazador Inteligente de Ofertas</p>
                     </td>
                 </tr>
@@ -445,7 +445,7 @@ export class NotificationsService {
                 <!-- FOOTER -->
                 <tr>
                     <td style="padding: 24px 28px; border-top: 1px solid #eeeeee; background-color: #ffffff;" align="center">
-                        <img src="${backendUrl}/assets/images/AlmiaLogoBlanco.svg" alt="almia" width="70" style="display: block; margin: 0 auto 6px auto; filter: invert(1) sepia(1) saturate(5) hue-rotate(220deg) brightness(0.6);">
+                        <img src="${backendUrl}/assets/images/logoAlmia.png" alt="almia" width="70" style="display: block; margin: 0 auto 6px auto;">
                         <p style="margin: 0 0 14px 0; font-size: 11px; color: #888888;">El cazador de ofertas de empleo más grande de LATAM</p>
                         <!-- Social icons (text-based fallback) -->
                         <table border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto 12px auto;">
