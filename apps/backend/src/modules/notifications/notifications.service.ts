@@ -333,7 +333,7 @@ export class NotificationsService {
                     <td style="padding: 28px 28px 0 28px; background-color: #ffffff;">
                         <p style="margin: 0 0 4px 0; font-size: 15px; color: #222222;">Hola,</p>
                         <p style="margin: 0 0 14px 0; font-size: 15px; color: #222222; font-weight: 700;">¡Gracias por registrarte en CIO – Cazador Inteligente de Ofertas!</p>
-                        <p style="margin: 0 0 22px 0; font-size: 14px; color: #444444;">Ahora sí... es momento de cazar ofertas de forma inteligente 🐱‍👤🎯</p>
+                        <p style="margin: 0 0 22px 0; font-size: 14px; color: #444444;">¡Es momento de configurar tu búsqueda para empezar a recibir oportunidades perfectas para ti! 🎯</p>
 
                         <!-- Tips header -->
                         <p style="margin: 0 0 16px 0; font-size: 15px; font-weight: 700; color: #222222;">🎯 Para que tus resultados sean efectivos:</p>
@@ -462,7 +462,7 @@ export class NotificationsService {
                         <p style="margin: 0 0 10px 0; font-size: 11px; color: #aaaaaa;">
                             @almialatam &nbsp;•&nbsp; almia.com.co &nbsp;•&nbsp; +57 333 2393280
                         </p>
-                        <p style="margin: 0; font-size: 10px; color: #cccccc;">© 2025 Almia. Todos los derechos reservados.</p>
+                        <p style="margin: 0; font-size: 10px; color: #cccccc;">© 2026 Almia. Todos los derechos reservados.</p>
                     </td>
                 </tr>
 
