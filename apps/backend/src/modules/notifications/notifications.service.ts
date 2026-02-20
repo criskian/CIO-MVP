@@ -316,15 +316,14 @@ export class NotificationsService {
 
                 <!-- HEADER -->
                 <tr>
-                    <td align="center" style="background-color: #7c3aed; padding: 24px 20px 18px 20px;">
+                    <td align="center" style="background-color: #a676d1; padding: 24px 20px 18px 20px;">
                         <img src="${backendUrl}/assets/images/AlmiaLogoBlanco.png" alt="almia" width="90" style="display: block; margin: 0 auto 6px auto;">
-                        <p style="margin: 0; color: #ffffff; font-size: 13px; font-weight: 400; letter-spacing: 0.5px;">Cazador Inteligente de Ofertas</p>
                     </td>
                 </tr>
 
                 <!-- TEAL BANNER -->
                 <tr>
-                    <td align="center" style="background-color: #10b981; padding: 14px 24px;">
+                    <td align="center" style="background-color: #62d3c6; padding: 14px 24px;">
                         <p style="margin: 0; color: #ffffff; font-size: 15px; font-weight: 700;">🚀 ¡Ahora sí, a cazar ofertas de forma inteligente!</p>
                     </td>
                 </tr>
@@ -343,7 +342,7 @@ export class NotificationsService {
                         <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f3efff; border-radius: 10px; margin-bottom: 12px;">
                             <tr>
                                 <td width="50" valign="top" style="padding: 16px 0 16px 16px;">
-                                    <table border="0" cellpadding="0" cellspacing="0"><tr><td align="center" valign="middle" style="width: 36px; height: 36px; background-color: #7c3aed; border-radius: 8px;">
+                                    <table border="0" cellpadding="0" cellspacing="0"><tr><td align="center" valign="middle" style="width: 36px; height: 36px; background-color: #a676d1; border-radius: 8px;">
                                         <span style="color: #ffffff; font-size: 18px;">💼</span>
                                     </td></tr></table>
                                 </td>
@@ -359,7 +358,7 @@ export class NotificationsService {
                         <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f3efff; border-radius: 10px; margin-bottom: 12px;">
                             <tr>
                                 <td width="50" valign="top" style="padding: 16px 0 16px 16px;">
-                                    <table border="0" cellpadding="0" cellspacing="0"><tr><td align="center" valign="middle" style="width: 36px; height: 36px; background-color: #7c3aed; border-radius: 8px;">
+                                    <table border="0" cellpadding="0" cellspacing="0"><tr><td align="center" valign="middle" style="width: 36px; height: 36px; background-color: #a676d1; border-radius: 8px;">
                                         <span style="color: #ffffff; font-size: 18px;">📶</span>
                                     </td></tr></table>
                                 </td>
@@ -375,7 +374,7 @@ export class NotificationsService {
                         <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f3efff; border-radius: 10px; margin-bottom: 24px;">
                             <tr>
                                 <td width="50" valign="top" style="padding: 16px 0 16px 16px;">
-                                    <table border="0" cellpadding="0" cellspacing="0"><tr><td align="center" valign="middle" style="width: 36px; height: 36px; background-color: #7c3aed; border-radius: 8px;">
+                                    <table border="0" cellpadding="0" cellspacing="0"><tr><td align="center" valign="middle" style="width: 36px; height: 36px; background-color: #a676d1; border-radius: 8px;">
                                         <span style="color: #ffffff; font-size: 18px;">📍</span>
                                     </td></tr></table>
                                 </td>
@@ -390,7 +389,7 @@ export class NotificationsService {
                         <!-- CTA Button -->
                         <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 28px;">
                             <tr>
-                                <td align="center" style="background-color: #7c3aed; border-radius: 8px; padding: 16px 24px;">
+                                <td align="center" style="background-color: #a676d1; border-radius: 8px; padding: 16px 24px;">
                                     <a href="https://wa.me/573226906461" style="color: #ffffff; font-size: 15px; font-weight: 700; text-decoration: none; display: block;">Ir a configurar mi búsqueda &nbsp;›</a>
                                 </td>
                             </tr>
@@ -403,7 +402,7 @@ export class NotificationsService {
                         <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 16px;">
                             <tr>
                                 <td width="44" valign="middle" style="padding-right: 12px;">
-                                    <table border="0" cellpadding="0" cellspacing="0"><tr><td align="center" valign="middle" style="width: 40px; height: 40px; background-color: #25d366; border-radius: 50%;">
+                                    <table border="0" cellpadding="0" cellspacing="0"><tr><td align="center" valign="middle" style="width: 40px; height: 40px; background-color: #62d3c6; border-radius: 50%;">
                                         <span style="color: #ffffff; font-size: 20px;">💬</span>
                                     </td></tr></table>
                                 </td>
@@ -417,7 +416,7 @@ export class NotificationsService {
                         <!-- WhatsApp button -->
                         <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 28px;">
                             <tr>
-                                <td align="center" style="background-color: #10b981; border-radius: 8px; padding: 14px 24px;">
+                                <td align="center" style="background-color: #62d3c6; border-radius: 8px; padding: 14px 24px;">
                                     <a href="https://wa.me/573226906461" style="color: #ffffff; font-size: 15px; font-weight: 700; text-decoration: none; display: block;">💬 Hablar por WhatsApp</a>
                                 </td>
                             </tr>
@@ -434,8 +433,7 @@ export class NotificationsService {
                                 </td>
                                 <td valign="middle">
                                     <p style="margin: 0 0 4px 0; font-size: 14px; color: #222222;">¡Vamos con toda por esas oportunidades! 💼🔥</p>
-                                    <p style="margin: 0; font-size: 14px; font-weight: 600; color: #222222;">Karen</p>
-                                    <p style="margin: 0; font-size: 14px; font-weight: 700; color: #7c3aed;">Almia</p>
+                                    <p style="margin: 0; font-size: 14px; font-weight: 700; color: #a676d1;">Team Almia</p>
                                 </td>
                             </tr>
                         </table>
@@ -450,19 +448,19 @@ export class NotificationsService {
                         <!-- Social icons (text-based fallback) -->
                         <table border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto 12px auto;">
                             <tr>
-                                <td style="padding: 0 8px;">
-                                    <a href="https://instagram.com/almialatam" style="text-decoration: none; color: #888888; font-size: 18px;">📷</a>
+                                <td style="padding: 0 10px;">
+                                    <a href="https://instagram.com/almialatam"><img src="${backendUrl}/assets/images/instagramlogo.png" alt="Instagram" width="24" height="24" style="display: block;"></a>
                                 </td>
-                                <td style="padding: 0 8px;">
+                                <td style="padding: 0 10px;">
                                     <a href="https://almia.com.co" style="text-decoration: none; color: #888888; font-size: 18px;">🌐</a>
                                 </td>
-                                <td style="padding: 0 8px;">
-                                    <a href="tel:+573135064977" style="text-decoration: none; color: #888888; font-size: 18px;">📞</a>
+                                <td style="padding: 0 10px;">
+                                    <a href="https://wa.me/573332393280"><img src="${backendUrl}/assets/images/whatsapplogo.png" alt="WhatsApp" width="32" height="32" style="display: block;"></a>
                                 </td>
                             </tr>
                         </table>
                         <p style="margin: 0 0 10px 0; font-size: 11px; color: #aaaaaa;">
-                            @almialatam &nbsp;•&nbsp; almia.com.co &nbsp;•&nbsp; +57 3135064977
+                            @almialatam &nbsp;•&nbsp; almia.com.co &nbsp;•&nbsp; +57 333 2393280
                         </p>
                         <p style="margin: 0; font-size: 10px; color: #cccccc;">© 2025 Almia. Todos los derechos reservados.</p>
                     </td>
