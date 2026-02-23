@@ -973,8 +973,68 @@ export function normalizeLocation(text: string): string | null {
 // }
 
 //Valida que un texto sea un rol o área válida (acepta roles específicos o áreas generales, mínimo 2 caracteres)
+/**
+ * Detecta si un texto es claramente NO un rol profesional.
+ * Atrapa saludos, preguntas, frases conversacionales, etc.
+ * Funciona sin LLM como primera línea de defensa.
+ */
+export function isNonRoleInput(text: string): boolean {
+  const normalizedText = text.toLowerCase().trim();
+
+  // Patrones de saludos
+  const greetings = [
+    'hola', 'buenas', 'buenos', 'hey', 'hi', 'hello',
+    'qué tal', 'que tal', 'como estas', 'cómo estás', 'como estás',
+    'cómo estas', 'buenas tardes', 'buenas noches', 'buenos días',
+    'buenos dias', 'buen día', 'buen dia', 'qué onda', 'que onda',
+    'saludos', 'hola buenas', 'buenas buenas',
+  ];
+  if (greetings.some(g => normalizedText === g || normalizedText.startsWith(g + ' ') || normalizedText.startsWith(g + ','))) {
+    return true;
+  }
+
+  // Tiene signo de interrogación → es una pregunta, no un rol
+  if (normalizedText.includes('?') || normalizedText.includes('¿')) {
+    return true;
+  }
+
+  // Frases conversacionales comunes (NO roles)
+  const conversational = [
+    'gracias', 'muchas gracias', 'ok', 'vale', 'entendido',
+    'no entiendo', 'no entendí', 'no sé', 'no se', 'espera',
+    'un momento', 'ya voy', 'ahí voy', 'dame un segundo',
+    'qué es esto', 'que es esto', 'para qué sirve', 'para que sirve',
+    'quién eres', 'quien eres', 'qué haces', 'que haces',
+    'ayuda', 'help', 'necesito ayuda',
+    'jaja', 'jajaja', 'lol', 'xd',
+    'si', 'no', 'sí', 'nop', 'nope',
+    'chao', 'adiós', 'adios', 'bye', 'hasta luego',
+  ];
+  if (conversational.some(c => normalizedText === c)) {
+    return true;
+  }
+
+  // Frases que empiezan con verbos conversacionales (no profesionales)
+  const conversationalStarts = [
+    'quiero saber', 'me puedes', 'puedes', 'podrías', 'podrias',
+    'dime', 'explícame', 'explicame', 'cuéntame', 'cuentame',
+    'necesito que', 'oye', 'disculpa', 'perdón', 'perdon',
+    'una pregunta', 'tengo una duda', 'no sé qué', 'no se que',
+  ];
+  if (conversationalStarts.some(s => normalizedText.startsWith(s))) {
+    return true;
+  }
+
+  return false;
+}
+
 export function normalizeRole(text: string): string | null {
   const normalizedText = text.trim();
+
+  // Rechazar si es claramente un mensaje conversacional, no un rol
+  if (isNonRoleInput(normalizedText)) {
+    return null;
+  }
 
   if (normalizedText.length >= 2) {
     return normalizedText;
