@@ -1186,7 +1186,19 @@ Por favor intenta de nuevo en unos minutos.`,
       return await this.returnToMainMenu(userId, BotMessages.RESTART_CANCELLED);
     }
 
-    // No entendió la respuesta, mostrar botones
+    // Respuesta ambigua — intentar respuesta conversacional de la IA
+    const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.CONFIRM_RESTART);
+    if (conversational) {
+      return {
+        text: conversational,
+        buttons: [
+          { id: 'confirm_restart', title: 'Sí, reiniciar' },
+          { id: 'cancel_restart', title: 'No, cancelar' },
+        ],
+      };
+    }
+
+    // Fallback: repetir botones
     return {
       text: `${BotMessages.CONFIRM_RESTART}\n\n_Por favor, selecciona una opción:_`,
       buttons: [
@@ -1212,7 +1224,19 @@ Por favor intenta de nuevo en unos minutos.`,
       return await this.returnToMainMenu(userId, BotMessages.CANCEL_SERVICE_ABORTED);
     }
 
-    // No entendió la respuesta
+    // Respuesta ambigua — intentar respuesta conversacional de la IA
+    const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.CONFIRM_CANCEL_SERVICE);
+    if (conversational) {
+      return {
+        text: conversational,
+        buttons: [
+          { id: 'confirm_cancel', title: 'Sí, confirmar' },
+          { id: 'abort_cancel', title: 'No, continuar' },
+        ],
+      };
+    }
+
+    // Fallback: repetir botones
     return {
       text: `${BotMessages.CONFIRM_CANCEL_SERVICE}\n\n_Por favor, selecciona una opción:_`,
       buttons: [

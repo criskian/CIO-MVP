@@ -59,50 +59,41 @@ export function isDesktopDevice(text: string): boolean {
 //Detecta si el usuario está aceptando (sí, acepto, ok, dale, etc.)
 export function isAcceptance(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
-  const acceptancePatterns = [
-    'si',
-    'sí',
-    'acepto',
-    'ok',
-    'okay',
-    'dale',
-    'claro',
-    'de acuerdo',
-    'estoy de acuerdo',
-    'confirmo',
-    'adelante',
-    's',
-    'y',
-    'yes',
-    'alerts_yes', // ID de botón para aceptar alertas
-    'accept_alerts', // ID alternativo de botón para aceptar alertas
+
+  // Patrones que requieren match EXACTO (palabras cortas/ambiguas)
+  const exactPatterns = [
+    'si', 'sí', 'ok', 'okay', 'dale', 'claro', 's', 'y', 'yes',
+    'alerts_yes', 'accept_alerts',
   ];
 
-  return acceptancePatterns.some(
-    (pattern) => normalizedText === pattern || normalizedText.startsWith(pattern),
-  );
+  // Patrones que permiten startsWith (frases largas e inequívocas)
+  const startsWithPatterns = [
+    'acepto', 'de acuerdo', 'estoy de acuerdo', 'confirmo', 'adelante',
+    'si,', 'sí,', 'si ', 'sí ',
+  ];
+
+  if (exactPatterns.includes(normalizedText)) return true;
+  return startsWithPatterns.some((pattern) => normalizedText.startsWith(pattern));
 }
 
 //Detecta si el usuario está rechazando (no, rechazo, etc.)
 export function isRejection(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
-  const rejectionPatterns = [
-    'no',
-    'nop',
-    'nope',
-    'rechazo',
-    'no acepto',
-    'no quiero',
-    'cancelar',
-    'salir',
-    'n',
-    'alerts_no', // ID de botón para rechazar alertas
-    'reject_alerts', // ID alternativo de botón para rechazar alertas
+
+  // Patrones que requieren match EXACTO (palabras cortas/ambiguas)
+  const exactPatterns = [
+    'no', 'nop', 'nope', 'n',
+    'alerts_no', 'reject_alerts',
   ];
 
-  return rejectionPatterns.some(
-    (pattern) => normalizedText === pattern || normalizedText.startsWith(pattern),
-  );
+  // Patrones que permiten startsWith (frases largas e inequívocas)
+  const startsWithPatterns = [
+    'no acepto', 'no quiero', 'rechazo', 'cancelar', 'salir',
+    'no,', 'no ',
+  ];
+
+  if (exactPatterns.includes(normalizedText)) return true;
+  return startsWithPatterns.some((pattern) => normalizedText.startsWith(pattern));
 }
 
 //Detecta intención de buscar ahora
