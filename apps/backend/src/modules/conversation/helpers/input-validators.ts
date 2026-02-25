@@ -874,6 +874,11 @@ export function validateAndNormalizeLocation(text: string): LocationValidationRe
   const extracted = extractFirstLocation(originalInput);
   const wasMultiple = extracted !== originalInput;
 
+  // Si hay múltiples ubicaciones, NO auto-seleccionar — dejar que el LLM pregunte al usuario
+  if (wasMultiple) {
+    return { isValid: false, location: null, errorType: 'multiple' as any, originalInput };
+  }
+
   // Corregir typos
   const corrected = correctLocationTypo(extracted);
   const wasCorrected = corrected.toLowerCase() !== extracted.toLowerCase();
@@ -882,7 +887,7 @@ export function validateAndNormalizeLocation(text: string): LocationValidationRe
     isValid: true,
     location: corrected,
     originalInput,
-    wasMultiple,
+    wasMultiple: false,
     wasCorrected,
   };
 }

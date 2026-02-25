@@ -616,12 +616,29 @@ export class ConversationService {
    * ACTUALIZADO: Ahora va a OFFER_ALERTS para preguntar si quiere alertas (antes de poder buscar)
    */
   private async handleAskLocationState(userId: string, text: string): Promise<BotReply> {
+    const wordCount = text.trim().split(/\s+/).length;
     const validation = validateAndNormalizeLocation(text);
 
     let finalLocation: string | null = null;
 
-    if (validation.isValid && validation.location) {
-      // Regex resolvió — usar directamente
+    // Si tiene 3+ palabras, ir directo al LLM (puede ser multiple ciudades o ciudad multi-palabra)
+    if (wordCount >= 3) {
+      const aiResult = await this.llmService.validateAndCorrectLocation(text);
+      if (aiResult) {
+        if (!aiResult.isValid) {
+          return { text: aiResult.suggestion || BotMessages.ERROR_LOCATION_INVALID };
+        }
+        finalLocation = aiResult.location;
+      } else {
+        // LLM no disponible — fallback a regex
+        if (validation.isValid && validation.location) {
+          finalLocation = validation.location;
+        } else {
+          return { text: BotMessages.ERROR_LOCATION_INVALID };
+        }
+      }
+    } else if (validation.isValid && validation.location) {
+      // Regex resolvió (1-2 palabras) — usar directamente
       finalLocation = validation.location;
     } else {
       // Regex falló — pedir ayuda al LLM
@@ -1484,11 +1501,28 @@ Selecciona qué quieres editar:`,
    * Estado EDIT_LOCATION: Editando ubicación
    */
   private async handleEditLocationState(userId: string, text: string): Promise<BotReply> {
+    const wordCount = text.trim().split(/\s+/).length;
     const validation = validateAndNormalizeLocation(text);
 
     let finalLocation: string | null = null;
 
-    if (validation.isValid && validation.location) {
+    // Si tiene 3+ palabras, ir directo al LLM (puede ser multiple ciudades o ciudad multi-palabra)
+    if (wordCount >= 3) {
+      const aiResult = await this.llmService.validateAndCorrectLocation(text);
+      if (aiResult) {
+        if (!aiResult.isValid) {
+          return { text: aiResult.suggestion || BotMessages.ERROR_LOCATION_INVALID };
+        }
+        finalLocation = aiResult.location;
+      } else {
+        // LLM no disponible — fallback a regex
+        if (validation.isValid && validation.location) {
+          finalLocation = validation.location;
+        } else {
+          return { text: BotMessages.ERROR_LOCATION_INVALID };
+        }
+      }
+    } else if (validation.isValid && validation.location) {
       finalLocation = validation.location;
     } else {
       // Regex falló — pedir ayuda al LLM
