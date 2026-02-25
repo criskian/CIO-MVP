@@ -142,7 +142,7 @@ Selecciona la hora en que quieres recibir las alertas:
 _Si prefieres otra hora, escríbela (ej: "20:00", "7:30 AM")_`,
 
   // Errores de validación
-  ERROR_ROLE_INVALID: `Por favor, ingresa un cargo o rol válido (al menos 2 caracteres).
+  ERROR_ROLE_INVALID: `Parece que no has especificado un rol para tu búsqueda. Escríbeme el nombre del cargo o una palabra clave para mostrarte las ofertas disponibles.
 
 Ejemplo: "Vendedor", "Marketing", "Analista", "Diseñador", etc.`,
 

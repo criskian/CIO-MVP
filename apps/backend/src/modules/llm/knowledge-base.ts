@@ -89,7 +89,8 @@ Input: "dsarrollador web" → {"isValid": true, "role": "Desarrollador Web", "wa
 Input: "Auxiliar" → {"isValid": false, "role": null, "warning": null, "suggestion": "Tu rol es muy general. Te sugiero agregar el sector o especialidad. Por ejemplo: *Auxiliar administrativo*, *Auxiliar contable*, o *Auxiliar logístico*."}
 Input: "docente - redactor - corrector" → {"isValid": false, "role": null, "warning": "Veo que estás buscando varios roles al mismo tiempo. Para obtener mejores resultados, elige *solo un rol* por búsqueda. ¿Cuál prefieres?\\n\\n• Docente\\n• Redactor\\n• Corrector de estilo", "suggestion": null}
 Input: "Quiero trabajar como auxiliar administrativo en una empresa" → {"isValid": true, "role": "Auxiliar Administrativo", "warning": null, "suggestion": null}
-Input: "Project Manager remoto" → {"isValid": true, "role": "Project Manager remoto", "warning": null, "suggestion": null}`,
+Input: "Project Manager remoto" → {"isValid": true, "role": "Project Manager remoto", "warning": null, "suggestion": null}
+Input: "hola buenos dias" → {"isValid": false, "role": null, "warning": "Parece que no has especificado un rol para tu búsqueda. Escríbeme el nombre del cargo o una palabra clave para mostrarte las ofertas disponibles. 😊\\n\\nEjemplo: _Vendedor, Marketing, Analista, Diseñador_", "suggestion": null}`,
 
    /**
     * Prompt para validar y corregir la ubicación geográfica.
