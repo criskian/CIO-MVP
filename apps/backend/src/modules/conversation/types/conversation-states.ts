@@ -11,18 +11,19 @@ export enum ConversationState {
   // ASK_DEVICE = 'ASK_DEVICE', // [ELIMINADO] Siempre asumimos celular/móvil para usar botones interactivos
   ASK_TERMS = 'ASK_TERMS',
   ASK_ROLE = 'ASK_ROLE',
+  ASK_REMOTE = 'ASK_REMOTE', // Pregunta si quiere trabajar remoto (Sí/No)
   ASK_EXPERIENCE = 'ASK_EXPERIENCE', // Pregunta por años de experiencia
   ASK_LOCATION = 'ASK_LOCATION', // Pregunta por la ciudad/país
   // ASK_WORK_MODE = 'ASK_WORK_MODE', // [DESACTIVADO] Pregunta si quiere remoto o presencial
   // ASK_JOB_TYPE = 'ASK_JOB_TYPE', // [DESACTIVADO] No aporta valor significativo
   // ASK_MIN_SALARY = 'ASK_MIN_SALARY', // [DESACTIVADO] No aporta valor significativo
   READY = 'READY',
-  
+
   // Estados de configuración de alertas (durante onboarding)
   OFFER_ALERTS = 'OFFER_ALERTS', // Pregunta si desea recibir alertas (antes de primera búsqueda)
   ASK_ALERT_FREQUENCY = 'ASK_ALERT_FREQUENCY', // [NO USADO] Frecuencia siempre es diaria, pero se mantiene por compatibilidad
   ASK_ALERT_TIME = 'ASK_ALERT_TIME', // Pregunta a qué hora desea alertas
-  
+
   // Estados adicionales para flujos especiales
   WAITING_CV = 'WAITING_CV', // Usuario quiere enviar CV
   PROCESSING_CV = 'PROCESSING_CV', // CV siendo procesado
@@ -37,7 +38,7 @@ export enum ConversationState {
   // EDIT_MIN_SALARY = 'EDIT_MIN_SALARY', // [DESACTIVADO] No aporta valor significativo
   EDIT_ALERT_FREQUENCY = 'EDIT_ALERT_FREQUENCY', // [NO USADO] Frecuencia siempre es diaria
   EDIT_ALERT_TIME = 'EDIT_ALERT_TIME', // Editando horario de alertas
-  
+
   // Estados para sistema de planes (NUEVOS)
   FREEMIUM_EXPIRED = 'FREEMIUM_EXPIRED', // Freemium agotado, mostrar opciones de pago
   ASK_EMAIL = 'ASK_EMAIL', // Pedir email para vincular pago

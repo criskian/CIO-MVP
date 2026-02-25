@@ -171,6 +171,9 @@ export class ConversationService {
       case ConversationState.ASK_ROLE:
         return await this.handleAskRoleState(userId, text);
 
+      case ConversationState.ASK_REMOTE:
+        return await this.handleAskRemoteState(userId, text);
+
       case ConversationState.ASK_EXPERIENCE:
         return await this.handleAskExperienceState(userId, text);
 
@@ -353,7 +356,7 @@ export class ConversationService {
       return {
         text: BotMessages.WELCOME_BACK_PREMIUM(getFirstName(user.name)),
         buttons: [
-          { id: 'continue', title: 'Continuar' },
+          { id: 'continue', title: '¡A buscar empleo!' },
         ],
       };
     }
@@ -390,7 +393,7 @@ export class ConversationService {
     return {
       text: BotMessages.WELCOME_REGISTERED(getFirstName(user?.name)),
       buttons: [
-        { id: 'continue', title: 'Continuar' },
+        { id: 'continue', title: '¡A buscar empleo!' },
       ],
     };
   }
@@ -463,10 +466,57 @@ export class ConversationService {
     // Guardar en UserProfile
     await this.updateUserProfile(userId, { role });
 
-    // Transición: ASK_ROLE → ASK_EXPERIENCE
+    // Transición: ASK_ROLE → ASK_REMOTE
+    await this.updateSessionState(userId, ConversationState.ASK_REMOTE);
+
+    return {
+      text: `¿Estás abierto/a a trabajar *remoto*? 🏠`,
+      buttons: [
+        { id: 'remote_yes', title: 'Sí' },
+        { id: 'remote_no', title: 'No' },
+      ],
+    };
+  }
+
+  /**
+   * Estado ASK_REMOTE: Pregunta rápida si quiere remoto
+   * Si dice Sí → agrega "remoto" al rol para la búsqueda
+   * Si dice No → mantiene el rol tal cual
+   * Luego transiciona a ASK_EXPERIENCE
+   */
+  private async handleAskRemoteState(userId: string, text: string): Promise<BotReply> {
+    const normalizedText = text.trim().toLowerCase();
+    const isYes = ['sí', 'si', 'yes', 'remote_yes'].includes(normalizedText);
+    const isNo = ['no', 'remote_no'].includes(normalizedText);
+
+    if (!isYes && !isNo) {
+      // Si no entendió, repetir la pregunta
+      return {
+        text: `Solo necesito saber: ¿te interesa trabajar *remoto*? 🏠`,
+        buttons: [
+          { id: 'remote_yes', title: 'Sí' },
+          { id: 'remote_no', title: 'No' },
+        ],
+      };
+    }
+
+    // Si quiere remoto, agregar "remoto" al rol
+    if (isYes) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: { profile: true },
+      });
+
+      const currentRole = user?.profile?.role;
+      if (currentRole && !currentRole.toLowerCase().includes('remoto')) {
+        await this.updateUserProfile(userId, { role: `${currentRole} remoto` });
+        this.logger.log(`🏠 Rol actualizado con remoto: "${currentRole}" → "${currentRole} remoto"`);
+      }
+    }
+
+    // Transición: ASK_REMOTE → ASK_EXPERIENCE
     await this.updateSessionState(userId, ConversationState.ASK_EXPERIENCE);
 
-    // Siempre mostrar lista interactiva
     return {
       text: BotMessages.ASK_EXPERIENCE,
       listTitle: 'Seleccionar nivel',
