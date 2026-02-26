@@ -814,16 +814,17 @@ export class ConversationService {
     await this.updateSessionState(userId, ConversationState.READY);
 
     const confirmationMessage = `¡Listo! ✅
-Tus alertas están activadas 🔔
-⏰ *Hora:* ${alertTime}
+Alertas activadas 🔔 a las ${alertTime}
 
-Cuando recibas una alerta, te avisaré que hay nuevas ofertas y podrás tocar "Buscar empleos" para verlas.
+Cuando te llegue la notificación, toca *“Buscar empleos”* para ver las ofertas.
 
-ℹ️ *Ten en cuenta:*
-Cada vez que presionas "Buscar empleos", se consume 1 búsqueda de tu plan.
-📅 *Plan Free:* 5 búsquedas por semana. Cada búsqueda trae hasta 3 ofertas ideales para ti.
+ℹ️ Ten en cuenta:
 
-👆 *¿Qué quieres hacer ahora?*`;
+📌 Cada vez que le des clic en “Buscar empleos” consumes 1 Búsqueda.
+
+Actualmente tienes el Plan Free: 5 búsquedas por una semana.
+
+¿Qué quieres hacer ahora?`;
 
     // Siempre mostrar lista interactiva con comandos
     return {
@@ -1072,13 +1073,33 @@ Cada vez que presionas "Buscar empleos", se consume 1 búsqueda de tu plan.
 
       // Construir mensaje retrasado con info de búsquedas
       const planLabel = isPremium ? (subscription?.plan === 'PRO' ? 'Plan Pro' : 'Plan Premium') : 'Plan Free';
-      const menuText = `ℹ️ *Búsquedas restantes esta semana:* ${usesLeft} (${planLabel})
+
+      let menuText: string;
+
+      if (usesLeft === 0 && !isPremium) {
+        // Mensaje especial cuando se agotan las búsquedas del Plan Free
+        const profile = await this.prisma.userProfile.findUnique({ where: { userId } });
+        const userRole = profile?.role || 'tu perfil';
+        const checkoutLink = process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ';
+
+        menuText = `*Búsquedas restantes esta semana:* 0 (Plan Free)
+
+🚀 Hay muchas ofertas que podemos cazar por ti en internet para tu rol (*${userRole}*).
+Si quieres seguir recibiéndolas de forma automática y filtradas según tu perfil, activa CIO por solo *$20.000 COP al mes* y continúa tu búsqueda sin límites.
+🎯 Actívalo aquí:
+
+👉 ${checkoutLink}
+
+Estoy lista para ayudarte a cazar tu próxima oportunidad.`;
+      } else {
+        menuText = `ℹ️ *Búsquedas restantes esta semana:* ${usesLeft} (${planLabel})
 
 Si estas ofertas no se ajustan del todo a lo que buscas, puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
 
 ⚠️ Recuerda: mañana recibirás nuevas alertas y podrás volver a buscar ofertas.
 
 ¿Qué quieres hacer ahora?`;
+      }
 
       return {
         text: formattedJobs + exhaustedMessage,

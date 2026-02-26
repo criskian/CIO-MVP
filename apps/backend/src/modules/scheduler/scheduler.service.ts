@@ -58,7 +58,8 @@ export class SchedulerService implements OnModuleInit {
 
   onModuleInit() {
     this.startJobAlertsCron();
-    this.startFreemiumReminderCron();
+    // [DESACTIVADO] Violación de política WhatsApp - envía mensajes proactivos sin template aprobado
+    // this.startFreemiumReminderCron();
     this.startPremiumExpirationCron();
   }
 
@@ -79,75 +80,49 @@ export class SchedulerService implements OnModuleInit {
   /**
    * Inicia el cron para enviar recordatorios de freemium (23 horas después)
    */
-  private startFreemiumReminderCron() {
-    // Ejecutar cada hora para revisar usuarios pendientes
-    cron.schedule('0 * * * *', async () => {
-      this.logger.log('⏰ Revisando recordatorios de freemium...');
-      await this.sendFreemiumReminders();
-    });
-
-    this.logger.log('✅ Scheduler de recordatorios freemium iniciado (cada hora)');
-  }
+  // [DESACTIVADO] Violación de política WhatsApp - envía mensajes promocionales con links de pago fuera de la ventana 24h sin template
+  // private startFreemiumReminderCron() {
+  //   cron.schedule('0 * * * *', async () => {
+  //     this.logger.log('⏰ Revisando recordatorios de freemium...');
+  //     await this.sendFreemiumReminders();
+  //   });
+  //   this.logger.log('✅ Scheduler de recordatorios freemium iniciado (cada hora)');
+  // }
 
   /**
    * Envía recordatorios a usuarios que recibieron FREEMIUM_EXPIRED hace 23+ horas
    * y no han respondido ni pagado
    */
-  private async sendFreemiumReminders() {
-    try {
-      const twentyThreeHoursAgo = new Date(Date.now() - 23 * 60 * 60 * 1000);
-
-      // Buscar usuarios que:
-      // - Tienen freemiumExpiredSentAt (se les envió FREEMIUM_EXPIRED)
-      // - Hace más de 23 horas
-      // - No se les ha enviado el reminder todavía
-      // - Siguen sin pagar (plan = FREEMIUM y freemiumExpired = true)
-      const usersToRemind = await this.prisma.subscription.findMany({
-        where: {
-          freemiumExpiredSentAt: {
-            not: null,
-            lte: twentyThreeHoursAgo,
-          },
-          freemiumReminderSent: false,
-          plan: 'FREEMIUM',
-          freemiumExpired: true,
-        },
-        include: {
-          user: true,
-        },
-      });
-
-      this.logger.log(`📬 ${usersToRemind.length} usuarios pendientes de recordatorio freemium`);
-
-      for (const subscription of usersToRemind) {
-        try {
-          const userName = getFirstName(subscription.user?.name);
-          const phone = subscription.user?.phone;
-
-          if (!phone) continue;
-
-          // Importar mensaje dinámicamente para evitar dependencia circular
-          const { BotMessages } = await import('../conversation/helpers/bot-messages');
-
-          await this.whatsappService.sendBotReply(phone, {
-            text: BotMessages.FREEMIUM_REMINDER(userName),
-          });
-
-          // Marcar como enviado
-          await this.prisma.subscription.update({
-            where: { id: subscription.id },
-            data: { freemiumReminderSent: true },
-          });
-
-          this.logger.log(`✅ Recordatorio enviado a ${phone}`);
-        } catch (error) {
-          this.logger.error(`❌ Error enviando recordatorio a ${subscription.userId}: ${error}`);
-        }
-      }
-    } catch (error) {
-      this.logger.error(`❌ Error en sendFreemiumReminders: ${error}`);
-    }
-  }
+  // [DESACTIVADO] Violación de política WhatsApp - envía mensajes promocionales con links de pago fuera de la ventana 24h sin template
+  // private async sendFreemiumReminders() {
+  //   try {
+  //     const twentyThreeHoursAgo = new Date(Date.now() - 23 * 60 * 60 * 1000);
+  //     const usersToRemind = await this.prisma.subscription.findMany({
+  //       where: {
+  //         freemiumExpiredSentAt: { not: null, lte: twentyThreeHoursAgo },
+  //         freemiumReminderSent: false,
+  //         plan: 'FREEMIUM',
+  //         freemiumExpired: true,
+  //       },
+  //       include: { user: true },
+  //     });
+  //     for (const subscription of usersToRemind) {
+  //       const userName = getFirstName(subscription.user?.name);
+  //       const phone = subscription.user?.phone;
+  //       if (!phone) continue;
+  //       const { BotMessages } = await import('../conversation/helpers/bot-messages');
+  //       await this.whatsappService.sendBotReply(phone, {
+  //         text: BotMessages.FREEMIUM_REMINDER(userName),
+  //       });
+  //       await this.prisma.subscription.update({
+  //         where: { id: subscription.id },
+  //         data: { freemiumReminderSent: true },
+  //       });
+  //     }
+  //   } catch (error) {
+  //     this.logger.error(`❌ Error en sendFreemiumReminders: ${error}`);
+  //   }
+  // }
 
   /**
    * Inicia el cron para verificar y expirar usuarios premium que cumplieron 30 días
@@ -572,21 +547,20 @@ export class SchedulerService implements OnModuleInit {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`❌ Error en runJobSearchAndNotifyUser para ${userId}: ${errorMessage}`);
 
-      // Intentar enviar mensaje de error al usuario
-      try {
-        const user = await this.prisma.user.findUnique({
-          where: { id: userId },
-          select: { phone: true },
-        });
-
-        if (user) {
-          await this.whatsappService.sendBotReply(user.phone, {
-            text: 'Lo siento, hubo un problema temporal al buscar ofertas. Intentaré de nuevo en la próxima alerta. 🔄',
-          });
-        }
-      } catch (sendError) {
-        this.logger.error('No se pudo enviar mensaje de error al usuario');
-      }
+      // [DESACTIVADO] Violación de política WhatsApp - envía mensaje proactivo sin template fuera de la ventana 24h
+      // try {
+      //   const user = await this.prisma.user.findUnique({
+      //     where: { id: userId },
+      //     select: { phone: true },
+      //   });
+      //   if (user) {
+      //     await this.whatsappService.sendBotReply(user.phone, {
+      //       text: 'Lo siento, hubo un problema temporal al buscar ofertas. Intentaré de nuevo en la próxima alerta. 🔄',
+      //     });
+      //   }
+      // } catch (sendError) {
+      //   this.logger.error('No se pudo enviar mensaje de error al usuario');
+      // }
 
       throw error;
     }
@@ -708,7 +682,23 @@ export class SchedulerService implements OnModuleInit {
    * Notifica al usuario que su plan expiró
    * @param expiredPlan - El plan que expiró ('PREMIUM', 'PRO' o 'FREEMIUM')
    */
+  // [DESACTIVADO] Violación de política WhatsApp - envía mensajes con links de pago fuera de la ventana 24h sin template
   private async notifyPlanExpired(userId: string, expiredPlan?: 'FREEMIUM' | 'PREMIUM' | 'PRO'): Promise<void> {
+    this.logger.log(`⚠️ notifyPlanExpired DESACTIVADO para usuario ${userId} (plan: ${expiredPlan || 'desconocido'}). Requiere template aprobado por Meta.`);
+
+    // Solo desactivar alertas, sin enviar mensaje proactivo
+    try {
+      await this.prisma.alertPreference.updateMany({
+        where: { userId },
+        data: { enabled: false },
+      });
+    } catch (error) {
+      this.logger.error(`Error desactivando alertas para usuario ${userId}`);
+    }
+    return;
+
+    // --- CÓDIGO ORIGINAL COMENTADO (viola política WhatsApp) ---
+    /*
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -717,7 +707,6 @@ export class SchedulerService implements OnModuleInit {
 
       if (!user) return;
 
-      // Mensaje diferente según el plan que expiró
       const isPaidPlanExpired = expiredPlan === 'PREMIUM' || expiredPlan === 'PRO';
       const planName = expiredPlan === 'PRO' ? 'Pro' : 'Premium';
 
@@ -753,7 +742,6 @@ Una vez realices el pago, escríbeme por este chat para activar tu cuenta.`;
 
       await this.whatsappService.sendBotReply(user.phone, { text: message });
 
-      // Desactivar alertas para no seguir intentando
       await this.prisma.alertPreference.updateMany({
         where: { userId },
         data: { enabled: false },
@@ -763,6 +751,7 @@ Una vez realices el pago, escríbeme por este chat para activar tu cuenta.`;
     } catch (error) {
       this.logger.error(`Error notificando expiración a usuario ${userId}`);
     }
+    */
   }
 
   /**
