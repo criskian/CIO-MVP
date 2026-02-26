@@ -21,6 +21,7 @@ import {
   // isMobileDevice, // [ELIMINADO] Ya no se usa, todos son tratados como móvil
   // isDesktopDevice, // [ELIMINADO] Ya no se usa, todos son tratados como móvil
   normalizeRole,
+  isNonRoleInput,
   normalizeExperienceLevel,
   normalizeLocation,
   validateAndNormalizeLocation,
@@ -98,7 +99,22 @@ export class ConversationService {
       }
 
       // 7. Detectar intención general (para comandos especiales)
-      const intent = detectIntent(text);
+      let intent = detectIntent(text);
+
+      // 7.5. Si regex no detectó nada y estamos en READY, preguntar al LLM
+      if (intent === UserIntent.UNKNOWN && session.state === ConversationState.READY) {
+        const aiIntent = await this.llmService.detectIntent(text, session.state);
+        if (aiIntent && aiIntent !== UserIntent.UNKNOWN) {
+          intent = aiIntent;
+          this.logger.log(`🧠 Intent detectado por IA: ${intent}`);
+        }
+      }
+
+      // 7.6. Si estamos en onboarding y el texto no parece una respuesta válida, manejar out-of-flow
+      const outOfFlowResponse = await this.tryHandleOutOfFlow(text, session.state, intent);
+      if (outOfFlowResponse) {
+        return outOfFlowResponse;
+      }
 
       // 8. Manejar comandos especiales independientes del estado
       if (intent === UserIntent.HELP) {
@@ -154,6 +170,10 @@ export class ConversationService {
 
       case ConversationState.ASK_ROLE:
         return await this.handleAskRoleState(userId, text);
+
+      // [DESACTIVADO] Pregunta de remoto eliminada del flujo
+      // case ConversationState.ASK_REMOTE:
+      //   return await this.handleAskRemoteState(userId, text);
 
       case ConversationState.ASK_EXPERIENCE:
         return await this.handleAskExperienceState(userId, text);
@@ -248,6 +268,75 @@ export class ConversationService {
   }
 
   /**
+   * Intenta manejar mensajes fuera de flujo durante onboarding.
+   * Si el usuario escribe algo inesperado (preguntas, saludos, etc.),
+   * el LLM intenta responder contextualmente o extraer la respuesta real.
+   * Retorna null si no aplica o si el mensaje parece ser una respuesta válida.
+   */
+  private async tryHandleOutOfFlow(
+    text: string,
+    currentState: string,
+    intent: UserIntent,
+  ): Promise<BotReply | null> {
+    // Solo aplica en estados donde esperamos respuesta específica
+    const interactiveStates = [
+      ConversationState.ASK_ROLE,
+      ConversationState.ASK_LOCATION,
+      ConversationState.ASK_EXPERIENCE,
+      ConversationState.OFFER_ALERTS,
+      ConversationState.READY,
+    ];
+
+    if (!interactiveStates.includes(currentState as ConversationState)) return null;
+
+    // Si el regex ya detectó un intent conocido, no es out-of-flow
+    if (intent !== UserIntent.UNKNOWN) return null;
+
+    // Solo interceptar si parece un mensaje conversacional (no respuesta válida)
+    if (!isNonRoleInput(text)) return null;
+
+    // PRIORIDAD 1: Respuesta conversacional única del LLM
+    const aiResponse = await this.llmService.generateConversationalResponse(text, currentState);
+    if (aiResponse) {
+      this.logger.log(`🗣️ Respuesta conversacional IA en ${currentState}: "${text}"`);
+      return { text: aiResponse };
+    }
+
+    // PRIORIDAD 2: Heurístico variado (LLM caído)
+    const stateMessages: Record<string, string[]> = {
+      [ConversationState.ASK_ROLE]: [
+        `¡Hola! 😊 Estoy aquí para ayudarte a encontrar empleo.\n\nNecesito saber: *¿cuál es tu cargo o profesión?*\n\n👉 Ejemplo: _Desarrollador web_, _Vendedor_, _Auxiliar administrativo_`,
+        `¡Entiendo! Pero primero necesito que me digas *en qué trabajas o quieres trabajar*.\n\nEscribe solo *un rol*, por ejemplo: _Diseñador gráfico_, _Contador_, _Marketing_`,
+        `¡Sin problema! 😉 Para encontrarte las mejores ofertas, dime *tu profesión principal*.\n\nPor ejemplo: _Ingeniero industrial_, _Analista de datos_, _Recepcionista_`,
+      ],
+      [ConversationState.ASK_LOCATION]: [
+        `¡Claro! Pero necesito saber *dónde quieres buscar empleo*. 📍\n\n👉 Escribe una *ciudad* o *país*: _Bogotá_, _Colombia_, _Medellín_`,
+        `Entiendo tu mensaje. 😊 Ahora dime, *¿en qué ciudad o país* te gustaría trabajar?\n\nEjemplo: _Lima_, _México_, _Remoto_`,
+      ],
+      [ConversationState.ASK_EXPERIENCE]: [
+        `¡Gracias por escribir! Pero necesito saber *tu nivel de experiencia*. 👇\n\nUsa el botón de abajo para seleccionarlo.`,
+        `Entiendo. 😊 Para continuar, selecciona *tu nivel de experiencia* con el botón de abajo.`,
+      ],
+      [ConversationState.OFFER_ALERTS]: [
+        `¡Solo necesito una respuesta rápida! *¿Quieres recibir alertas diarias* de nuevas ofertas?\n\nResponde *Sí* o *No*.`,
+      ],
+      [ConversationState.READY]: [
+        `¡Hola! 😊 Puedo ayudarte a *buscar empleo*, *editar tu perfil*, o *ver tu perfil actual*.\n\nEscribe lo que necesites o usa el menú de abajo. 👇`,
+      ],
+    };
+
+    const messages = stateMessages[currentState];
+    if (messages) {
+      // Elegir mensaje aleatorio para variedad
+      const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+      this.logger.log(`🛡️ Heurístico variado en ${currentState}: "${text}"`);
+      return { text: randomMessage };
+    }
+
+    return null;
+  }
+
+  /**
    * Estado NEW: Usuario registrado que inicia el onboarding
    * NOTA: Solo llegan aquí usuarios ya registrados desde la landing
    * ACTUALIZADO: Ya no se pregunta por dispositivo, siempre se usan botones interactivos
@@ -268,7 +357,7 @@ export class ConversationService {
       return {
         text: BotMessages.WELCOME_BACK_PREMIUM(getFirstName(user.name)),
         buttons: [
-          { id: 'continue', title: 'Continuar' },
+          { id: 'continue', title: '¡A buscar empleo!' },
         ],
       };
     }
@@ -305,7 +394,7 @@ export class ConversationService {
     return {
       text: BotMessages.WELCOME_REGISTERED(getFirstName(user?.name)),
       buttons: [
-        { id: 'continue', title: 'Continuar' },
+        { id: 'continue', title: '¡A buscar empleo!' },
       ],
     };
   }
@@ -339,19 +428,48 @@ export class ConversationService {
    * ACTUALIZADO: Siempre muestra lista interactiva
    */
   private async handleAskRoleState(userId: string, text: string): Promise<BotReply> {
-    const role = normalizeRole(text);
+    // Paso 1: Intentar con regex (gratis)
+    let role = normalizeRole(text);
+
+    // Paso 2: Si regex falla, pedir ayuda al LLM
+    if (!role) {
+      const aiResult = await this.llmService.validateAndCorrectRole(text);
+      if (aiResult) {
+        // Si la IA detectó un problema específico (genérico, múltiples roles, etc.), mostrar su mensaje
+        if (!aiResult.isValid) {
+          return { text: aiResult.warning || aiResult.suggestion || BotMessages.ERROR_ROLE_INVALID };
+        }
+        role = aiResult.role;
+      }
+    } else {
+      // Regex dio resultado — validar con IA para posibles mejoras (typos, genérico)
+      const aiResult = await this.llmService.validateAndCorrectRole(text);
+      if (aiResult) {
+        if (!aiResult.isValid && aiResult.warning) {
+          return { text: aiResult.warning };
+        }
+        if (!aiResult.isValid && aiResult.suggestion) {
+          return { text: aiResult.suggestion };
+        }
+        // Si la IA corrigió/mejoró el rol, usar la versión de la IA
+        if (aiResult.isValid && aiResult.role) {
+          role = aiResult.role;
+        }
+      }
+    }
 
     if (!role) {
-      return { text: BotMessages.ERROR_ROLE_INVALID };
+      // Intentar respuesta conversacional única
+      const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.ASK_ROLE);
+      return { text: conversational || BotMessages.ERROR_ROLE_INVALID };
     }
 
     // Guardar en UserProfile
     await this.updateUserProfile(userId, { role });
 
-    // Transición: ASK_ROLE → ASK_EXPERIENCE
+    // Transición: ASK_ROLE → ASK_EXPERIENCE (ASK_REMOTE eliminado del flujo)
     await this.updateSessionState(userId, ConversationState.ASK_EXPERIENCE);
 
-    // Siempre mostrar lista interactiva
     return {
       text: BotMessages.ASK_EXPERIENCE,
       listTitle: 'Seleccionar nivel',
@@ -389,6 +507,63 @@ export class ConversationService {
       ],
     };
   }
+
+  // [DESACTIVADO] Pregunta de remoto eliminada del flujo de onboarding
+  // /**
+  //  * Estado ASK_REMOTE: Pregunta rápida si quiere remoto
+  //  * Si dice Sí → agrega "remoto" al rol para la búsqueda
+  //  * Si dice No → mantiene el rol tal cual
+  //  * Luego transiciona a ASK_EXPERIENCE
+  //  */
+  // private async handleAskRemoteState(userId: string, text: string): Promise<BotReply> {
+  /*
+    const normalizedText = text.trim().toLowerCase();
+    const isYes = ['sí', 'si', 'yes', 'remote_yes'].includes(normalizedText);
+    const isNo = ['no', 'remote_no'].includes(normalizedText);
+
+    if (!isYes && !isNo) {
+      return {
+        text: `Solo necesito saber: ¿te interesa trabajar *remoto*? 🏠`,
+        buttons: [
+          { id: 'remote_yes', title: 'Sí' },
+          { id: 'remote_no', title: 'No' },
+        ],
+      };
+    }
+
+    if (isYes) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: { profile: true },
+      });
+
+      const currentRole = user?.profile?.role;
+      if (currentRole && !currentRole.toLowerCase().includes('remoto')) {
+        await this.updateUserProfile(userId, { role: `${currentRole} remoto` });
+        this.logger.log(`🏠 Rol actualizado con remoto: "${currentRole}" → "${currentRole} remoto"`);
+      }
+    }
+
+    await this.updateSessionState(userId, ConversationState.ASK_EXPERIENCE);
+
+    return {
+      text: BotMessages.ASK_EXPERIENCE,
+      listTitle: 'Seleccionar nivel',
+      listSections: [
+        {
+          title: 'Nivel de Experiencia',
+          rows: [
+            { id: 'exp_none', title: 'Sin experiencia', description: 'Recién graduado o sin experiencia laboral' },
+            { id: 'exp_junior', title: 'Junior (1-2 años)', description: 'Experiencia inicial en el campo' },
+            { id: 'exp_mid', title: 'Intermedio (3-5 años)', description: 'Experiencia sólida' },
+            { id: 'exp_senior', title: 'Senior (5+ años)', description: 'Experto en el área' },
+            { id: 'exp_lead', title: 'Lead/Expert (7+ años)', description: 'Liderazgo y expertise avanzado' },
+          ],
+        },
+      ],
+    };
+  }
+  */
 
   /**
    * Estado ASK_EXPERIENCE: Esperando nivel de experiencia
@@ -451,18 +626,54 @@ export class ConversationService {
    * ACTUALIZADO: Ahora va a OFFER_ALERTS para preguntar si quiere alertas (antes de poder buscar)
    */
   private async handleAskLocationState(userId: string, text: string): Promise<BotReply> {
+    const wordCount = text.trim().split(/\s+/).length;
     const validation = validateAndNormalizeLocation(text);
 
-    // Verificar si es una ubicación demasiado vaga
-    if (validation.errorType === 'too_vague') {
-      return { text: BotMessages.ERROR_LOCATION_TOO_VAGUE };
+    let finalLocation: string | null = null;
+
+    // Si tiene 3+ palabras, ir directo al LLM (puede ser multiple ciudades o ciudad multi-palabra)
+    if (wordCount >= 3) {
+      const aiResult = await this.llmService.validateAndCorrectLocation(text);
+      if (aiResult) {
+        if (!aiResult.isValid) {
+          return { text: aiResult.suggestion || BotMessages.ERROR_LOCATION_INVALID };
+        }
+        finalLocation = aiResult.location;
+      } else {
+        // LLM no disponible — fallback a regex
+        if (validation.isValid && validation.location) {
+          finalLocation = validation.location;
+        } else {
+          return { text: BotMessages.ERROR_LOCATION_INVALID };
+        }
+      }
+    } else if (validation.isValid && validation.location) {
+      // Regex resolvió (1-2 palabras) — usar directamente
+      finalLocation = validation.location;
+    } else {
+      // Regex falló — pedir ayuda al LLM
+      const aiResult = await this.llmService.validateAndCorrectLocation(text);
+      if (aiResult) {
+        if (!aiResult.isValid) {
+          return { text: aiResult.suggestion || BotMessages.ERROR_LOCATION_INVALID };
+        }
+        finalLocation = aiResult.location;
+      } else {
+        // LLM no disponible — usar errores de regex
+        if (validation.errorType === 'too_vague') {
+          return { text: BotMessages.ERROR_LOCATION_TOO_VAGUE };
+        }
+        return { text: BotMessages.ERROR_LOCATION_INVALID };
+      }
     }
 
-    if (!validation.isValid || !validation.location) {
-      return { text: BotMessages.ERROR_LOCATION_INVALID };
+    if (!finalLocation) {
+      // Intentar respuesta conversacional única
+      const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.ASK_LOCATION);
+      return { text: conversational || BotMessages.ERROR_LOCATION_INVALID };
     }
 
-    await this.updateUserProfile(userId, { location: validation.location });
+    await this.updateUserProfile(userId, { location: finalLocation });
 
     // [ACTUALIZADO] Flujo: ASK_LOCATION → OFFER_ALERTS (preguntar si quiere alertas antes de buscar)
     await this.updateSessionState(userId, ConversationState.OFFER_ALERTS);
@@ -613,16 +824,17 @@ export class ConversationService {
     await this.updateSessionState(userId, ConversationState.READY);
 
     const confirmationMessage = `¡Listo! ✅
-Tus alertas están activadas 🔔
-⏰ *Hora:* ${alertTime}
+Alertas activadas 🔔 a las ${alertTime}
 
-Cuando recibas una alerta, te avisaré que hay nuevas ofertas y podrás tocar "Buscar empleos" para verlas.
+Cuando te llegue la notificación, toca *“Buscar empleos”* para ver las ofertas.
 
-ℹ️ *Ten en cuenta:*
-Cada vez que presionas "Buscar empleos", se consume 1 búsqueda de tu plan.
-📅 *Plan Free:* 5 búsquedas por semana. Cada búsqueda trae hasta 3 ofertas ideales para ti.
+ℹ️ Ten en cuenta:
 
-👆 *¿Qué quieres hacer ahora?*`;
+📌 Cada vez que le des clic en “Buscar empleos” consumes 1 Búsqueda.
+
+Actualmente tienes el Plan Free: 5 búsquedas por una semana.
+
+¿Qué quieres hacer ahora?`;
 
     // Siempre mostrar lista interactiva con comandos
     return {
@@ -829,12 +1041,20 @@ Cada vez que presionas "Buscar empleos", se consume 1 búsqueda de tu plan.
       // Ejecutar búsqueda
       const result = await this.jobSearchService.searchJobsForUser(userId, maxResults);
 
-      // Si no hay ofertas
+      // Si no hay ofertas — sugerir roles alternativos con IA
       if (result.jobs.length === 0) {
-        return {
-          text: `No encontré ofertas que coincidan con tu perfil en este momento. 😔
+        // Obtener perfil para el rol actual
+        const profile = await this.prisma.userProfile.findUnique({ where: { userId } });
+        const currentRole = profile?.role || 'tu perfil';
 
-Intenta de nuevo más tarde o escribe "reiniciar" para ajustar tus preferencias.`,
+        // Pedir sugerencias al LLM
+        const suggestions = await this.llmService.suggestRelatedRoles(currentRole);
+        const suggestionsText = suggestions.length > 0
+          ? `\n\n💡 *Roles relacionados que podrías probar:*\n${suggestions.map(s => `• ${s}`).join('\n')}\n\nPuedes escribir *"editar"* para cambiar tu cargo.`
+          : `\n\nIntenta de nuevo más tarde o escribe *"editar"* para ajustar tus preferencias.`;
+
+        return {
+          text: `No encontré ofertas que coincidan con *"${currentRole}"* en este momento. 😔${suggestionsText}`,
         };
       }
 
@@ -863,13 +1083,33 @@ Intenta de nuevo más tarde o escribe "reiniciar" para ajustar tus preferencias.
 
       // Construir mensaje retrasado con info de búsquedas
       const planLabel = isPremium ? (subscription?.plan === 'PRO' ? 'Plan Pro' : 'Plan Premium') : 'Plan Free';
-      const menuText = `ℹ️ *Búsquedas restantes esta semana:* ${usesLeft} (${planLabel})
+
+      let menuText: string;
+
+      if (usesLeft === 0 && !isPremium) {
+        // Mensaje especial cuando se agotan las búsquedas del Plan Free
+        const profile = await this.prisma.userProfile.findUnique({ where: { userId } });
+        const userRole = profile?.role || 'tu perfil';
+        const checkoutLink = process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ';
+
+        menuText = `*Búsquedas restantes esta semana:* 0 (Plan Free)
+
+🚀 Hay muchas ofertas que podemos cazar por ti en internet para tu rol (*${userRole}*).
+Si quieres seguir recibiéndolas de forma automática y filtradas según tu perfil, activa CIO por solo *$20.000 COP al mes* y continúa tu búsqueda sin límites.
+🎯 Actívalo aquí:
+
+👉 ${checkoutLink}
+
+Estoy lista para ayudarte a cazar tu próxima oportunidad.`;
+      } else {
+        menuText = `ℹ️ *Búsquedas restantes esta semana:* ${usesLeft} (${planLabel})
 
 Si estas ofertas no se ajustan del todo a lo que buscas, puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
 
 ⚠️ Recuerda: mañana recibirás nuevas alertas y podrás volver a buscar ofertas.
 
 ¿Qué quieres hacer ahora?`;
+      }
 
       return {
         text: formattedJobs + exhaustedMessage,
@@ -977,7 +1217,19 @@ Por favor intenta de nuevo en unos minutos.`,
       return await this.returnToMainMenu(userId, BotMessages.RESTART_CANCELLED);
     }
 
-    // No entendió la respuesta, mostrar botones
+    // Respuesta ambigua — intentar respuesta conversacional de la IA
+    const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.CONFIRM_RESTART);
+    if (conversational) {
+      return {
+        text: conversational,
+        buttons: [
+          { id: 'confirm_restart', title: 'Sí, reiniciar' },
+          { id: 'cancel_restart', title: 'No, cancelar' },
+        ],
+      };
+    }
+
+    // Fallback: repetir botones
     return {
       text: `${BotMessages.CONFIRM_RESTART}\n\n_Por favor, selecciona una opción:_`,
       buttons: [
@@ -1003,7 +1255,19 @@ Por favor intenta de nuevo en unos minutos.`,
       return await this.returnToMainMenu(userId, BotMessages.CANCEL_SERVICE_ABORTED);
     }
 
-    // No entendió la respuesta
+    // Respuesta ambigua — intentar respuesta conversacional de la IA
+    const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.CONFIRM_CANCEL_SERVICE);
+    if (conversational) {
+      return {
+        text: conversational,
+        buttons: [
+          { id: 'confirm_cancel', title: 'Sí, confirmar' },
+          { id: 'abort_cancel', title: 'No, continuar' },
+        ],
+      };
+    }
+
+    // Fallback: repetir botones
     return {
       text: `${BotMessages.CONFIRM_CANCEL_SERVICE}\n\n_Por favor, selecciona una opción:_`,
       buttons: [
@@ -1215,10 +1479,31 @@ Selecciona qué quieres editar:`,
    * Estado EDIT_ROLE: Editando rol
    */
   private async handleEditRoleState(userId: string, text: string): Promise<BotReply> {
-    const role = normalizeRole(text);
+    // Paso 1: Regex
+    let role = normalizeRole(text);
+
+    // Paso 2: IA como fallback/mejora
+    if (!role) {
+      const aiResult = await this.llmService.validateAndCorrectRole(text);
+      if (aiResult) {
+        if (!aiResult.isValid) {
+          return { text: aiResult.warning || aiResult.suggestion || BotMessages.ERROR_ROLE_INVALID };
+        }
+        role = aiResult.role;
+      }
+    } else {
+      const aiResult = await this.llmService.validateAndCorrectRole(text);
+      if (aiResult && aiResult.isValid && aiResult.role) {
+        role = aiResult.role;
+      } else if (aiResult && !aiResult.isValid) {
+        return { text: aiResult.warning || aiResult.suggestion || BotMessages.ERROR_ROLE_INVALID };
+      }
+    }
 
     if (!role) {
-      return { text: BotMessages.ERROR_ROLE_INVALID };
+      // Intentar respuesta conversacional única
+      const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.EDIT_ROLE);
+      return { text: conversational || BotMessages.ERROR_ROLE_INVALID };
     }
 
     await this.updateUserProfile(userId, { role });
@@ -1271,23 +1556,58 @@ Selecciona qué quieres editar:`,
    * Estado EDIT_LOCATION: Editando ubicación
    */
   private async handleEditLocationState(userId: string, text: string): Promise<BotReply> {
+    const wordCount = text.trim().split(/\s+/).length;
     const validation = validateAndNormalizeLocation(text);
 
-    // Verificar si es una ubicación demasiado vaga
-    if (validation.errorType === 'too_vague') {
-      return { text: BotMessages.ERROR_LOCATION_TOO_VAGUE };
+    let finalLocation: string | null = null;
+
+    // Si tiene 3+ palabras, ir directo al LLM (puede ser multiple ciudades o ciudad multi-palabra)
+    if (wordCount >= 3) {
+      const aiResult = await this.llmService.validateAndCorrectLocation(text);
+      if (aiResult) {
+        if (!aiResult.isValid) {
+          return { text: aiResult.suggestion || BotMessages.ERROR_LOCATION_INVALID };
+        }
+        finalLocation = aiResult.location;
+      } else {
+        // LLM no disponible — fallback a regex
+        if (validation.isValid && validation.location) {
+          finalLocation = validation.location;
+        } else {
+          return { text: BotMessages.ERROR_LOCATION_INVALID };
+        }
+      }
+    } else if (validation.isValid && validation.location) {
+      finalLocation = validation.location;
+    } else {
+      // Regex falló — pedir ayuda al LLM
+      const aiResult = await this.llmService.validateAndCorrectLocation(text);
+      if (aiResult) {
+        if (!aiResult.isValid) {
+          return { text: aiResult.suggestion || BotMessages.ERROR_LOCATION_INVALID };
+        }
+        finalLocation = aiResult.location;
+      } else {
+        // LLM no disponible — usar errores de regex
+        if (validation.errorType === 'too_vague') {
+          return { text: BotMessages.ERROR_LOCATION_TOO_VAGUE };
+        }
+        return { text: BotMessages.ERROR_LOCATION_INVALID };
+      }
     }
 
-    if (!validation.isValid || !validation.location) {
-      return { text: BotMessages.ERROR_LOCATION_INVALID };
+    if (!finalLocation) {
+      // Intentar respuesta conversacional única
+      const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.EDIT_LOCATION);
+      return { text: conversational || BotMessages.ERROR_LOCATION_INVALID };
     }
 
     await this.updateUserProfile(userId, {
-      location: validation.location,
+      location: finalLocation,
     });
     await this.updateSessionState(userId, ConversationState.READY);
 
-    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('ubicación', validation.location));
+    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('ubicación', finalLocation));
   }
 
   // [DESACTIVADO] Handler de EDIT_WORK_MODE - Puede reactivarse en el futuro

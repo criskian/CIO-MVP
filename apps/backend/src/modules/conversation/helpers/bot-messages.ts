@@ -71,16 +71,11 @@ Escribe *"buscar"* cuando estés listo y te mostraré las mejores ofertas que en
   // Preguntas del onboarding
   ASK_ROLE: `¡Genial! 🎯
 
-*¿Cuál es el cargo o profesión PRINCIPAL en el que te gustaría trabajar ahora?*
+*¿Cuál es el cargo o profesión PRINCIPAL en el que estás buscando empleo?*
 
 👉 Escribe solo UNO para que la búsqueda sea más acertada.
 
-*Ejemplos:* Asesor Comercial - Marketing - Analista de datos - Auxiliar Administrativo - Ingeniero Industrial - Desarrollador de software
-
-Después podrás EDITAR tus prerencias de búsquedas si decides cambiar de cargo o profesión.
-
-💡 _Tip: si buscas trabajo remoto, escribe el cargo y al final agrega la palabra “remoto”_
-_Ejemplo: Analista de datos remoto_`,
+*Ejemplos:* Asesor Comercial - Marketing - Analista de datos - Auxiliar Administrativo - Ingeniero Industrial - Desarrollador de software`,
 
   ASK_EXPERIENCE: `¡Perfecto! Ahora dime tu nivel de experiencia en este rol: 
 Elige una opción 👇`,
@@ -147,7 +142,7 @@ Selecciona la hora en que quieres recibir las alertas:
 _Si prefieres otra hora, escríbela (ej: "20:00", "7:30 AM")_`,
 
   // Errores de validación
-  ERROR_ROLE_INVALID: `Por favor, ingresa un cargo o rol válido (al menos 2 caracteres).
+  ERROR_ROLE_INVALID: `Parece que no has especificado un rol para tu búsqueda. Escríbeme el nombre del cargo o una palabra clave para mostrarte las ofertas disponibles.
 
 Ejemplo: "Vendedor", "Marketing", "Analista", "Diseñador", etc.`,
 

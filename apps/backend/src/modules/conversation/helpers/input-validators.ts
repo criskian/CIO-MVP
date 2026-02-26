@@ -59,50 +59,41 @@ export function isDesktopDevice(text: string): boolean {
 //Detecta si el usuario está aceptando (sí, acepto, ok, dale, etc.)
 export function isAcceptance(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
-  const acceptancePatterns = [
-    'si',
-    'sí',
-    'acepto',
-    'ok',
-    'okay',
-    'dale',
-    'claro',
-    'de acuerdo',
-    'estoy de acuerdo',
-    'confirmo',
-    'adelante',
-    's',
-    'y',
-    'yes',
-    'alerts_yes', // ID de botón para aceptar alertas
-    'accept_alerts', // ID alternativo de botón para aceptar alertas
+
+  // Patrones que requieren match EXACTO (palabras cortas/ambiguas)
+  const exactPatterns = [
+    'si', 'sí', 'ok', 'okay', 'dale', 'claro', 's', 'y', 'yes',
+    'alerts_yes', 'accept_alerts',
   ];
 
-  return acceptancePatterns.some(
-    (pattern) => normalizedText === pattern || normalizedText.startsWith(pattern),
-  );
+  // Patrones que permiten startsWith (frases largas e inequívocas)
+  const startsWithPatterns = [
+    'acepto', 'de acuerdo', 'estoy de acuerdo', 'confirmo', 'adelante',
+    'si,', 'sí,', 'si ', 'sí ',
+  ];
+
+  if (exactPatterns.includes(normalizedText)) return true;
+  return startsWithPatterns.some((pattern) => normalizedText.startsWith(pattern));
 }
 
 //Detecta si el usuario está rechazando (no, rechazo, etc.)
 export function isRejection(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
-  const rejectionPatterns = [
-    'no',
-    'nop',
-    'nope',
-    'rechazo',
-    'no acepto',
-    'no quiero',
-    'cancelar',
-    'salir',
-    'n',
-    'alerts_no', // ID de botón para rechazar alertas
-    'reject_alerts', // ID alternativo de botón para rechazar alertas
+
+  // Patrones que requieren match EXACTO (palabras cortas/ambiguas)
+  const exactPatterns = [
+    'no', 'nop', 'nope', 'n',
+    'alerts_no', 'reject_alerts',
   ];
 
-  return rejectionPatterns.some(
-    (pattern) => normalizedText === pattern || normalizedText.startsWith(pattern),
-  );
+  // Patrones que permiten startsWith (frases largas e inequívocas)
+  const startsWithPatterns = [
+    'no acepto', 'no quiero', 'rechazo', 'cancelar', 'salir',
+    'no,', 'no ',
+  ];
+
+  if (exactPatterns.includes(normalizedText)) return true;
+  return startsWithPatterns.some((pattern) => normalizedText.startsWith(pattern));
 }
 
 //Detecta intención de buscar ahora
@@ -874,6 +865,11 @@ export function validateAndNormalizeLocation(text: string): LocationValidationRe
   const extracted = extractFirstLocation(originalInput);
   const wasMultiple = extracted !== originalInput;
 
+  // Si hay múltiples ubicaciones, NO auto-seleccionar — dejar que el LLM pregunte al usuario
+  if (wasMultiple) {
+    return { isValid: false, location: null, errorType: 'multiple' as any, originalInput };
+  }
+
   // Corregir typos
   const corrected = correctLocationTypo(extracted);
   const wasCorrected = corrected.toLowerCase() !== extracted.toLowerCase();
@@ -882,7 +878,7 @@ export function validateAndNormalizeLocation(text: string): LocationValidationRe
     isValid: true,
     location: corrected,
     originalInput,
-    wasMultiple,
+    wasMultiple: false,
     wasCorrected,
   };
 }
@@ -973,8 +969,68 @@ export function normalizeLocation(text: string): string | null {
 // }
 
 //Valida que un texto sea un rol o área válida (acepta roles específicos o áreas generales, mínimo 2 caracteres)
+/**
+ * Detecta si un texto es claramente NO un rol profesional.
+ * Atrapa saludos, preguntas, frases conversacionales, etc.
+ * Funciona sin LLM como primera línea de defensa.
+ */
+export function isNonRoleInput(text: string): boolean {
+  const normalizedText = text.toLowerCase().trim();
+
+  // Patrones de saludos
+  const greetings = [
+    'hola', 'buenas', 'buenos', 'hey', 'hi', 'hello',
+    'qué tal', 'que tal', 'como estas', 'cómo estás', 'como estás',
+    'cómo estas', 'buenas tardes', 'buenas noches', 'buenos días',
+    'buenos dias', 'buen día', 'buen dia', 'qué onda', 'que onda',
+    'saludos', 'hola buenas', 'buenas buenas',
+  ];
+  if (greetings.some(g => normalizedText === g || normalizedText.startsWith(g + ' ') || normalizedText.startsWith(g + ','))) {
+    return true;
+  }
+
+  // Tiene signo de interrogación → es una pregunta, no un rol
+  if (normalizedText.includes('?') || normalizedText.includes('¿')) {
+    return true;
+  }
+
+  // Frases conversacionales comunes (NO roles)
+  const conversational = [
+    'gracias', 'muchas gracias', 'ok', 'vale', 'entendido',
+    'no entiendo', 'no entendí', 'no sé', 'no se', 'espera',
+    'un momento', 'ya voy', 'ahí voy', 'dame un segundo',
+    'qué es esto', 'que es esto', 'para qué sirve', 'para que sirve',
+    'quién eres', 'quien eres', 'qué haces', 'que haces',
+    'ayuda', 'help', 'necesito ayuda',
+    'jaja', 'jajaja', 'lol', 'xd',
+    'si', 'no', 'sí', 'nop', 'nope',
+    'chao', 'adiós', 'adios', 'bye', 'hasta luego',
+  ];
+  if (conversational.some(c => normalizedText === c)) {
+    return true;
+  }
+
+  // Frases que empiezan con verbos conversacionales (no profesionales)
+  const conversationalStarts = [
+    'quiero saber', 'me puedes', 'puedes', 'podrías', 'podrias',
+    'dime', 'explícame', 'explicame', 'cuéntame', 'cuentame',
+    'necesito que', 'oye', 'disculpa', 'perdón', 'perdon',
+    'una pregunta', 'tengo una duda', 'no sé qué', 'no se que',
+  ];
+  if (conversationalStarts.some(s => normalizedText.startsWith(s))) {
+    return true;
+  }
+
+  return false;
+}
+
 export function normalizeRole(text: string): string | null {
   const normalizedText = text.trim();
+
+  // Rechazar si es claramente un mensaje conversacional, no un rol
+  if (isNonRoleInput(normalizedText)) {
+    return null;
+  }
 
   if (normalizedText.length >= 2) {
     return normalizedText;
