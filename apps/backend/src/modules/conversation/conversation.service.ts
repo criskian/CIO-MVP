@@ -68,17 +68,37 @@ export class ConversationService {
       // 1. Buscar usuario por teléfono (NO crear, debe registrarse en landing)
       const user = await this.findUserByPhone(phone);
 
-      // 2. Si no está registrado, indicar que debe registrarse en la landing
+      // 2. Si no está registrado, iniciar registro in-bot
       if (!user) {
-        this.logger.log(`🚫 Usuario no registrado: ${phone}`);
+        this.logger.log(`📝 Usuario no registrado: ${phone} — iniciando registro in-bot`);
+
+        // Crear usuario mínimo con solo el teléfono
+        const newUser = await this.prisma.user.create({
+          data: { phone },
+          include: { subscription: true },
+        });
+
+        // Crear sesión con estado WA_ASK_NAME
+        await this.prisma.session.create({
+          data: {
+            userId: newUser.id,
+            state: ConversationState.WA_ASK_NAME,
+          },
+        });
+
         return { text: BotMessages.NOT_REGISTERED };
       }
 
-      // 3. Si está registrado pero no tiene nombre, también indicar registro
-      // (esto no debería pasar si el registro desde landing es correcto)
+      // 3. Si tiene user pero no tiene nombre (registro in-bot en progreso), continuar flujo
       if (!user.name) {
-        this.logger.warn(`⚠️ Usuario ${phone} sin nombre completo`);
-        return { text: BotMessages.NOT_REGISTERED };
+        const session = await this.getOrCreateSession(user.id);
+        // Si por alguna razón no tiene sesión en WA_ASK_NAME, ponerlo ahí
+        if (session.state !== ConversationState.WA_ASK_NAME && session.state !== ConversationState.WA_ASK_EMAIL) {
+          await this.updateSessionState(user.id, ConversationState.WA_ASK_NAME);
+          return { text: BotMessages.NOT_REGISTERED };
+        }
+        // Continuar con el flujo normal de estados
+        return await this.handleStateTransition(user.id, session.state, text || '', detectIntent(text || ''));
       }
 
       // 4. Obtener o crear sesión activa
@@ -158,6 +178,12 @@ export class ConversationService {
     this.logger.debug(`Estado actual: ${currentState}, Intent: ${intent}`);
 
     switch (currentState) {
+      case ConversationState.WA_ASK_NAME:
+        return await this.handleWaAskNameState(userId, text);
+
+      case ConversationState.WA_ASK_EMAIL:
+        return await this.handleWaAskEmailState(userId, text);
+
       case ConversationState.NEW:
         return await this.handleNewState(userId);
 
@@ -334,6 +360,119 @@ export class ConversationService {
     }
 
     return null;
+  }
+
+  // ========================================
+  // ESTADOS DE REGISTRO IN-BOT
+  // ========================================
+
+  /**
+   * Estado WA_ASK_NAME: Usuario no registrado, pidiendo nombre
+   */
+  private async handleWaAskNameState(userId: string, text: string): Promise<BotReply> {
+    const name = text.trim();
+
+    // Validar nombre: mínimo 2 caracteres, máximo 50, solo letras y espacios
+    if (name.length < 2 || name.length > 50) {
+      return {
+        text: 'Por favor, escribe tu *nombre completo* (entre 2 y 50 caracteres).\n\n📝 Ejemplo: Juan Pérez',
+      };
+    }
+
+    // Validar que contenga al menos letras
+    if (!/[a-záéíóúñ]/i.test(name)) {
+      return {
+        text: 'Hmm, eso no parece un nombre válido. 🤔\n\nPor favor, escribe tu *nombre completo*:',
+      };
+    }
+
+    // Guardar nombre en la DB
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { name: name },
+    });
+
+    this.logger.log(`📝 Nombre guardado para usuario ${userId}: "${name}"`);
+
+    // Transición a WA_ASK_EMAIL
+    await this.updateSessionState(userId, ConversationState.WA_ASK_EMAIL);
+
+    return { text: BotMessages.WA_ASK_EMAIL(getFirstName(name)) };
+  }
+
+  /**
+   * Estado WA_ASK_EMAIL: Usuario proporcionó nombre, pidiendo email
+   */
+  private async handleWaAskEmailState(userId: string, text: string): Promise<BotReply> {
+    const email = text.trim().toLowerCase();
+
+    // Validar formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return {
+        text: 'Ese no parece un correo válido. 🤔\n\nPor favor, escribe tu *correo electrónico*:\n\n📧 Ejemplo: tu.correo@ejemplo.com',
+      };
+    }
+
+    // Verificar si el email ya está registrado por otro usuario
+    const existingByEmail = await this.prisma.user.findFirst({
+      where: {
+        email: email,
+        NOT: { id: userId },
+      },
+    });
+
+    if (existingByEmail) {
+      return {
+        text: 'Este correo ya está registrado con otro número. 😕\n\nPor favor, usa un *correo diferente*:',
+      };
+    }
+
+    // Guardar email
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { email: email },
+    });
+
+    // Crear suscripción FREEMIUM
+    const existingSub = await this.prisma.subscription.findUnique({
+      where: { userId },
+    });
+
+    if (!existingSub) {
+      await this.prisma.subscription.create({
+        data: {
+          userId,
+          plan: 'FREEMIUM',
+          freemiumUsesLeft: 5,
+          freemiumStartDate: new Date(),
+          freemiumExpired: false,
+          status: 'ACTIVE',
+        },
+      });
+    }
+
+    // Obtener nombre para el mensaje
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+
+    this.logger.log(`✅ Registro in-bot completado para usuario ${userId}: ${user?.name} (${email})`);
+
+    // Transición a NEW para iniciar onboarding normal
+    await this.updateSessionState(userId, ConversationState.NEW);
+
+    // Retornar mensaje de registro completo + proceder con onboarding
+    const registrationMsg = BotMessages.WA_REGISTRATION_COMPLETE(getFirstName(user?.name));
+    const onboardingReply = await this.handleNewState(userId);
+
+    return {
+      text: `${registrationMsg}\n\n${onboardingReply.text}`,
+      buttons: onboardingReply.buttons,
+      listTitle: onboardingReply.listTitle,
+      listSections: onboardingReply.listSections,
+    };
   }
 
   /**

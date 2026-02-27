@@ -7,6 +7,11 @@
  */
 export enum ConversationState {
   NEW = 'NEW',
+
+  // Estados de registro in-bot (usuario no registrado escribe al bot)
+  WA_ASK_NAME = 'WA_ASK_NAME', // Pidiendo nombre al usuario no registrado
+  WA_ASK_EMAIL = 'WA_ASK_EMAIL', // Pidiendo email al usuario no registrado
+
   // ASK_NAME = 'ASK_NAME', // [ELIMINADO] Nombre se obtiene del registro en landing
   // ASK_DEVICE = 'ASK_DEVICE', // [ELIMINADO] Siempre asumimos celular/móvil para usar botones interactivos
   ASK_TERMS = 'ASK_TERMS',
