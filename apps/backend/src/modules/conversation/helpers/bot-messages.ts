@@ -21,14 +21,27 @@ Estás usando la *versión Free*: Estoy aquí para ayudarte a encontrar las *mej
 ✨ Recibir alertas diarias según tus intereses
 ✨ Ajustar filtros por ubicación, salario y tipo de empleo`,
 
-  // Usuario no registrado - debe registrarse en la landing
-  NOT_REGISTERED: `👋 ¡Hola! Veo que aún no estás registrado en CIO.
+  // Usuario no registrado - registro in-bot
+  NOT_REGISTERED: `👋 ¡Hola! Bienvenido a *CIO*, tu Cazador Inteligente de Ofertas de Almia.
 
-Para usar el *Cazador Inteligente de Ofertas*, primero debes registrarte en nuestra página web:
+Para comenzar, necesito registrarte. Es *gratis* y solo toma unos segundos.
 
-🔗 *Regístrate aquí:* https://cio.almia.com.co
+📝 ¿Cuál es tu *nombre completo*?`,
 
-El registro es *gratis* y solo toma unos segundos. Una vez registrado, podrás comenzar a buscar ofertas de empleo personalizadas.`,
+  // Pedir email durante registro in-bot
+  WA_ASK_EMAIL: (name: string) => `¡Perfecto, *${name}*! 👋
+
+Ahora necesito tu *correo electrónico* para completar el registro.
+
+📧 Escríbelo a continuación:`,
+
+  // Registro completado
+  WA_REGISTRATION_COMPLETE: (name: string) => `✅ ¡Registro exitoso, *${name}*!
+
+Tu cuenta ha sido creada con el *Plan Free*:
+🔍 5 búsquedas por una semana
+
+¡Vamos a configurar tu perfil para encontrar las mejores ofertas!`,
 
   // Bienvenida para usuario registrado (primera vez en el chat)
   WELCOME_REGISTERED: (name: string) => `¡Hola *${name}*! 👋 Bienvenido a CIO, tu Cazador Inteligente de Ofertas de Almia.
