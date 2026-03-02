@@ -88,6 +88,9 @@ model Subscription {
   // Estado de la suscripción
   status            SubscriptionStatus @default(ACTIVE)
   
+  // Contador de templates de alerta enviados (Meta)
+  templatesSentCount Int               @default(0)
+  
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 

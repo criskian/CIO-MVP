@@ -11,6 +11,7 @@ import {
   Briefcase,
   Calendar,
   RefreshCw,
+  Send,
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -42,7 +43,7 @@ export default function DashboardPage() {
   const [activity, setActivity] = useState<RecentActivity | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   // Filtros de fecha
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -82,59 +83,66 @@ export default function DashboardPage() {
 
   const statCards = stats
     ? [
-        {
-          title: 'Total Usuarios',
-          value: stats.summary.totalUsers,
-          icon: Users,
-          color: 'text-almia-purple-dark',
-          bgColor: 'bg-almia-purple-light/10',
-        },
-        {
-          title: 'Freemium Activos',
-          value: stats.summary.freemiumActive,
-          icon: UserCheck,
-          color: 'text-blue-600',
-          bgColor: 'bg-blue-50',
-        },
-        {
-          title: 'Premium Activos',
-          value: stats.summary.premiumActive,
-          icon: Crown,
-          color: 'text-yellow-600',
-          bgColor: 'bg-yellow-50',
-        },
-        {
-          title: 'Tasa Conversión',
-          value: `${stats.summary.conversionRate}%`,
-          icon: TrendingUp,
-          color: 'text-green-600',
-          bgColor: 'bg-green-50',
-          isPercentage: true,
-        },
-        {
-          title: 'Ingresos Totales',
-          value: `$${(stats.summary.totalRevenue / 100).toLocaleString('es-CO')}`,
-          icon: DollarSign,
-          color: 'text-emerald-600',
-          bgColor: 'bg-emerald-50',
-          isCurrency: true,
-        },
-        {
-          title: 'Ofertas Enviadas',
-          value: stats.summary.totalJobsSent,
-          icon: Briefcase,
-          color: 'text-indigo-600',
-          bgColor: 'bg-indigo-50',
-        },
-      ]
+      {
+        title: 'Total Usuarios',
+        value: stats.summary.totalUsers,
+        icon: Users,
+        color: 'text-almia-purple-dark',
+        bgColor: 'bg-almia-purple-light/10',
+      },
+      {
+        title: 'Freemium Activos',
+        value: stats.summary.freemiumActive,
+        icon: UserCheck,
+        color: 'text-blue-600',
+        bgColor: 'bg-blue-50',
+      },
+      {
+        title: 'Premium Activos',
+        value: stats.summary.premiumActive,
+        icon: Crown,
+        color: 'text-yellow-600',
+        bgColor: 'bg-yellow-50',
+      },
+      {
+        title: 'Tasa Conversión',
+        value: `${stats.summary.conversionRate}%`,
+        icon: TrendingUp,
+        color: 'text-green-600',
+        bgColor: 'bg-green-50',
+        isPercentage: true,
+      },
+      {
+        title: 'Ingresos Totales',
+        value: `$${(stats.summary.totalRevenue / 100).toLocaleString('es-CO')}`,
+        icon: DollarSign,
+        color: 'text-emerald-600',
+        bgColor: 'bg-emerald-50',
+        isCurrency: true,
+      },
+      {
+        title: 'Ofertas Enviadas',
+        value: stats.summary.totalJobsSent,
+        icon: Briefcase,
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
+      },
+      {
+        title: 'Alertas Enviadas',
+        value: stats.summary.totalTemplatesSent,
+        icon: Send,
+        color: 'text-teal-600',
+        bgColor: 'bg-teal-50',
+      },
+    ]
     : [];
 
   const periodCards = stats
     ? [
-        { title: 'Nuevos Registros', value: stats.period.newUsers, color: 'text-blue-600' },
-        { title: 'Conversiones', value: stats.period.conversions, color: 'text-purple-600' },
-        { title: 'Pagos Exitosos', value: stats.period.payments, color: 'text-green-600' },
-      ]
+      { title: 'Nuevos Registros', value: stats.period.newUsers, color: 'text-blue-600' },
+      { title: 'Conversiones', value: stats.period.conversions, color: 'text-purple-600' },
+      { title: 'Pagos Exitosos', value: stats.period.payments, color: 'text-green-600' },
+    ]
     : [];
 
   return (
@@ -250,37 +258,37 @@ export default function DashboardPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={stats?.dailyStats || []}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis 
-                          dataKey="date" 
+                        <XAxis
+                          dataKey="date"
                           tickFormatter={(value) => format(new Date(value), 'd MMM', { locale: es })}
                           fontSize={12}
                         />
                         <YAxis fontSize={12} />
-                        <Tooltip 
+                        <Tooltip
                           labelFormatter={(value) => format(new Date(value), "d 'de' MMMM yyyy", { locale: es })}
                         />
                         <Legend />
-                        <Line 
-                          type="monotone" 
-                          dataKey="registros" 
+                        <Line
+                          type="monotone"
+                          dataKey="registros"
                           name="Registros"
-                          stroke="#3B82F6" 
+                          stroke="#3B82F6"
                           strokeWidth={2}
                           dot={{ r: 3 }}
                         />
-                        <Line 
-                          type="monotone" 
-                          dataKey="conversiones" 
+                        <Line
+                          type="monotone"
+                          dataKey="conversiones"
                           name="Conversiones"
-                          stroke="#7C3AED" 
+                          stroke="#7C3AED"
                           strokeWidth={2}
                           dot={{ r: 3 }}
                         />
-                        <Line 
-                          type="monotone" 
-                          dataKey="pagos" 
+                        <Line
+                          type="monotone"
+                          dataKey="pagos"
                           name="Pagos"
-                          stroke="#10B981" 
+                          stroke="#10B981"
                           strokeWidth={2}
                           dot={{ r: 3 }}
                         />
@@ -332,13 +340,13 @@ export default function DashboardPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={stats?.dailyStats?.slice(-14) || []}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="date" 
+                      <XAxis
+                        dataKey="date"
                         tickFormatter={(value) => format(new Date(value), 'd MMM', { locale: es })}
                         fontSize={12}
                       />
                       <YAxis fontSize={12} />
-                      <Tooltip 
+                      <Tooltip
                         labelFormatter={(value) => format(new Date(value), "d 'de' MMMM yyyy", { locale: es })}
                       />
                       <Legend />
@@ -377,11 +385,10 @@ export default function DashboardPage() {
                               </div>
                             </td>
                             <td className="py-2 px-2">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                user.subscription?.plan === 'PREMIUM' 
-                                  ? 'bg-purple-100 text-purple-700' 
-                                  : 'bg-blue-100 text-blue-700'
-                              }`}>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${user.subscription?.plan === 'PREMIUM'
+                                ? 'bg-purple-100 text-purple-700'
+                                : 'bg-blue-100 text-blue-700'
+                                }`}>
                                 {user.subscription?.plan || 'Nuevo'}
                               </span>
                             </td>

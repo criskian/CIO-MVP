@@ -46,12 +46,18 @@ export class AdminController {
         @Query('page') page: string = '1',
         @Query('limit') limit: string = '20',
         @Query('search') search?: string,
+        @Query('plan') plan?: string,
+        @Query('status') status?: string,
+        @Query('hasAlerts') hasAlerts?: string,
+        @Query('freemiumExpired') freemiumExpired?: string,
+        @Query('searchesUsed') searchesUsed?: string,
     ) {
         this.logger.log(`📋 Listando usuarios (page: ${page}, limit: ${limit})`);
         return this.adminService.listUsers(
             parseInt(page, 10),
             parseInt(limit, 10),
             search,
+            { plan, status, hasAlerts, freemiumExpired, searchesUsed },
         );
     }
 
