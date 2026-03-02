@@ -542,6 +542,12 @@ export class SchedulerService implements OnModuleInit {
         },
       });
 
+      // 7. Incrementar contador de templates enviados
+      await this.prisma.subscription.updateMany({
+        where: { userId },
+        data: { templatesSentCount: { increment: 1 } },
+      });
+
       this.logger.log(`✅ Usuario ${userId} notificado via template con ${searchResult.jobs.length} ofertas pendientes`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

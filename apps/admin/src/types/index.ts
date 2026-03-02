@@ -91,6 +91,7 @@ export interface DetailedStats {
     totalRevenue: number;
     totalJobsSent: number;
     usersWithSearches: number;
+    totalTemplatesSent: number;
   };
   period: {
     startDate: string;

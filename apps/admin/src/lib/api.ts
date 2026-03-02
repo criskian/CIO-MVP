@@ -61,7 +61,14 @@ export async function login(credentials: LoginCredentials): Promise<AuthResponse
 export async function getUsers(
   page: number = 1,
   limit: number = 20,
-  search?: string
+  search?: string,
+  filters?: {
+    plan?: string;
+    status?: string;
+    hasAlerts?: string;
+    freemiumExpired?: string;
+    searchesUsed?: string;
+  }
 ): Promise<PaginatedResponse<User>> {
   const params = new URLSearchParams({
     page: page.toString(),
@@ -71,6 +78,12 @@ export async function getUsers(
   if (search) {
     params.append('search', search);
   }
+
+  if (filters?.plan) params.append('plan', filters.plan);
+  if (filters?.status) params.append('status', filters.status);
+  if (filters?.hasAlerts) params.append('hasAlerts', filters.hasAlerts);
+  if (filters?.freemiumExpired) params.append('freemiumExpired', filters.freemiumExpired);
+  if (filters?.searchesUsed) params.append('searchesUsed', filters.searchesUsed);
 
   const { data } = await api.get<PaginatedResponse<User>>(
     `/api/admin/users?${params.toString()}`

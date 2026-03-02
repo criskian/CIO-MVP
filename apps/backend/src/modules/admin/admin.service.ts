@@ -30,12 +30,24 @@ export class AdminService {
     // ==============================
 
     /**
-     * Lista usuarios con paginación
+     * Lista usuarios con paginación y filtros
      */
-    async listUsers(page: number = 1, limit: number = 20, search?: string) {
+    async listUsers(
+        page: number = 1,
+        limit: number = 20,
+        search?: string,
+        filters?: {
+            plan?: string;
+            status?: string;
+            hasAlerts?: string;
+            freemiumExpired?: string;
+            searchesUsed?: string;
+        },
+    ) {
         const skip = (page - 1) * limit;
 
-        const where = search
+        // Construir filtro de búsqueda de texto
+        const searchCondition = search
             ? {
                 OR: [
                     { name: { contains: search, mode: 'insensitive' as const } },
@@ -45,12 +57,65 @@ export class AdminService {
             }
             : {};
 
+        // Construir filtros adicionales
+        const filterConditions: any[] = [];
+
+        if (filters?.plan) {
+            filterConditions.push({
+                subscription: { plan: filters.plan },
+            });
+        }
+
+        if (filters?.status) {
+            filterConditions.push({
+                subscription: { status: filters.status },
+            });
+        }
+
+        if (filters?.hasAlerts === 'true') {
+            filterConditions.push({
+                alert: { isNot: null },
+            });
+        } else if (filters?.hasAlerts === 'false') {
+            filterConditions.push({
+                alert: null,
+            });
+        }
+
+        if (filters?.freemiumExpired === 'true') {
+            filterConditions.push({
+                subscription: { freemiumExpired: true },
+            });
+        } else if (filters?.freemiumExpired === 'false') {
+            filterConditions.push({
+                subscription: { freemiumExpired: false },
+            });
+        }
+
+        // Filtrar por número de búsquedas usadas (5 - freemiumUsesLeft)
+        if (filters?.searchesUsed) {
+            const used = parseInt(filters.searchesUsed, 10);
+            if (!isNaN(used) && used >= 0 && used <= 5) {
+                const usesLeft = 5 - used;
+                filterConditions.push({
+                    subscription: { freemiumUsesLeft: usesLeft },
+                });
+            }
+        }
+
+        // Combinar todas las condiciones con AND
+        const where = {
+            ...searchCondition,
+            ...(filterConditions.length > 0 ? { AND: filterConditions } : {}),
+        };
+
         const [users, total] = await Promise.all([
             this.prisma.user.findMany({
                 where,
                 include: {
                     subscription: true,
                     profile: true,
+                    alert: { select: { enabled: true, alertTimeLocal: true } },
                 },
                 orderBy: { createdAt: 'desc' },
                 skip,
@@ -451,6 +516,7 @@ export class AdminService {
             premiumUsers,
             expiredUsers,
             recentUsers,
+            totalTemplatesSent,
         ] = await Promise.all([
             this.prisma.user.count(),
             this.prisma.subscription.count({
@@ -463,6 +529,9 @@ export class AdminService {
                     createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
                 },
             }),
+            this.prisma.subscription.aggregate({
+                _sum: { templatesSentCount: true },
+            }),
         ]);
 
         return {
@@ -471,6 +540,7 @@ export class AdminService {
             premiumUsers,
             expiredUsers,
             recentUsers,
+            totalTemplatesSent: totalTemplatesSent._sum.templatesSentCount || 0,
             timestamp: new Date().toISOString(),
         };
     }
@@ -500,6 +570,9 @@ export class AdminService {
 
             // Ingresos
             totalRevenue,
+
+            // Templates
+            totalTemplatesSent,
         ] = await Promise.all([
             // Total usuarios
             this.prisma.user.count(),
@@ -551,6 +624,11 @@ export class AdminService {
                 where: { wompiStatus: 'APPROVED' },
                 _sum: { amount: true },
             }),
+
+            // Total de templates de alerta enviados
+            this.prisma.subscription.aggregate({
+                _sum: { templatesSentCount: true },
+            }),
         ]);
 
         // Calcular tasa de conversión
@@ -571,6 +649,7 @@ export class AdminService {
                 totalRevenue: totalRevenue._sum.amount || 0,
                 totalJobsSent,
                 usersWithSearches,
+                totalTemplatesSent: totalTemplatesSent._sum.templatesSentCount || 0,
             },
             period: {
                 startDate: start.toISOString(),
