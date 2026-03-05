@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
+import { countBusinessDays } from '../conversation/helpers/date-utils';
 import {
     UpdateUserDto,
     UpdateSubscriptionDto,
@@ -44,6 +45,8 @@ export class AdminService {
             searchesUsed?: string;
         },
     ) {
+        await this.syncFreemiumExpirationStatus();
+
         const skip = (page - 1) * limit;
 
         // Construir filtro de búsqueda de texto
@@ -139,6 +142,8 @@ export class AdminService {
      * Obtiene todos los usuarios para exportación CSV (sin paginación)
      */
     async getAllUsersForExport() {
+        await this.syncFreemiumExpirationStatus();
+
         const users = await this.prisma.user.findMany({
             include: {
                 subscription: true,
@@ -510,6 +515,8 @@ export class AdminService {
     // ==============================
 
     async getStats() {
+        await this.syncFreemiumExpirationStatus();
+
         const [
             totalUsers,
             freemiumUsers,
@@ -549,6 +556,8 @@ export class AdminService {
      * Obtiene estadísticas detalladas con filtros de fecha
      */
     async getDetailedStats(startDate?: Date, endDate?: Date) {
+        await this.syncFreemiumExpirationStatus();
+
         const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Últimos 30 días por defecto
         const end = endDate || new Date();
 
@@ -757,6 +766,50 @@ export class AdminService {
         d.setDate(diff);
         d.setHours(0, 0, 0, 0);
         return d;
+    }
+
+    /**
+     * Sincroniza expiración de freemium para mantener consistencia en admin.
+     * Marca EXPIRED cuando pasaron 5 días hábiles o no hay usos.
+     */
+    private async syncFreemiumExpirationStatus(): Promise<void> {
+        const candidates = await this.prisma.subscription.findMany({
+            where: {
+                plan: 'FREEMIUM',
+                OR: [
+                    { freemiumExpired: false },
+                    { status: 'ACTIVE' },
+                ],
+            },
+            select: {
+                userId: true,
+                freemiumStartDate: true,
+                freemiumUsesLeft: true,
+                freemiumExpired: true,
+                status: true,
+            },
+        });
+
+        if (candidates.length === 0) return;
+
+        const usersToExpire: string[] = [];
+        for (const subscription of candidates) {
+            const businessDays = countBusinessDays(subscription.freemiumStartDate, new Date());
+            const shouldExpire = businessDays >= 5 || subscription.freemiumUsesLeft <= 0;
+            if (shouldExpire) {
+                usersToExpire.push(subscription.userId);
+            }
+        }
+
+        if (usersToExpire.length === 0) return;
+
+        await this.prisma.subscription.updateMany({
+            where: { userId: { in: usersToExpire } },
+            data: {
+                freemiumExpired: true,
+                status: 'EXPIRED',
+            },
+        });
     }
 
     // ==============================

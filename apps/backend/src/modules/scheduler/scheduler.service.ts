@@ -60,6 +60,7 @@ export class SchedulerService implements OnModuleInit {
     this.startJobAlertsCron();
     // [DESACTIVADO] Violación de política WhatsApp - envía mensajes proactivos sin template aprobado
     // this.startFreemiumReminderCron();
+    this.startFreemiumExpirationCron();
     this.startPremiumExpirationCron();
   }
 
@@ -136,6 +137,64 @@ export class SchedulerService implements OnModuleInit {
     });
 
     this.logger.log('✅ Scheduler de expiración premium iniciado (medianoche y mediodía)');
+  }
+
+  /**
+   * Inicia el cron para expirar planes freemium por tiempo/usos.
+   * Se ejecuta 2 veces al día para mantener consistencia de métricas en admin.
+   */
+  private startFreemiumExpirationCron() {
+    cron.schedule('30 0,12 * * *', async () => {
+      this.logger.log('⏰ Verificando expiraciones de freemium...');
+      await this.expireFreemiumSubscriptions();
+    });
+
+    this.logger.log('✅ Scheduler de expiración freemium iniciado (00:30 y 12:30)');
+  }
+
+  /**
+   * Expira suscripciones FREEMIUM por:
+   * - 5 días hábiles transcurridos
+   * - 0 usos restantes
+   */
+  private async expireFreemiumSubscriptions() {
+    try {
+      const candidates = await this.prisma.subscription.findMany({
+        where: {
+          plan: 'FREEMIUM',
+          OR: [
+            { freemiumExpired: false },
+            { status: 'ACTIVE' },
+          ],
+        },
+      });
+
+      if (candidates.length === 0) {
+        this.logger.log('ℹ️ No hay suscripciones freemium para revisar');
+        return;
+      }
+
+      let expiredCount = 0;
+      for (const subscription of candidates) {
+        const businessDays = this.countBusinessDays(subscription.freemiumStartDate, new Date());
+        const shouldExpire = businessDays >= 5 || subscription.freemiumUsesLeft <= 0;
+
+        if (!shouldExpire) continue;
+
+        await this.prisma.subscription.update({
+          where: { userId: subscription.userId },
+          data: {
+            freemiumExpired: true,
+            status: 'EXPIRED',
+          },
+        });
+        expiredCount++;
+      }
+
+      this.logger.log(`✅ Freemium expirados en esta ejecución: ${expiredCount}/${candidates.length}`);
+    } catch (error) {
+      this.logger.error(`❌ Error en expireFreemiumSubscriptions: ${error}`);
+    }
   }
 
   /**
@@ -663,7 +722,10 @@ export class SchedulerService implements OnModuleInit {
       // Marcar freemium como expirado
       await this.prisma.subscription.update({
         where: { userId },
-        data: { freemiumExpired: true },
+        data: {
+          freemiumExpired: true,
+          status: 'EXPIRED',
+        },
       });
 
       return {

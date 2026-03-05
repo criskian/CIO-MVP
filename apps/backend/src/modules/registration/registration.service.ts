@@ -219,7 +219,10 @@ export class RegistrationService {
       if (freemiumDaysLeft === 0 && !subscription.freemiumExpired) {
         await this.prisma.subscription.update({
           where: { id: subscription.id },
-          data: { freemiumExpired: true },
+          data: {
+            freemiumExpired: true,
+            status: 'EXPIRED',
+          },
         });
       }
     }

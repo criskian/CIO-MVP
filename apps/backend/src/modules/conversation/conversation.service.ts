@@ -2235,12 +2235,28 @@ Selecciona qué quieres editar:`,
 
       // Verificar si el plan premium expiró (30 días)
       if (subscription.premiumEndDate && now > subscription.premiumEndDate) {
+        await this.prisma.subscription.update({
+          where: { userId },
+          data: {
+            status: 'EXPIRED',
+            plan: 'FREEMIUM',
+            freemiumExpired: true,
+          },
+        });
         return { allowed: false, message: BotMessages.PREMIUM_EXPIRED };
       }
 
       if (!subscription.premiumEndDate && subscription.premiumStartDate) {
         const msSinceStart = now.getTime() - subscription.premiumStartDate.getTime();
         if (msSinceStart > thirtyDaysInMs) {
+          await this.prisma.subscription.update({
+            where: { userId },
+            data: {
+              status: 'EXPIRED',
+              plan: 'FREEMIUM',
+              freemiumExpired: true,
+            },
+          });
           return { allowed: false, message: BotMessages.PREMIUM_EXPIRED };
         }
       }
@@ -2266,6 +2282,13 @@ Selecciona qué quieres editar:`,
     const businessDays = countBusinessDays(subscription.freemiumStartDate, new Date());
 
     if (businessDays >= 5 || subscription.freemiumUsesLeft <= 0) {
+      await this.prisma.subscription.update({
+        where: { userId },
+        data: {
+          status: 'EXPIRED',
+          freemiumExpired: true,
+        },
+      });
       return { allowed: false, message: BotMessages.FREEMIUM_EXPIRED };
     }
 
@@ -2433,7 +2456,10 @@ Selecciona qué quieres editar:`,
       // Marcar freemium como expirado
       await this.prisma.subscription.update({
         where: { userId },
-        data: { freemiumExpired: true },
+        data: {
+          freemiumExpired: true,
+          status: 'EXPIRED',
+        },
       });
 
       return {
