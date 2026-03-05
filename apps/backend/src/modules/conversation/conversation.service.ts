@@ -337,7 +337,7 @@ export class ConversationService {
       ],
       [ConversationState.ASK_LOCATION]: [
         `¡Claro! Pero necesito saber *dónde quieres buscar empleo*. 📍\n\n👉 Escribe una *ciudad* o *país*: _Bogotá_, _Colombia_, _Medellín_`,
-        `Entiendo tu mensaje. 😊 Ahora dime, *¿en qué ciudad o país* te gustaría trabajar?\n\nEjemplo: _Lima_, _México_, _Remoto_`,
+        `Entiendo tu mensaje. 😊 Ahora dime, *¿en qué ciudad o país* te gustaría trabajar?\n\nEjemplo: _Lima_, _México_, _Bogotá_`,
       ],
       [ConversationState.ASK_EXPERIENCE]: [
         `¡Gracias por escribir! Pero necesito saber *tu nivel de experiencia*. 👇\n\nUsa el botón de abajo para seleccionarlo.`,
@@ -765,63 +765,52 @@ export class ConversationService {
    * ACTUALIZADO: Ahora va a OFFER_ALERTS para preguntar si quiere alertas (antes de poder buscar)
    */
   private async handleAskLocationState(userId: string, text: string): Promise<BotReply> {
-    const wordCount = text.trim().split(/\s+/).length;
     const validation = validateAndNormalizeLocation(text);
+    const normalizedText = text.toLowerCase().trim();
+    const remotePatterns = ['remoto', 'remote', 'trabajo remoto', 'home office', 'teletrabajo'];
+    const isRemoteIntent = remotePatterns.some((pattern) => normalizedText.includes(pattern));
 
     let finalLocation: string | null = null;
 
-    // Si tiene 3+ palabras, ir directo al LLM (puede ser multiple ciudades o ciudad multi-palabra)
-    if (wordCount >= 3) {
-      const aiResult = await this.llmService.validateAndCorrectLocation(text);
-      if (aiResult) {
-        if (!aiResult.isValid) {
-          return { text: aiResult.suggestion || BotMessages.ERROR_LOCATION_INVALID };
-        }
-        finalLocation = aiResult.location;
-      } else {
-        // LLM no disponible — fallback a regex
-        if (validation.isValid && validation.location) {
-          finalLocation = validation.location;
-        } else {
-          return { text: BotMessages.ERROR_LOCATION_INVALID };
-        }
+    // Siempre pasar por IA primero para ubicaci�n.
+    const aiResult = await this.llmService.validateAndCorrectLocation(text);
+    if (aiResult) {
+      if (!aiResult.isValid) {
+        return {
+          text: aiResult.suggestion
+            || (isRemoteIntent ? BotMessages.ERROR_LOCATION_REMOTE_INVALID : BotMessages.ERROR_LOCATION_INVALID),
+        };
       }
+      finalLocation = aiResult.location;
     } else if (validation.isValid && validation.location) {
-      // Regex resolvió (1-2 palabras) — usar directamente
+      // LLM no disponible: fallback local.
       finalLocation = validation.location;
     } else {
-      // Regex falló — pedir ayuda al LLM
-      const aiResult = await this.llmService.validateAndCorrectLocation(text);
-      if (aiResult) {
-        if (!aiResult.isValid) {
-          return { text: aiResult.suggestion || BotMessages.ERROR_LOCATION_INVALID };
-        }
-        finalLocation = aiResult.location;
-      } else {
-        // LLM no disponible — usar errores de regex
-        if (validation.errorType === 'too_vague') {
-          return { text: BotMessages.ERROR_LOCATION_TOO_VAGUE };
-        }
-        return { text: BotMessages.ERROR_LOCATION_INVALID };
+      if (isRemoteIntent) {
+        return { text: BotMessages.ERROR_LOCATION_REMOTE_INVALID };
       }
+      if (validation.errorType === 'too_vague') {
+        return { text: BotMessages.ERROR_LOCATION_TOO_VAGUE };
+      }
+      return { text: BotMessages.ERROR_LOCATION_INVALID };
     }
 
     if (!finalLocation) {
-      // Intentar respuesta conversacional única
+      // Intentar respuesta conversacional �nica
       const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.ASK_LOCATION);
       return { text: conversational || BotMessages.ERROR_LOCATION_INVALID };
     }
 
     await this.updateUserProfile(userId, { location: finalLocation });
 
-    // [ACTUALIZADO] Flujo: ASK_LOCATION → OFFER_ALERTS (preguntar si quiere alertas antes de buscar)
+    // [ACTUALIZADO] Flujo: ASK_LOCATION ? OFFER_ALERTS (preguntar si quiere alertas antes de buscar)
     await this.updateSessionState(userId, ConversationState.OFFER_ALERTS);
 
     // Preguntar si desea recibir alertas con botones interactivos (sin emojis)
     return {
       text: BotMessages.OFFER_ALERTS,
       buttons: [
-        { id: 'alerts_yes', title: 'Sí, activar' },
+        { id: 'alerts_yes', title: 'S�, activar' },
         { id: 'alerts_no', title: 'No, gracias' },
       ],
     };
@@ -1695,48 +1684,38 @@ Selecciona qué quieres editar:`,
    * Estado EDIT_LOCATION: Editando ubicación
    */
   private async handleEditLocationState(userId: string, text: string): Promise<BotReply> {
-    const wordCount = text.trim().split(/\s+/).length;
     const validation = validateAndNormalizeLocation(text);
+    const normalizedText = text.toLowerCase().trim();
+    const remotePatterns = ['remoto', 'remote', 'trabajo remoto', 'home office', 'teletrabajo'];
+    const isRemoteIntent = remotePatterns.some((pattern) => normalizedText.includes(pattern));
 
     let finalLocation: string | null = null;
 
-    // Si tiene 3+ palabras, ir directo al LLM (puede ser multiple ciudades o ciudad multi-palabra)
-    if (wordCount >= 3) {
-      const aiResult = await this.llmService.validateAndCorrectLocation(text);
-      if (aiResult) {
-        if (!aiResult.isValid) {
-          return { text: aiResult.suggestion || BotMessages.ERROR_LOCATION_INVALID };
-        }
-        finalLocation = aiResult.location;
-      } else {
-        // LLM no disponible — fallback a regex
-        if (validation.isValid && validation.location) {
-          finalLocation = validation.location;
-        } else {
-          return { text: BotMessages.ERROR_LOCATION_INVALID };
-        }
+    // Siempre pasar por IA primero en edici�n de ubicaci�n.
+    const aiResult = await this.llmService.validateAndCorrectLocation(text);
+    if (aiResult) {
+      if (!aiResult.isValid) {
+        return {
+          text: aiResult.suggestion
+            || (isRemoteIntent ? BotMessages.ERROR_LOCATION_REMOTE_INVALID : BotMessages.ERROR_LOCATION_INVALID),
+        };
       }
+      finalLocation = aiResult.location;
     } else if (validation.isValid && validation.location) {
+      // LLM no disponible: fallback local.
       finalLocation = validation.location;
     } else {
-      // Regex falló — pedir ayuda al LLM
-      const aiResult = await this.llmService.validateAndCorrectLocation(text);
-      if (aiResult) {
-        if (!aiResult.isValid) {
-          return { text: aiResult.suggestion || BotMessages.ERROR_LOCATION_INVALID };
-        }
-        finalLocation = aiResult.location;
-      } else {
-        // LLM no disponible — usar errores de regex
-        if (validation.errorType === 'too_vague') {
-          return { text: BotMessages.ERROR_LOCATION_TOO_VAGUE };
-        }
-        return { text: BotMessages.ERROR_LOCATION_INVALID };
+      if (isRemoteIntent) {
+        return { text: BotMessages.ERROR_LOCATION_REMOTE_INVALID };
       }
+      if (validation.errorType === 'too_vague') {
+        return { text: BotMessages.ERROR_LOCATION_TOO_VAGUE };
+      }
+      return { text: BotMessages.ERROR_LOCATION_INVALID };
     }
 
     if (!finalLocation) {
-      // Intentar respuesta conversacional única
+      // Intentar respuesta conversacional �nica
       const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.EDIT_LOCATION);
       return { text: conversational || BotMessages.ERROR_LOCATION_INVALID };
     }
@@ -1746,7 +1725,7 @@ Selecciona qué quieres editar:`,
     });
     await this.updateSessionState(userId, ConversationState.READY);
 
-    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('ubicación', finalLocation));
+    return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('ubicaci\u00f3n', finalLocation));
   }
 
   // [DESACTIVADO] Handler de EDIT_WORK_MODE - Puede reactivarse en el futuro
@@ -2787,3 +2766,4 @@ Selecciona qué quieres editar:`,
     this.logger.log(`🗑️ Preferencias eliminadas para usuario ${userId} (usuario NO eliminado)`);
   }
 }
+

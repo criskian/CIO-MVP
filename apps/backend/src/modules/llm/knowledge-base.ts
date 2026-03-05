@@ -106,7 +106,9 @@ REGLAS:
 3. RECHAZAR ubicaciones demasiado vagas: "Latam", "Sudamérica", "Global", "Mundial", "Internacional", "Cualquiera", "Donde sea", "USA", "Europa".
 4. CORREGIR TYPOS de ciudades (ej: "bogtá" → "Bogotá", "medelín" → "Medellín", "barranqilla" → "Barranquilla").
 5. Si el usuario escribió varias ciudades, pedir que elija solo una.
-6. "Remoto" es una ubicación válida (el usuario quiere empleo remoto desde LATAM).
+6. "Remoto", "remote", "quiero remoto" y variantes NO son válidas en esta pregunta.
+   Si el usuario quiere trabajo remoto, igual debe ingresar una ciudad o país válido.
+   Debes pedir que vuelva a escribir la ubicación.
 7. Agregar tildes correctos (ej: "Bogota" → "Bogotá", "Mexico" → "México").
 
 CIUDADES PRINCIPALES DE REFERENCIA:
@@ -129,7 +131,7 @@ Ejemplos:
 Input: "bogtá" → {"isValid": true, "location": "Bogotá", "wasCorrected": true, "suggestion": null}
 Input: "Latam" → {"isValid": false, "location": null, "wasCorrected": false, "suggestion": "Esa ubicación es muy amplia para buscar ofertas. 🌎\\n\\nPor favor escribe una *ciudad* o *país* específico.\\n\\nEjemplo: \\"Colombia\\", \\"Bogotá\\", \\"Lima\\", \\"México\\""}
 Input: "Cali o Palmira" → {"isValid": false, "location": null, "wasCorrected": false, "suggestion": "Escribe *solo una ubicación* por búsqueda. ¿Cuál prefieres?\\n\\n• Cali\\n• Palmira"}
-Input: "remoto" → {"isValid": true, "location": "Remoto", "wasCorrected": false, "suggestion": null}`,
+Input: "remoto" → {"isValid": false, "location": null, "wasCorrected": false, "suggestion": "Entiendo que quieres trabajo remoto. 😊\n\nEn esta pregunta debes escribir *una ubicación válida* (ciudad o país) para continuar.\n\nEjemplo: \"Bogotá\", \"Colombia\", \"Lima\".\n\nPor favor vuelve a ingresar tu ubicación."}`,
 
    /**
     * Prompt para detectar la intención del usuario en estado READY.
@@ -277,7 +279,7 @@ ASK_EXPERIENCE: Necesitas el nivel de experiencia.
 → Opciones: Sin experiencia, Junior, Intermedio, Senior, Lead/Expert
 
 ASK_LOCATION: Necesitas la ciudad o país donde buscar empleo.
-→ Ejemplos: _Bogotá, Colombia, Medellín, Remoto_
+→ Ejemplos: _Bogotá, Colombia, Medellín, Lima_
 → Solo UNA ubicación
 
 OFFER_ALERTS: Necesitas saber si quiere alertas diarias.

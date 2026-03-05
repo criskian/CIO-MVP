@@ -171,6 +171,14 @@ Ejemplo: "Vendedor", "Marketing", "Analista", "Diseñador", etc.`,
 
 Ejemplo: "Bogotá", "Lima", "México", "Colombia", "Perú", etc.`,
 
+  ERROR_LOCATION_REMOTE_INVALID: `Entiendo que quieres trabajo remoto. 😊
+
+En esta pregunta debes escribir *una ubicación válida* (ciudad o país) para continuar.
+
+Ejemplo: "Bogotá", "Colombia", "Lima".
+
+Por favor vuelve a ingresar tu ubicación.`,
+
   ERROR_LOCATION_TOO_VAGUE: `Esa ubicación es muy amplia para buscar ofertas. 🌎
 
 Por favor escribe una *ciudad* o *país* específico.
@@ -274,7 +282,7 @@ Selecciona qué quieres editar en la lista.
 💡 _Tips rápidos_
 
 📍 Ubicación: si estás abierto/a, escribe solo el país (ej: Colombia).
-Para remoto, escribe el país desde donde te gustaría trabajar.
+Si quieres remoto, igual escribe una ciudad o país base (ej: Bogotá o Colombia).
 
 🎯 Cargo: si no hay resultados, prueba con áreas (Tecnología, Ventas, Marketing) o habilidades (Power BI, IA, Excel).`,
 

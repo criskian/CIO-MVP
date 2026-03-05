@@ -722,10 +722,6 @@ const KNOWN_LOCATIONS: Record<string, string> = {
   'san jose': 'San José',
   'san josé': 'San José',
 
-  // Remoto
-  'remoto': 'Remoto',
-  'remote': 'Remoto',
-  'trabajo remoto': 'Remoto',
 };
 
 /**
@@ -740,6 +736,8 @@ const INVALID_LOCATIONS = [
   'mundial', 'global', 'internacional', 'world',
   'cualquier', 'cualquiera', 'donde sea', 'anywhere',
   'no importa', 'da igual', 'todo', 'todos', 'todas',
+  'remoto', 'remote', 'trabajo remoto', 'home office', 'teletrabajo',
+  'quiero remoto', 'busco remoto',
 ];
 
 /**
