@@ -59,7 +59,7 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
   const wompiProLink = 'https://checkout.wompi.co/l/3XLQMl';
 
   return (
-    <section className="-mt-6 md:-mt-0 lg:-mt-[240px] pb-32 lg:pb-0 px-6 md:px-4 bg-white overflow-hidden">
+    <section id="pricing-plans" className="-mt-6 md:-mt-0 lg:-mt-[240px] pb-32 lg:pb-0 px-6 md:px-4 bg-white overflow-hidden">
       <div className="max-w-[1440px] mx-auto">
         <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
 

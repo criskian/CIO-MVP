@@ -1,15 +1,15 @@
 'use client';
 
-import { useState } from 'react';
 import Image from 'next/image';
-import RegistrationModal from './RegistrationModal';
 
 interface HeroProps {
   whatsappLink: string;
 }
 
 export default function Hero({ whatsappLink }: HeroProps) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const scrollToPlans = () => {
+    document.getElementById('pricing-plans')?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   return (
     <section className="w-full h-auto min-h-[800px] md:min-h-[700px] lg:min-h-[800px] xl:h-screen xl:min-h-[920px] xl:max-h-[1100px] flex flex-col bg-white relative overflow-hidden">
@@ -479,7 +479,7 @@ export default function Hero({ whatsappLink }: HeroProps) {
             <div className="flex flex-col gap-3 pt-4 md:pt-5 lg:pt-6 xl:pt-8 w-full items-center lg:items-start">
               {/* Botón principal - Empieza Ahora */}
               <button
-                onClick={() => setIsModalOpen(true)}
+                onClick={scrollToPlans}
                 className="font-poppins inline-flex items-center justify-center gap-3 px-12 md:px-16 lg:px-20 py-2.5 md:py-3 bg-[#25D366] text-white font-normal rounded-lg border-2 border-[#25D366] hover:bg-white hover:text-[#25D366] transition-all duration-300 shadow-lg"
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -544,12 +544,6 @@ export default function Hero({ whatsappLink }: HeroProps) {
           </div>
         </div>
       </div>
-
-      {/* Modal de Registro */}
-      <RegistrationModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
     </section>
   );
 }
