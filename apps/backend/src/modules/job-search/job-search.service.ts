@@ -862,7 +862,39 @@ export class JobSearchService {
     // Ordenar por score descendente
     jobsWithScore.sort((a, b) => (b.score || 0) - (a.score || 0));
 
+    // Priorizar que la primera oferta coincida con la ubicación del usuario (si existe al menos una).
+    this.prioritizeFirstJobByLocation(jobsWithScore, query);
+
     return jobsWithScore;
+  }
+
+  /**
+   * Si existe al menos una oferta que coincide con la ubicación objetivo,
+   * mueve la de mayor score (primera coincidencia tras ordenar) al primer lugar.
+   */
+  private prioritizeFirstJobByLocation(jobs: JobPosting[], query: JobSearchQuery): void {
+    if (!query.location || jobs.length <= 1) return;
+
+    const firstMatchIndex = jobs.findIndex((job) => this.isLocationMatch(job, query.location!));
+    if (firstMatchIndex <= 0) return;
+
+    const [firstLocationMatch] = jobs.splice(firstMatchIndex, 1);
+    jobs.unshift(firstLocationMatch);
+  }
+
+  /**
+   * Determina si la ubicación de una oferta coincide con la ubicación solicitada.
+   */
+  private isLocationMatch(job: JobPosting, targetLocation: string): boolean {
+    if (!job.locationRaw) return false;
+
+    const normalizedJobLocation = this.normalizeTextForComparison(job.locationRaw);
+    const normalizedTargetLocation = this.normalizeTextForComparison(targetLocation);
+
+    if (!normalizedJobLocation || !normalizedTargetLocation) return false;
+
+    return normalizedJobLocation.includes(normalizedTargetLocation)
+      || normalizedTargetLocation.includes(normalizedJobLocation);
   }
 
   /**

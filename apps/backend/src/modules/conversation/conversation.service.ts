@@ -1230,11 +1230,12 @@ Si quieres seguir recibiéndolas de forma automática y filtradas según tu perf
 
 Estoy lista para ayudarte a cazar tu próxima oportunidad.`;
       } else {
-        menuText = `ℹ️ *Búsquedas restantes esta semana:* ${usesLeft} (${planLabel})
+        const searchWord = usesLeft === 1 ? 'búsqueda' : 'búsquedas';
+        menuText = `📌 Te quedan *${usesLeft} ${searchWord} esta semana* (${planLabel}).
 
-Si estas ofertas no se ajustan del todo a lo que buscas, puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
+⚠️ ¿Las ofertas no encajan del todo?
 
-⚠️ Recuerda: mañana recibirás nuevas alertas y podrás volver a buscar ofertas.
+Puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
 
 ¿Qué quieres hacer ahora?`;
       }
