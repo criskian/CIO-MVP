@@ -662,7 +662,14 @@ const KNOWN_LOCATIONS: Record<string, string> = {
   'republica dominicana': 'República Dominicana',
   'república dominicana': 'República Dominicana',
   'puerto rico': 'Puerto Rico',
-  'cuba': 'Cuba',
+  'estados unidos': 'Estados Unidos',
+  'eeuu': 'Estados Unidos',
+  'e.e.u.u': 'Estados Unidos',
+  'usa': 'Estados Unidos',
+  'us': 'Estados Unidos',
+  'u.s.a': 'Estados Unidos',
+  'united states': 'Estados Unidos',
+  'united states of america': 'Estados Unidos',
 
   // México - Ciudades principales
   'cdmx': 'Ciudad de México',
@@ -720,7 +727,19 @@ const KNOWN_LOCATIONS: Record<string, string> = {
   'asunción': 'Asunción',
   'ciudad de panama': 'Ciudad de Panamá',
   'san jose': 'San José',
-  'san josé': 'San José',
+  'miami': 'Miami',
+  'orlando': 'Orlando',
+  'tampa': 'Tampa',
+  'new york': 'New York',
+  'nueva york': 'New York',
+  'los angeles': 'Los Angeles',
+  'houston': 'Houston',
+  'chicago': 'Chicago',
+  'dallas': 'Dallas',
+  'san francisco': 'San Francisco',
+  'california': 'California',
+  'texas': 'Texas',
+  'florida': 'Florida',
 
 };
 
