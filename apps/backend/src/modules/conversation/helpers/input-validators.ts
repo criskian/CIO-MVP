@@ -207,6 +207,71 @@ export function isEditIntent(text: string): boolean {
   return editPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
+// Detecta si el usuario quiere ajustar preferencias del perfil (incluye remoto)
+export function isPreferenceUpdateIntent(text: string): boolean {
+  const normalizedText = text.toLowerCase().trim();
+
+  const remotePatterns = [
+    /\bremoto\b/,
+    /\bremote\b/,
+    /desde casa/,
+    /home office/,
+    /teletrabajo/,
+  ];
+
+  if (remotePatterns.some((pattern) => pattern.test(normalizedText))) {
+    return true;
+  }
+
+  const preferenceKeywords = [
+    'preferencia',
+    'preferencias',
+    'perfil',
+    'rol',
+    'cargo',
+    'profesion',
+    'experiencia',
+    'ubicacion',
+    'ubicación',
+    'ciudad',
+    'pais',
+    'país',
+    'lugar',
+    'salario',
+    'sueldo',
+    'horario',
+    'alertas',
+  ];
+
+  const changeVerbs = [
+    'quiero',
+    'prefiero',
+    'me gustaria',
+    'me gustaría',
+    'necesito',
+    'deseo',
+    'cambiar',
+    'modificar',
+    'actualizar',
+    'ajustar',
+    'editar',
+  ];
+
+  const hasPreferenceKeyword = preferenceKeywords.some((keyword) =>
+    normalizedText.includes(keyword),
+  );
+  const hasChangeVerb = changeVerbs.some((verb) => normalizedText.includes(verb));
+
+  if (hasPreferenceKeyword && hasChangeVerb) {
+    return true;
+  }
+
+  // Ej: "quiero trabajar en miami", "prefiero en california"
+  return /(quiero|prefiero|me gustaria|me gustaría|necesito|deseo).*(trabajar|empleo|ofertas?).*\b(en|desde)\b/.test(
+    normalizedText,
+  );
+}
+
 // Detecta qué campo del perfil el usuario quiere editar
 export function detectEditField(
   text: string,
@@ -248,6 +313,10 @@ export function detectEditField(
     'ubicacion',
     'ciudad',
     'lugar',
+    'remoto',
+    'remote',
+    'home office',
+    'teletrabajo',
     'localización',
     'localizacion',
     'donde',

@@ -22,6 +22,7 @@ import {
   // isDesktopDevice, // [ELIMINADO] Ya no se usa, todos son tratados como móvil
   normalizeRole,
   isNonRoleInput,
+  isPreferenceUpdateIntent,
   normalizeExperienceLevel,
   normalizeLocation,
   validateAndNormalizeLocation,
@@ -121,6 +122,11 @@ export class ConversationService {
       // 7. Detectar intención general (para comandos especiales)
       let intent = detectIntent(text);
 
+      // 7.25. Seguridad: frases como "quiero remoto" deben ir a editar perfil
+      if (session.state === ConversationState.READY && isPreferenceUpdateIntent(text)) {
+        intent = UserIntent.CHANGE_PREFERENCES;
+      }
+
       // 7.5. Si regex no detectó nada y estamos en READY, preguntar al LLM
       if (intent === UserIntent.UNKNOWN && session.state === ConversationState.READY) {
         const aiIntent = await this.llmService.detectIntent(text, session.state);
@@ -131,7 +137,7 @@ export class ConversationService {
       }
 
       // 7.6. Si estamos en onboarding y el texto no parece una respuesta válida, manejar out-of-flow
-      const outOfFlowResponse = await this.tryHandleOutOfFlow(text, session.state, intent);
+      const outOfFlowResponse = await this.tryHandleOutOfFlow(user.id, text, session.state, intent);
       if (outOfFlowResponse) {
         return outOfFlowResponse;
       }
@@ -300,6 +306,7 @@ export class ConversationService {
    * Retorna null si no aplica o si el mensaje parece ser una respuesta válida.
    */
   private async tryHandleOutOfFlow(
+    userId: string,
     text: string,
     currentState: string,
     intent: UserIntent,
@@ -311,15 +318,22 @@ export class ConversationService {
       ConversationState.ASK_EXPERIENCE,
       ConversationState.OFFER_ALERTS,
       ConversationState.READY,
+      ConversationState.EDITING_PROFILE,
     ];
 
     if (!interactiveStates.includes(currentState as ConversationState)) return null;
+
+    if (currentState === ConversationState.READY && this.shouldRedirectToEditFlow(text, intent)) {
+      return await this.redirectReadyUserToEditFlow(userId);
+    }
 
     // Si el regex ya detectó un intent conocido, no es out-of-flow
     if (intent !== UserIntent.UNKNOWN) return null;
 
     // Solo interceptar si parece un mensaje conversacional (no respuesta válida)
-    if (!isNonRoleInput(text)) return null;
+    const isConversational =
+      currentState === ConversationState.EDITING_PROFILE || isNonRoleInput(text);
+    if (!isConversational) return null;
 
     // PRIORIDAD 1: Respuesta conversacional única del LLM
     const aiResponse = await this.llmService.generateConversationalResponse(text, currentState);
@@ -349,6 +363,9 @@ export class ConversationService {
       [ConversationState.READY]: [
         `¡Hola! 😊 Puedo ayudarte a *buscar empleo*, *editar tu perfil*, o *ver tu perfil actual*.\n\nEscribe lo que necesites o usa el menú de abajo. 👇`,
       ],
+      [ConversationState.EDITING_PROFILE]: [
+        `Perfecto 👍 Para continuar, elige qué prefieres editar: *rol*, *experiencia*, *ubicación* o *horario de alertas*.`,
+      ],
     };
 
     const messages = stateMessages[currentState];
@@ -360,6 +377,20 @@ export class ConversationService {
     }
 
     return null;
+  }
+
+  private shouldRedirectToEditFlow(text: string, intent: UserIntent): boolean {
+    if (isEditIntent(text)) return true;
+    if (intent === UserIntent.CHANGE_PREFERENCES) return true;
+    return isPreferenceUpdateIntent(text);
+  }
+
+  private async redirectReadyUserToEditFlow(userId: string): Promise<BotReply> {
+    const editReply = await this.showProfileForEditing(userId);
+    return {
+      ...editReply,
+      text: `Perfecto, te ayudo con ese ajuste antes de buscar de nuevo.\n\n${editReply.text}`,
+    };
   }
 
   // ========================================
@@ -1031,9 +1062,9 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
       };
     }
 
-    // Detectar intención de editar perfil
-    if (isEditIntent(text)) {
-      return await this.showProfileForEditing(userId);
+    // Detectar intención de editar/cambiar preferencias
+    if (this.shouldRedirectToEditFlow(text, intent)) {
+      return await this.redirectReadyUserToEditFlow(userId);
     }
 
     // Detectar intención de buscar empleos

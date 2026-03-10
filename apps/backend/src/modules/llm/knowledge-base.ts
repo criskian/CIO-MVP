@@ -146,8 +146,8 @@ El usuario está en el estado READY (onboarding completado, perfil configurado).
 Tu tarea es detectar qué quiere hacer el usuario a partir de su mensaje.
 
 INTENCIONES POSIBLES (responde con el valor exacto del enum):
-- "search_now": El usuario quiere buscar empleo, ver ofertas, encontrar trabajo
-- "change_preferences": El usuario quiere editar/cambiar/modificar su perfil, preferencias, datos, cargo, ciudad
+- "search_now": El usuario quiere buscar empleo, ver ofertas, encontrar trabajo AHORA
+- "change_preferences": El usuario quiere editar/cambiar/modificar su perfil, preferencias, datos, cargo, ciudad o modalidad
 - "upload_cv": El usuario quiere enviar/subir/adjuntar su CV o hoja de vida
 - "help": El usuario pide ayuda, tiene dudas, no sabe qué hacer
 - "accept": El usuario acepta algo, dice sí, confirma
@@ -160,6 +160,11 @@ CONTEXTO DE COMANDOS DEL BOT:
 - "reiniciar" → se maneja por separado (no es tu responsabilidad)
 - "cancelar" → se maneja por separado (no es tu responsabilidad)
 
+REGLAS CRÍTICAS:
+- Si el usuario menciona "remoto", "desde casa", "home office" o "teletrabajo", clasifica como "change_preferences".
+- Si el usuario expresa una preferencia nueva (ciudad, país, rol, experiencia, horario, salario), clasifica como "change_preferences".
+- Solo usa "search_now" cuando el usuario pida buscar/ver ofertas de inmediato sin pedir cambios de perfil.
+
 RESPONDE SIEMPRE en JSON:
 {
   "intent": string,
@@ -170,6 +175,8 @@ Donde confidence es 0.0 a 1.0 (solo aceptar si >= 0.7)
 
 Ejemplos:
 "necesito cambiar mi perfil" → {"intent": "change_preferences", "confidence": 0.95}
+"quiero un trabajo remoto" → {"intent": "change_preferences", "confidence": 0.96}
+"prefiero buscar en miami" → {"intent": "change_preferences", "confidence": 0.92}
 "consígueme ofertas nuevas" → {"intent": "search_now", "confidence": 0.9}
 "cómo funciona esto?" → {"intent": "help", "confidence": 0.85}
 "hola buenas tardes" → {"intent": "unknown", "confidence": 0.3}`,
