@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { RegisterUserDto } from './dto/register-user.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 /**
  * Servicio de registro de usuarios
@@ -16,7 +17,10 @@ import { RegisterUserDto } from './dto/register-user.dto';
 export class RegistrationService {
   private readonly logger = new Logger(RegistrationService.name);
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) { }
 
   /**
    * Registra un nuevo usuario con plan freemium
@@ -83,6 +87,7 @@ export class RegistrationService {
     });
 
     this.logger.log(`✅ Usuario freemium registrado: ${user.phone} - ${user.name} (${user.email})`);
+    void this.sendOnboardingEmailSafely(user.id, user.email, user.name);
 
     return {
       success: true,
@@ -143,6 +148,7 @@ export class RegistrationService {
     }
 
     this.logger.log(`✅ Registro completado para usuario existente: ${user.phone}`);
+    void this.sendOnboardingEmailSafely(user.id, user.email, user.name);
 
     return {
       success: true,
@@ -240,6 +246,33 @@ export class RegistrationService {
       premiumUsesLeft: subscription?.premiumUsesLeft || 0,
       premiumEndDate: subscription?.premiumEndDate || null,
     };
+  }
+
+  /**
+   * Envia onboarding email sin bloquear el registro.
+   * Si falla Resend o falta configuracion, solo se registra en logs.
+   */
+  private async sendOnboardingEmailSafely(
+    userId: string,
+    email: string | null,
+    name: string | null,
+  ): Promise<void> {
+    if (!email || !name) {
+      this.logger.warn(
+        `No se envio onboarding email al usuario ${userId}: faltan email o nombre`,
+      );
+      return;
+    }
+
+    try {
+      await this.notificationsService.sendOnboardingEmail(email, name);
+      this.logger.log(`📧 Onboarding email enviado automaticamente a ${email}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(
+        `Error enviando onboarding email automatico a ${email} (usuario ${userId}): ${errorMessage}`,
+      );
+    }
   }
 
   /**

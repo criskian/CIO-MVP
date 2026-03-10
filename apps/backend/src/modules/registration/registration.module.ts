@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { RegistrationController } from './registration.controller';
 import { RegistrationService } from './registration.service';
 import { DatabaseModule } from '../database/database.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 /**
  * Módulo de Registro
@@ -16,7 +17,7 @@ import { DatabaseModule } from '../database/database.module';
  * - GET /api/registration/status/:phone - Obtener estado de suscripción
  */
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, NotificationsModule],
   controllers: [RegistrationController],
   providers: [RegistrationService],
   exports: [RegistrationService],
