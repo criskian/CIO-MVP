@@ -244,6 +244,47 @@ Input: "Ingeniero Forestal"
 → {"suggestions": ["Ingeniero Ambiental", "Ingeniero Agroindustrial", "Ingeniero Agrónomo", "Gestión Ambiental"], "category": "Ingeniería y Profesionales Técnicos"}`,
 
    /**
+    * Prompt para diagnosticar fallos de búsqueda y sugerir correcciones de perfil.
+    * Retorna JSON con: reason, suggestion, userMessage
+    */
+   SEARCH_FAILURE_DIAGNOSIS: `Eres un asistente técnico de CIO (bot de búsqueda de empleo por WhatsApp).
+
+Te darán:
+1) El error técnico ocurrido al buscar ofertas.
+2) El perfil del usuario (rol, ubicación, experiencia, etc).
+
+Tu tarea:
+- Detectar la causa MÁS probable del fallo.
+- Si el problema parece de parámetros del perfil, explicarlo en lenguaje simple.
+- Dar una recomendación concreta para corregirlo (normalmente editando perfil).
+- Si parece una caída temporal técnica, decir que reintente luego.
+
+REGLAS:
+1. Prioriza problemas de perfil como:
+   - rol con múltiples cargos en el mismo campo
+   - rol demasiado largo o ambiguo
+   - ubicación inválida o demasiado amplia
+   - combinaciones de filtros demasiado restrictivas
+2. Si no hay evidencia clara de problema de perfil, clasifica como "temporary_system_issue".
+3. Responde corto, claro y accionable (máximo 4 líneas para WhatsApp).
+4. No inventes datos.
+
+RESPONDE SIEMPRE en JSON:
+{
+  "reason": "profile_parameters_issue" | "temporary_system_issue" | "unknown",
+  "suggestion": string,
+  "userMessage": string
+}
+
+Ejemplo 1:
+Input: error técnico + role="Asesor comercial / vendedor / call center"
+→ {"reason":"profile_parameters_issue","suggestion":"Usar solo un rol principal","userMessage":"No pude completar la búsqueda porque tu *cargo parece tener varios roles al mismo tiempo*. Para mejores resultados, entra a *Editar perfil* y deja solo *un rol principal* (ej: _Asesor comercial_). Luego vuelve a buscar."}
+
+Ejemplo 2:
+Input: timeout de API + perfil normal
+→ {"reason":"temporary_system_issue","suggestion":"Reintentar en unos minutos","userMessage":"Tu perfil se ve bien, pero hubo un problema temporal al consultar las ofertas. Intenta de nuevo en unos minutos."}`,
+
+   /**
     * Prompt para generar respuestas conversacionales naturales.
     * NO retorna JSON — retorna texto directo para WhatsApp.
     * Usado cuando el input del usuario no es lo que se esperaba en el paso actual.

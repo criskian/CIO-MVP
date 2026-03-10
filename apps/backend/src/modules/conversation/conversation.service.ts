@@ -1263,6 +1263,30 @@ Puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Error en búsqueda de empleos: ${errorMessage}`);
 
+      const profile = await this.prisma.userProfile.findUnique({
+        where: { userId },
+      });
+
+      // Fallback heurístico rápido para problemas obvios de parámetros.
+      const heuristicDiagnosis = this.detectSearchProfileIssue(profile);
+      if (heuristicDiagnosis) {
+        return { text: heuristicDiagnosis };
+      }
+
+      // Diagnóstico con IA para explicar causa probable y siguiente acción.
+      const diagnosis = await this.llmService.diagnoseSearchFailure({
+        errorMessage,
+        role: profile?.role,
+        location: profile?.location,
+        experienceLevel: profile?.experienceLevel,
+        jobType: profile?.jobType,
+        minSalary: profile?.minSalary,
+      });
+
+      if (diagnosis?.userMessage) {
+        return { text: diagnosis.userMessage };
+      }
+
       return {
         text: `Lo siento, no pude buscar ofertas en este momento. 😔
 
@@ -2520,6 +2544,42 @@ Selecciona qué quieres editar:`,
     };
 
     return experienceMap[experienceLevel || ''] || 'No configurado';
+  }
+
+  /**
+   * Detecta errores comunes en parámetros de perfil que suelen romper la búsqueda.
+   */
+  private detectSearchProfileIssue(profile: {
+    role: string | null;
+    location: string | null;
+  } | null): string | null {
+    if (!profile) return null;
+
+    const role = (profile.role || '').trim();
+    const location = (profile.location || '').trim();
+
+    const hasMultipleRoles = /[,/;]|(\s-\s)|(\sy\s)|(\so\s)/i.test(role);
+    if (hasMultipleRoles) {
+      return `No pude completar la búsqueda porque tu *cargo parece tener varios roles al mismo tiempo*.
+
+Para obtener mejores resultados, entra a *Editar perfil* y deja solo *un rol principal* (ej: _Asesor comercial_).
+
+Después vuelve a escribir *buscar*.`;
+    }
+
+    if (!role || role.length < 2) {
+      return `No pude completar la búsqueda porque tu *cargo* no está bien definido.
+
+Entra a *Editar perfil*, ajusta tu cargo principal y vuelve a buscar.`;
+    }
+
+    if (!location || location.length < 2) {
+      return `No pude completar la búsqueda porque tu *ubicación* no está bien definida.
+
+Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
+    }
+
+    return null;
   }
 
   // [DESACTIVADO] Formatea el workMode para mostrar al usuario - Puede reactivarse

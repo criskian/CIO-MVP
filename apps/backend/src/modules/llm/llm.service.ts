@@ -36,6 +36,12 @@ export interface RoleSuggestionsResult {
   category: string;
 }
 
+export interface SearchFailureDiagnosisResult {
+  reason: 'profile_parameters_issue' | 'temporary_system_issue' | 'unknown';
+  suggestion: string;
+  userMessage: string;
+}
+
 @Injectable()
 export class LlmService {
   private readonly logger = new Logger(LlmService.name);
@@ -272,6 +278,37 @@ export class LlmService {
     }
 
     return result.suggestions;
+  }
+
+  /**
+   * Diagnostica la posible causa de un fallo de búsqueda y sugiere acción al usuario.
+   * Retorna null si el LLM no está disponible.
+   */
+  async diagnoseSearchFailure(input: {
+    errorMessage: string;
+    role?: string | null;
+    location?: string | null;
+    experienceLevel?: string | null;
+    jobType?: string | null;
+    minSalary?: number | null;
+  }): Promise<SearchFailureDiagnosisResult | null> {
+    const raw = await this.callOpenAI(
+      SYSTEM_PROMPTS.SEARCH_FAILURE_DIAGNOSIS,
+      JSON.stringify(input),
+    );
+    if (!raw) return null;
+
+    const result = this.parseJSON<SearchFailureDiagnosisResult>(raw, {
+      reason: 'unknown',
+      suggestion: 'Reintentar en unos minutos',
+      userMessage: 'Hubo un problema temporal al buscar ofertas. Intenta de nuevo en unos minutos.',
+    });
+
+    if (result.userMessage) {
+      this.logger.log(`🩺 Diagnóstico IA de fallo de búsqueda: ${result.reason}`);
+    }
+
+    return result;
   }
 
   // ===== Método conversacional =====
