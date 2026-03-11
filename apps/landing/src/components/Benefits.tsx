@@ -150,7 +150,7 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
                     POPULAR
                   </div>
                   <div className="mb-2">
-                    <h3 className="font-poppins font-bold text-white text-base">Plan Premium</h3>
+                    <h3 className="font-poppins font-bold text-white text-base">Plan 1 Mes</h3>
                   </div>
                   <p className="font-poppins text-white font-bold text-xl mb-3">
                     {prices[currency].premium.amount}{' '}
@@ -192,10 +192,10 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
                 <div className="bg-gradient-to-br from-[#646363] to-[#1a1a1a] rounded-2xl p-4 border-2 border-[#a6a6a6] shadow-lg relative overflow-hidden flex flex-col transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer">
                   {/* Badge Descuento */}
                   <div className="absolute top-0 right-0 bg-[#25D366] text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg">
-                    -10%
+                    -10% DTO.
                   </div>
                   <div className="mb-2">
-                    <h3 className="font-poppins font-bold text-white text-base">Plan Pro</h3>
+                    <h3 className="font-poppins font-bold text-white text-base">Plan 3 Meses</h3>
                   </div>
                   <p className="font-poppins text-white font-bold text-xl mb-3">
                     {prices[currency].pro.amount}{' '}
