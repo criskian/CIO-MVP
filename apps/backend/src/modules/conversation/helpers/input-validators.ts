@@ -288,7 +288,7 @@ export function detectEditField(
   const normalizedText = text.toLowerCase().trim();
 
   // Detectar campo "rol"
-  const rolePatterns = ['rol', 'cargo', 'puesto', 'profesión', 'profesion'];
+  const rolePatterns = ['rol', 'cargo', 'puesto', 'profesión', 'profesion', 'edit_rol', 'field_role'];
   if (rolePatterns.some((pattern) => normalizedText.includes(pattern))) {
     return 'rol';
   }
@@ -302,6 +302,8 @@ export function detectEditField(
     'nivel',
     'junior',
     'senior',
+    'edit_experiencia',
+    'field_experience',
   ];
   if (experiencePatterns.some((pattern) => normalizedText.includes(pattern))) {
     return 'experiencia';
@@ -313,6 +315,9 @@ export function detectEditField(
     'ubicacion',
     'ciudad',
     'lugar',
+    'location',
+    'edit_ubicacion',
+    'field_location',
     'remoto',
     'remote',
     'home office',
@@ -375,6 +380,8 @@ export function detectEditField(
     'notificación',
     'notificacion',
     'notificaciones',
+    'edit_horario',
+    'field_alert_time',
   ];
   if (alertTimePatterns.some((pattern) => normalizedText.includes(pattern))) {
     return 'horario';
@@ -739,6 +746,34 @@ const KNOWN_LOCATIONS: Record<string, string> = {
   'u.s.a': 'Estados Unidos',
   'united states': 'Estados Unidos',
   'united states of america': 'Estados Unidos',
+  'portugal': 'Portugal',
+  'espana': 'España',
+  'españa': 'España',
+  'francia': 'Francia',
+  'alemania': 'Alemania',
+  'italia': 'Italia',
+  'reino unido': 'Reino Unido',
+  'paises bajos': 'Países Bajos',
+  'países bajos': 'Países Bajos',
+  'irlanda': 'Irlanda',
+  'holanda': 'Países Bajos',
+  'oporto': 'Oporto',
+  'porto': 'Oporto',
+  'lisboa': 'Lisboa',
+  'madrid': 'Madrid',
+  'barcelona': 'Barcelona',
+  'paris': 'París',
+  'parís': 'París',
+  'berlin': 'Berlín',
+  'berlín': 'Berlín',
+  'roma': 'Roma',
+  'milan': 'Milán',
+  'milán': 'Milán',
+  'londres': 'Londres',
+  'dublin': 'Dublín',
+  'dublín': 'Dublín',
+  'amsterdam': 'Ámsterdam',
+  'ámsterdam': 'Ámsterdam',
 
   // México - Ciudades principales
   'cdmx': 'Ciudad de México',
@@ -820,6 +855,8 @@ const INVALID_LOCATIONS = [
   'sudamerica', 'sudamérica', 'suramerica', 'surámerica', 'south america',
   'centroamerica', 'centroamérica', 'central america',
   'norteamerica', 'norteamérica', 'north america',
+  'europa', 'europe', 'union europea', 'unión europea', 'european union',
+  'asia', 'africa', 'áfrica', 'oceania', 'oceanía', 'middle east', 'medio oriente',
   'america', 'américa', 'americas', 'américas',
   'mundial', 'global', 'internacional', 'world',
   'cualquier', 'cualquiera', 'donde sea', 'anywhere',
@@ -1083,7 +1120,7 @@ export function isNonRoleInput(text: string): boolean {
   // Frases conversacionales comunes (NO roles)
   const conversational = [
     'gracias', 'muchas gracias', 'ok', 'vale', 'entendido',
-    'no entiendo', 'no entendí', 'no sé', 'no se', 'espera',
+    'no entiendo', 'no entendí', 'no sé', 'no se', 'no lo sé', 'no lo se', 'ni idea', 'quien sabe', 'quién sabe', 'nose', 'espera',
     'un momento', 'ya voy', 'ahí voy', 'dame un segundo',
     'qué es esto', 'que es esto', 'para qué sirve', 'para que sirve',
     'quién eres', 'quien eres', 'qué haces', 'que haces',

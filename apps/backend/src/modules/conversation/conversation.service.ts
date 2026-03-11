@@ -317,8 +317,10 @@ export class ConversationService {
       ConversationState.ASK_LOCATION,
       ConversationState.ASK_EXPERIENCE,
       ConversationState.OFFER_ALERTS,
-      ConversationState.READY,
       ConversationState.EDITING_PROFILE,
+      ConversationState.EDIT_ROLE,
+      ConversationState.EDIT_LOCATION,
+      ConversationState.READY,
     ];
 
     if (!interactiveStates.includes(currentState as ConversationState)) return null;
@@ -330,16 +332,37 @@ export class ConversationService {
     // Si el regex ya detectó un intent conocido, no es out-of-flow
     if (intent !== UserIntent.UNKNOWN) return null;
 
+    // En selección de campo de edición, pasar siempre por IA si la respuesta no coincide con un campo.
+    if (currentState === ConversationState.EDITING_PROFILE) {
+      if (detectEditField(text) || isRejection(text) || text.toLowerCase().includes('cancelar')) {
+        return null;
+      }
+
+      const aiResponse = await this.llmService.generateConversationalResponse(text, currentState);
+      const editReply = await this.showProfileForEditing(userId);
+      const cleanAiResponse = this.normalizeConversationalMessage(aiResponse);
+
+      if (cleanAiResponse) {
+        return {
+          ...editReply,
+          text: `${cleanAiResponse}\n\n${editReply.text}`,
+        };
+      }
+
+      return {
+        ...editReply,
+        text: `Entiendo. Para continuar, elige que campo quieres editar: cargo, ubicacion, nivel de experiencia u horario de alertas.\n\n${editReply.text}`,
+      };
+    }
+
     // Solo interceptar si parece un mensaje conversacional (no respuesta válida)
-    const isConversational =
-      currentState === ConversationState.EDITING_PROFILE || isNonRoleInput(text);
-    if (!isConversational) return null;
+    if (!isNonRoleInput(text)) return null;
 
     // PRIORIDAD 1: Respuesta conversacional única del LLM
     const aiResponse = await this.llmService.generateConversationalResponse(text, currentState);
     if (aiResponse) {
       this.logger.log(`🗣️ Respuesta conversacional IA en ${currentState}: "${text}"`);
-      return { text: aiResponse };
+      return { text: this.normalizeConversationalMessage(aiResponse) || aiResponse };
     }
 
     // PRIORIDAD 2: Heurístico variado (LLM caído)
@@ -363,9 +386,6 @@ export class ConversationService {
       [ConversationState.READY]: [
         `¡Hola! 😊 Puedo ayudarte a *buscar empleo*, *editar tu perfil*, o *ver tu perfil actual*.\n\nEscribe lo que necesites o usa el menú de abajo. 👇`,
       ],
-      [ConversationState.EDITING_PROFILE]: [
-        `Perfecto 👍 Para continuar, elige qué prefieres editar: *rol*, *experiencia*, *ubicación* o *horario de alertas*.`,
-      ],
     };
 
     const messages = stateMessages[currentState];
@@ -377,6 +397,27 @@ export class ConversationService {
     }
 
     return null;
+  }
+
+  private normalizeConversationalMessage(message: string | null): string | null {
+    if (!message) return null;
+
+    let normalized = message
+      .replace(/\*{2,}/g, '*')
+      .replace(/_{2,}/g, '_')
+      .trim();
+
+    const boldMarks = (normalized.match(/\*/g) || []).length;
+    if (boldMarks % 2 !== 0) {
+      normalized = normalized.replace(/\*/g, '');
+    }
+
+    const italicMarks = (normalized.match(/_/g) || []).length;
+    if (italicMarks % 2 !== 0) {
+      normalized = normalized.replace(/_/g, '');
+    }
+
+    return normalized;
   }
 
   private shouldRedirectToEditFlow(text: string, intent: UserIntent): boolean {
@@ -631,7 +672,7 @@ export class ConversationService {
     if (!role) {
       // Intentar respuesta conversacional única
       const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.ASK_ROLE);
-      return { text: conversational || BotMessages.ERROR_ROLE_INVALID };
+      return { text: this.normalizeConversationalMessage(conversational) || BotMessages.ERROR_ROLE_INVALID };
     }
 
     // Guardar en UserProfile
@@ -821,7 +862,7 @@ export class ConversationService {
         return { text: BotMessages.ERROR_LOCATION_REMOTE_INVALID };
       }
       if (validation.errorType === 'too_vague') {
-        return { text: BotMessages.ERROR_LOCATION_TOO_VAGUE };
+        return { text: this.getTooVagueLocationMessage(text) };
       }
       return { text: BotMessages.ERROR_LOCATION_INVALID };
     }
@@ -829,7 +870,7 @@ export class ConversationService {
     if (!finalLocation) {
       // Intentar respuesta conversacional �nica
       const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.ASK_LOCATION);
-      return { text: conversational || BotMessages.ERROR_LOCATION_INVALID };
+      return { text: this.normalizeConversationalMessage(conversational) || BotMessages.ERROR_LOCATION_INVALID };
     }
 
     await this.updateUserProfile(userId, { location: finalLocation });
@@ -841,7 +882,7 @@ export class ConversationService {
     return {
       text: BotMessages.OFFER_ALERTS,
       buttons: [
-        { id: 'alerts_yes', title: 'S�, activar' },
+        { id: 'alerts_yes', title: 'Sí, activar' },
         { id: 'alerts_no', title: 'No, gracias' },
       ],
     };
@@ -1405,7 +1446,7 @@ Por favor intenta de nuevo en unos minutos.`,
     const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.CONFIRM_RESTART);
     if (conversational) {
       return {
-        text: conversational,
+        text: this.normalizeConversationalMessage(conversational) || conversational,
         buttons: [
           { id: 'confirm_restart', title: 'Sí, reiniciar' },
           { id: 'cancel_restart', title: 'No, cancelar' },
@@ -1443,7 +1484,7 @@ Por favor intenta de nuevo en unos minutos.`,
     const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.CONFIRM_CANCEL_SERVICE);
     if (conversational) {
       return {
-        text: conversational,
+        text: this.normalizeConversationalMessage(conversational) || conversational,
         buttons: [
           { id: 'confirm_cancel', title: 'Sí, confirmar' },
           { id: 'abort_cancel', title: 'No, continuar' },
@@ -1663,6 +1704,15 @@ Selecciona qué quieres editar:`,
    * Estado EDIT_ROLE: Editando rol
    */
   private async handleEditRoleState(userId: string, text: string): Promise<BotReply> {
+    // Si el usuario responde algo conversacional (ej: "no se"), reintegrarlo al paso de rol.
+    if (isNonRoleInput(text)) {
+      const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.EDIT_ROLE);
+      return {
+        text: this.normalizeConversationalMessage(conversational)
+          || 'Entiendo. Para continuar, escribeme tu nuevo cargo o profesion principal (solo uno).',
+      };
+    }
+
     // Paso 1: Regex
     let role = normalizeRole(text);
 
@@ -1684,10 +1734,15 @@ Selecciona qué quieres editar:`,
       }
     }
 
+    if (role) {
+      // Blindaje extra: si la IA devolvio algo conversacional, no actualizar perfil.
+      role = normalizeRole(role);
+    }
+
     if (!role) {
       // Intentar respuesta conversacional única
       const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.EDIT_ROLE);
-      return { text: conversational || BotMessages.ERROR_ROLE_INVALID };
+      return { text: this.normalizeConversationalMessage(conversational) || BotMessages.ERROR_ROLE_INVALID };
     }
 
     await this.updateUserProfile(userId, { role });
@@ -1765,7 +1820,7 @@ Selecciona qué quieres editar:`,
         return { text: BotMessages.ERROR_LOCATION_REMOTE_INVALID };
       }
       if (validation.errorType === 'too_vague') {
-        return { text: BotMessages.ERROR_LOCATION_TOO_VAGUE };
+        return { text: this.getTooVagueLocationMessage(text) };
       }
       return { text: BotMessages.ERROR_LOCATION_INVALID };
     }
@@ -1773,7 +1828,7 @@ Selecciona qué quieres editar:`,
     if (!finalLocation) {
       // Intentar respuesta conversacional �nica
       const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.EDIT_LOCATION);
-      return { text: conversational || BotMessages.ERROR_LOCATION_INVALID };
+      return { text: this.normalizeConversationalMessage(conversational) || BotMessages.ERROR_LOCATION_INVALID };
     }
 
     await this.updateUserProfile(userId, {
@@ -1782,6 +1837,61 @@ Selecciona qué quieres editar:`,
     await this.updateSessionState(userId, ConversationState.READY);
 
     return await this.returnToMainMenu(userId, BotMessages.FIELD_UPDATED('ubicaci\u00f3n', finalLocation));
+  }
+
+  private getTooVagueLocationMessage(input: string): string {
+    const normalized = input.toLowerCase();
+
+    if (
+      normalized.includes('europa') ||
+      normalized.includes('europe') ||
+      normalized.includes('union europea') ||
+      normalized.includes('unión europea')
+    ) {
+      return `Esa ubicación es muy amplia para buscar ofertas. 🌍
+
+Por favor escribe una *ciudad* o *país* de Europa.
+
+Ejemplo: "Oporto", "Lisboa", "Madrid", "Portugal", "España".`;
+    }
+
+    if (normalized.includes('asia')) {
+      return `Esa ubicación es muy amplia para buscar ofertas. 🌏
+
+Por favor escribe una *ciudad* o *país* de Asia.
+
+Ejemplo: "Tokio", "Singapur", "Bangkok", "Japón", "India".`;
+    }
+
+    if (normalized.includes('africa') || normalized.includes('áfrica')) {
+      return `Esa ubicación es muy amplia para buscar ofertas. 🌍
+
+Por favor escribe una *ciudad* o *país* de África.
+
+Ejemplo: "Nairobi", "Ciudad del Cabo", "El Cairo", "Kenia", "Sudáfrica".`;
+    }
+
+    if (normalized.includes('oceania') || normalized.includes('oceanía')) {
+      return `Esa ubicación es muy amplia para buscar ofertas. 🌏
+
+Por favor escribe una *ciudad* o *país* de Oceanía.
+
+Ejemplo: "Sídney", "Melbourne", "Auckland", "Australia", "Nueva Zelanda".`;
+    }
+
+    if (
+      normalized.includes('norteamerica') ||
+      normalized.includes('norteamérica') ||
+      normalized.includes('north america')
+    ) {
+      return `Esa ubicación es muy amplia para buscar ofertas. 🌎
+
+Por favor escribe una *ciudad* o *país* de Norteamérica.
+
+Ejemplo: "Toronto", "Miami", "New York", "Canadá", "Estados Unidos".`;
+    }
+
+    return BotMessages.ERROR_LOCATION_TOO_VAGUE;
   }
 
   // [DESACTIVADO] Handler de EDIT_WORK_MODE - Puede reactivarse en el futuro

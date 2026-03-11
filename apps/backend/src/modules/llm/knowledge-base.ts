@@ -102,23 +102,23 @@ Tu tarea es validar y corregir la ubicación geográfica que el usuario escribi�
 
 REGLAS:
 1. SOLO 1 ubicación por búsqueda (ciudad O país).
-2. Debe ser una ciudad o país válido para búsqueda. Acepta LATAM y también Estados Unidos.
-3. RECHAZAR ubicaciones demasiado vagas: "Latam", "Sudamérica", "Global", "Mundial", "Internacional", "Cualquiera", "Donde sea", "Europa".
+2. Debe ser una ciudad o país válido para búsqueda. Acepta ubicaciones de cualquier parte del mundo (global).
+3. RECHAZAR ubicaciones demasiado vagas: continentes, regiones o áreas amplias como "Latam", "Sudamérica", "Europa", "Asia", "Norteamérica", "Global", "Mundial", "Internacional", "Cualquiera", "Donde sea".
 4. CORREGIR TYPOS de ciudades (ej: "bogtá" → "Bogotá", "medelín" → "Medellín", "barranqilla" → "Barranquilla").
 5. Si el usuario escribió varias ciudades, pedir que elija solo una.
 6. "Remoto", "remote", "quiero remoto" y variantes NO son válidas en esta pregunta.
    Si el usuario quiere trabajo remoto, igual debe ingresar una ciudad o país válido.
    Debes pedir que vuelva a escribir la ubicación.
 7. Agregar tildes correctos (ej: "Bogota" → "Bogotá", "Mexico" → "México").
+8. Si el usuario escribió un continente o región amplia, responde con ejemplos del mismo continente/región.
+   Si no hay continente específico, usa ejemplos base de LATAM.
 
-CIUDADES PRINCIPALES DE REFERENCIA:
-Colombia: Bogotá, Medellín, Cali, Barranquilla, Cartagena, Bucaramanga, Pereira, Manizales, Cúcuta, Ibagué, Santa Marta, Villavicencio, Pasto, Montería, Neiva, Armenia, Popayán, Palmira, Valledupar, Tunja
-México: Ciudad de México (CDMX), Guadalajara, Monterrey, Puebla, Tijuana, León, Mérida, Cancún, Querétaro
-Argentina: Buenos Aires, Córdoba, Rosario, Mendoza, Tucumán, La Plata
-Perú: Lima, Arequipa, Trujillo, Chiclayo, Cusco
-Chile: Santiago, Valparaíso, Concepción, Viña del Mar
-Estados Unidos: Miami, Orlando, Tampa, New York, Los Angeles, Houston, Chicago, Dallas, San Francisco, California, Texas, Florida
-Otros: Quito, Guayaquil, Caracas, La Paz, Montevideo, Asunción, Ciudad de Panamá, San José
+CIUDADES PRINCIPALES DE REFERENCIA (global):
+Latam: Bogotá, Medellín, Ciudad de México, Buenos Aires, Lima, Santiago, Quito, Montevideo
+Estados Unidos/Canadá: Miami, New York, Los Angeles, Houston, Chicago, Toronto, Vancouver
+Europa: Oporto, Lisboa, Madrid, Barcelona, París, Berlín, Roma, Milán, Londres, Dublín, Ámsterdam
+Asia: Tokio, Osaka, Seúl, Singapur, Bangkok, Dubai, Mumbai
+África/Oceanía: Ciudad del Cabo, Nairobi, Sídney, Melbourne, Auckland
 
 RESPONDE SIEMPRE en JSON:
 {
@@ -133,6 +133,8 @@ Input: "bogtá" → {"isValid": true, "location": "Bogotá", "wasCorrected": tru
 Input: "Estados Unidos" → {"isValid": true, "location": "Estados Unidos", "wasCorrected": false, "suggestion": null}
 Input: "Miami" → {"isValid": true, "location": "Miami", "wasCorrected": false, "suggestion": null}
 Input: "Latam" → {"isValid": false, "location": null, "wasCorrected": false, "suggestion": "Esa ubicación es muy amplia para buscar ofertas. 🌎\\n\\nPor favor escribe una *ciudad* o *país* específico.\\n\\nEjemplo: \\"Colombia\\", \\"Bogotá\\", \\"Lima\\", \\"México\\""}
+Input: "Europa" → {"isValid": false, "location": null, "wasCorrected": false, "suggestion": "Esa ubicación es muy amplia para buscar ofertas. 🌍\\n\\nPor favor escribe una *ciudad* o *país* de Europa.\\n\\nEjemplo: \\"Oporto\\", \\"Lisboa\\", \\"Madrid\\", \\"Portugal\\", \\"España\\""}
+Input: "Asia" → {"isValid": false, "location": null, "wasCorrected": false, "suggestion": "Esa ubicación es muy amplia para buscar ofertas. 🌏\\n\\nPor favor escribe una *ciudad* o *país* de Asia.\\n\\nEjemplo: \\"Tokio\\", \\"Singapur\\", \\"Bangkok\\", \\"Japón\\", \\"India\\""}
 Input: "Cali o Palmira" → {"isValid": false, "location": null, "wasCorrected": false, "suggestion": "Escribe *solo una ubicación* por búsqueda. ¿Cuál prefieres?\\n\\n• Cali\\n• Palmira"}
 Input: "remoto" → {"isValid": false, "location": null, "wasCorrected": false, "suggestion": "Entiendo que quieres trabajo remoto. 😊\n\nEn esta pregunta debes escribir *una ubicación válida* (ciudad o país) para continuar.\n\nEjemplo: \"Bogotá\", \"Colombia\", \"Lima\".\n\nPor favor vuelve a ingresar tu ubicación."}`,
 
