@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import RegistrationModal from './RegistrationModal';
 
 interface BenefitsProps {
   whatsappLink: string;
@@ -38,7 +37,6 @@ const currencyFlags: Record<Currency, string> = {
 
 export default function Benefits({ whatsappLink }: BenefitsProps) {
   const [isDesktop, setIsDesktop] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [currency, setCurrency] = useState<Currency>('COP');
 
   useEffect(() => {
@@ -49,10 +47,6 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
     window.addEventListener('resize', checkDesktop);
     return () => window.removeEventListener('resize', checkDesktop);
   }, []);
-
-  const handleCTAClick = () => {
-    setIsModalOpen(true);
-  };
 
   // Links de checkout de Wompi
   const wompiPremiumLink = 'https://checkout.wompi.co/l/xTJSuZ';
@@ -147,41 +141,8 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
                 </p>
               </div>
 
-              {/* Pricing Cards - 3 columns */}
-              <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-                {/* Plan Free */}
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-4 border border-gray-200 shadow-sm flex flex-col transition-all duration-300 hover:scale-105 hover:shadow-xl hover:border-[#9054C6]/50 cursor-pointer">
-                  <div className="mb-2">
-                    <h3 className="font-poppins font-bold text-[#2C2C2C] text-base">Plan Free</h3>
-                  </div>
-                  <p className="font-poppins text-[#9054C6] font-bold text-xl mb-3">
-                    $0 <span className="text-xs font-normal text-gray-500">/ Una semana</span>
-                  </p>
-                  <ul className="space-y-1.5 text-xs text-gray-600 flex-grow">
-                    <li className="flex items-start gap-2">
-                      <span className="text-[#25D366] mt-0.5">✓</span>
-                      <span>1 semana cazando las mejores ofertas</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-[#25D366] mt-0.5">✓</span>
-                      <span>Alertas de empleo diarias</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-[#25D366] mt-0.5">✓</span>
-                      <span>Búsqueda personalizada según preferencias</span>
-                    </li>
-                  </ul>
-                  <button
-                    onClick={handleCTAClick}
-                    className="mt-4 w-full py-2.5 bg-white border-2 border-[#9054C6] text-[#9054C6] font-poppins font-semibold rounded-lg hover:bg-[#9054C6] hover:text-white transition-all duration-300 text-sm"
-                  >
-                    ¡Caza Ofertas ya!
-                  </button>
-                  <p className="text-[10px] text-[#25D366] text-center mt-2 font-medium">
-                    *1 semana gratis
-                  </p>
-                </div>
-
+              {/* Pricing Cards - 2 columns */}
+              <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
                 {/* Plan Premium */}
                 <div className="bg-gradient-to-br from-[#9054C6] to-[#7040A8] rounded-2xl p-4 border-2 border-[#B17DD9] shadow-lg relative overflow-hidden flex flex-col transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer">
                   {/* Badge Popular */}
@@ -279,11 +240,6 @@ export default function Benefits({ whatsappLink }: BenefitsProps) {
         </div>
       </div>
 
-      {/* Modal de Registro */}
-      <RegistrationModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
     </section>
   );
 }
