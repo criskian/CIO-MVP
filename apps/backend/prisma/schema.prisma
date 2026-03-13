@@ -26,6 +26,28 @@ enum SubscriptionStatus {
   CANCELLED
 }
 
+enum EmailTemplateType {
+  PREDEFINED
+  CUSTOM
+}
+
+enum EmailCampaignStatus {
+  DRAFT
+  SCHEDULED
+  PROCESSING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum EmailRecipientList {
+  ALL_USERS
+  FREEMIUM_ACTIVE
+  FREEMIUM_EXPIRED
+  PREMIUM_ACTIVE
+  NEW_LAST_7_DAYS
+}
+
 // ==========================================
 // MODELOS
 // ==========================================
@@ -49,6 +71,7 @@ model User {
   sentJobs        SentJob[]
   chatMessages    ChatMessage[]
   pendingAlerts   PendingJobAlert[]
+  emailDispatches EmailDispatch[]
   
   // Nuevas relaciones para sistema de planes
   subscription  Subscription?
@@ -259,6 +282,8 @@ model AdminUser {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  emailCampaigns EmailCampaign[]
+
   @@map("admin_users")
 }
 
@@ -279,4 +304,66 @@ model PendingJobAlert {
 
   @@index([userId, viewedAt])
   @@map("pending_job_alerts")
+}
+
+model EmailTemplate {
+  id          String            @id @default(cuid())
+  name        String
+  slug        String            @unique
+  description String?
+  subject     String
+  contentHtml String?           @db.Text
+  type        EmailTemplateType @default(CUSTOM)
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  campaigns   EmailCampaign[]
+
+  @@index([type, isActive])
+  @@map("email_templates")
+}
+
+model EmailCampaign {
+  id              String             @id @default(cuid())
+  name            String
+  templateId      String
+  recipientList   EmailRecipientList
+  status          EmailCampaignStatus @default(DRAFT)
+  scheduledFor    DateTime?
+  sentAt          DateTime?
+  totalRecipients Int                @default(0)
+  successCount    Int                @default(0)
+  failureCount    Int                @default(0)
+  createdById     String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  template        EmailTemplate      @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  createdBy       AdminUser?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  dispatches      EmailDispatch[]
+
+  @@index([status, scheduledFor])
+  @@index([createdAt])
+  @@map("email_campaigns")
+}
+
+model EmailDispatch {
+  id                String    @id @default(cuid())
+  campaignId        String
+  userId            String?
+  email             String
+  name              String?
+  status            String
+  errorMessage      String?   @db.Text
+  providerMessageId String?
+  sentAt            DateTime?
+  createdAt         DateTime  @default(now())
+
+  campaign          EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user              User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([campaignId, createdAt])
+  @@index([email])
+  @@map("email_dispatches")
 }

@@ -165,3 +165,71 @@ export interface AdminUser {
   role: string;
 }
 
+export type EmailTemplateType = 'PREDEFINED' | 'CUSTOM';
+export type EmailCampaignStatus = 'DRAFT' | 'SCHEDULED' | 'PROCESSING' | 'SENT' | 'FAILED' | 'CANCELLED';
+export type EmailRecipientList =
+  | 'ALL_USERS'
+  | 'FREEMIUM_ACTIVE'
+  | 'FREEMIUM_EXPIRED'
+  | 'PREMIUM_ACTIVE'
+  | 'NEW_LAST_7_DAYS';
+
+export interface EmailTemplate {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  subject: string;
+  contentHtml: string | null;
+  type: EmailTemplateType;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailListOption {
+  id: EmailRecipientList;
+  name: string;
+  description: string;
+  count: number;
+}
+
+export interface EmailCampaign {
+  id: string;
+  name: string;
+  templateId: string;
+  recipientList: EmailRecipientList;
+  status: EmailCampaignStatus;
+  scheduledFor: string | null;
+  sentAt: string | null;
+  totalRecipients: number;
+  successCount: number;
+  failureCount: number;
+  createdAt: string;
+  updatedAt: string;
+  template?: EmailTemplate;
+  _count?: {
+    dispatches: number;
+  };
+}
+
+export interface EmailDispatch {
+  id: string;
+  campaignId: string;
+  userId: string | null;
+  email: string;
+  name: string | null;
+  status: string;
+  errorMessage: string | null;
+  providerMessageId: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  campaign?: EmailCampaign;
+  user?: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    phone: string;
+  } | null;
+}
+

@@ -24,4 +24,14 @@ export class NotificationsController {
     getOnboardingPreview() {
         return this.notificationsService.getOnboardingEmailHtml('Usuario de Prueba');
     }
+
+    @Post('test-profile-update')
+    async sendTestProfileUpdateEmail(@Body('email') email: string, @Body('name') name: string) {
+        return await this.notificationsService.sendProfileUpdateEmail(email, name || 'Usuario');
+    }
+
+    @Get('preview-profile-update')
+    getProfileUpdatePreview() {
+        return this.notificationsService.getProfileUpdateEmailHtml('Usuario de Prueba');
+    }
 }

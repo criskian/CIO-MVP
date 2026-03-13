@@ -1,4 +1,12 @@
-import { IsString, IsEmail, IsOptional, IsBoolean, IsNumber, IsIn } from 'class-validator';
+import {
+    IsString,
+    IsEmail,
+    IsOptional,
+    IsBoolean,
+    IsNumber,
+    IsIn,
+    IsDateString,
+} from 'class-validator';
 
 /**
  * DTO para crear usuario desde admin
@@ -20,8 +28,8 @@ export class CreateUserDto {
 
     @IsString()
     @IsOptional()
-    @IsIn(['FREEMIUM', 'PREMIUM'])
-    plan?: 'FREEMIUM' | 'PREMIUM';
+    @IsIn(['FREEMIUM', 'PREMIUM', 'PRO'])
+    plan?: 'FREEMIUM' | 'PREMIUM' | 'PRO';
 }
 
 /**
@@ -47,8 +55,8 @@ export class UpdateUserDto {
 export class UpdateSubscriptionDto {
     @IsString()
     @IsOptional()
-    @IsIn(['FREEMIUM', 'PREMIUM'])
-    plan?: 'FREEMIUM' | 'PREMIUM';
+    @IsIn(['FREEMIUM', 'PREMIUM', 'PRO'])
+    plan?: 'FREEMIUM' | 'PREMIUM' | 'PRO';
 
     @IsString()
     @IsOptional()
@@ -75,4 +83,118 @@ export class UpdateSubscriptionDto {
 
     @IsOptional()
     premiumEndDate?: Date;
+}
+
+/**
+ * DTO para crear plantilla de email (custom o predefinida)
+ */
+export class CreateEmailTemplateDto {
+    @IsString()
+    name!: string;
+
+    @IsString()
+    slug!: string;
+
+    @IsString()
+    subject!: string;
+
+    @IsString()
+    @IsOptional()
+    description?: string;
+
+    @IsString()
+    @IsOptional()
+    contentHtml?: string;
+
+    @IsString()
+    @IsOptional()
+    @IsIn(['PREDEFINED', 'CUSTOM'])
+    type?: 'PREDEFINED' | 'CUSTOM';
+
+    @IsBoolean()
+    @IsOptional()
+    isActive?: boolean;
+}
+
+/**
+ * DTO para actualizar plantilla de email
+ */
+export class UpdateEmailTemplateDto {
+    @IsString()
+    @IsOptional()
+    name?: string;
+
+    @IsString()
+    @IsOptional()
+    subject?: string;
+
+    @IsString()
+    @IsOptional()
+    description?: string;
+
+    @IsString()
+    @IsOptional()
+    contentHtml?: string;
+
+    @IsBoolean()
+    @IsOptional()
+    isActive?: boolean;
+}
+
+/**
+ * DTO para crear campaña de emails
+ */
+export class CreateEmailCampaignDto {
+    @IsString()
+    name!: string;
+
+    @IsString()
+    templateId!: string;
+
+    @IsString()
+    @IsIn([
+        'ALL_USERS',
+        'FREEMIUM_ACTIVE',
+        'FREEMIUM_EXPIRED',
+        'PREMIUM_ACTIVE',
+        'NEW_LAST_7_DAYS',
+    ])
+    recipientList!: 'ALL_USERS' | 'FREEMIUM_ACTIVE' | 'FREEMIUM_EXPIRED' | 'PREMIUM_ACTIVE' | 'NEW_LAST_7_DAYS';
+
+    @IsDateString()
+    @IsOptional()
+    scheduledFor?: string;
+
+    @IsBoolean()
+    @IsOptional()
+    sendNow?: boolean;
+}
+
+/**
+ * DTO para editar campaña de emails
+ */
+export class UpdateEmailCampaignDto {
+    @IsString()
+    @IsOptional()
+    name?: string;
+
+    @IsString()
+    @IsOptional()
+    @IsIn([
+        'ALL_USERS',
+        'FREEMIUM_ACTIVE',
+        'FREEMIUM_EXPIRED',
+        'PREMIUM_ACTIVE',
+        'NEW_LAST_7_DAYS',
+    ])
+    recipientList?: 'ALL_USERS' | 'FREEMIUM_ACTIVE' | 'FREEMIUM_EXPIRED' | 'PREMIUM_ACTIVE' | 'NEW_LAST_7_DAYS';
+
+    @IsDateString()
+    @IsOptional()
+    scheduledFor?: string;
+
+    @IsString()
+    @IsOptional()
+    @IsIn(['DRAFT', 'SCHEDULED', 'PROCESSING', 'SENT', 'FAILED', 'CANCELLED'])
+    status?: 'DRAFT' | 'SCHEDULED' | 'PROCESSING' | 'SENT' | 'FAILED' | 'CANCELLED';
 }

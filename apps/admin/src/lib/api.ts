@@ -10,6 +10,12 @@ import {
   PaginatedResponse,
   LoginCredentials,
   AuthResponse,
+  EmailTemplate,
+  EmailCampaign,
+  EmailDispatch,
+  EmailListOption,
+  EmailRecipientList,
+  EmailCampaignStatus,
 } from '@/types';
 
 const api: AxiosInstance = axios.create({
@@ -222,6 +228,103 @@ export async function getDetailedStats(startDate?: string, endDate?: string): Pr
 
 export async function getRecentActivity(limit = 10): Promise<RecentActivity> {
   const { data } = await api.get<RecentActivity>(`/api/admin/activity/recent?limit=${limit}`);
+  return data;
+}
+
+export async function getEmailTemplates(): Promise<EmailTemplate[]> {
+  const { data } = await api.get<EmailTemplate[]>('/api/admin/emails/templates');
+  return data;
+}
+
+export async function createEmailTemplate(templateData: {
+  name: string;
+  slug: string;
+  subject: string;
+  description?: string;
+  contentHtml?: string;
+  type?: 'PREDEFINED' | 'CUSTOM';
+  isActive?: boolean;
+}): Promise<EmailTemplate> {
+  const { data } = await api.post<EmailTemplate>('/api/admin/emails/templates', templateData);
+  return data;
+}
+
+export async function updateEmailTemplate(
+  id: string,
+  templateData: {
+    name?: string;
+    subject?: string;
+    description?: string;
+    contentHtml?: string;
+    isActive?: boolean;
+  }
+): Promise<EmailTemplate> {
+  const { data } = await api.put<EmailTemplate>(`/api/admin/emails/templates/${id}`, templateData);
+  return data;
+}
+
+export async function deleteEmailTemplate(id: string): Promise<void> {
+  await api.delete(`/api/admin/emails/templates/${id}`);
+}
+
+export async function getEmailLists(): Promise<EmailListOption[]> {
+  const { data } = await api.get<EmailListOption[]>('/api/admin/emails/lists');
+  return data;
+}
+
+export async function getEmailCampaigns(
+  page: number = 1,
+  limit: number = 20
+): Promise<{ campaigns: EmailCampaign[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
+  const { data } = await api.get(`/api/admin/emails/campaigns?page=${page}&limit=${limit}`);
+  return data;
+}
+
+export async function createEmailCampaign(campaignData: {
+  name: string;
+  templateId: string;
+  recipientList: EmailRecipientList;
+  scheduledFor?: string;
+  sendNow?: boolean;
+}): Promise<EmailCampaign> {
+  const { data } = await api.post<EmailCampaign>('/api/admin/emails/campaigns', campaignData);
+  return data;
+}
+
+export async function updateEmailCampaign(
+  id: string,
+  campaignData: {
+    name?: string;
+    recipientList?: EmailRecipientList;
+    scheduledFor?: string;
+    status?: EmailCampaignStatus;
+  }
+): Promise<EmailCampaign> {
+  const { data } = await api.put<EmailCampaign>(`/api/admin/emails/campaigns/${id}`, campaignData);
+  return data;
+}
+
+export async function deleteEmailCampaign(id: string): Promise<void> {
+  await api.delete(`/api/admin/emails/campaigns/${id}`);
+}
+
+export async function sendEmailCampaign(id: string): Promise<EmailCampaign> {
+  const { data } = await api.post<EmailCampaign>(`/api/admin/emails/campaigns/${id}/send`);
+  return data;
+}
+
+export async function getSentEmails(
+  page: number = 1,
+  limit: number = 20,
+  search?: string
+): Promise<{ data: EmailDispatch[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+  });
+  if (search) params.append('search', search);
+
+  const { data } = await api.get(`/api/admin/emails/sent?${params.toString()}`);
   return data;
 }
 
