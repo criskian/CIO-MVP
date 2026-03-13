@@ -1111,13 +1111,7 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
     // Detectar intención de buscar empleos
     if (intent === UserIntent.SEARCH_NOW) {
       // PRIMERO: Verificar si hay alertas pendientes de un template notification
-      const pendingAlert = await this.prisma.pendingJobAlert.findFirst({
-        where: {
-          userId,
-          viewedAt: null,  // Aún no vistas
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+      const pendingAlert = await this.getLatestNonStalePendingAlert(userId);
 
       if (pendingAlert) {
         // Hay ofertas pendientes del template → enviarlas
@@ -2074,13 +2068,7 @@ Ejemplo: "Toronto", "Miami", "New York", "Canadá", "Estados Unidos".`;
     // PRIMERO: Si el usuario hace clic en "ver ofertas" y tiene alertas pendientes, mostrarlas
     const intent = detectIntent(text);
     if (intent === UserIntent.SEARCH_NOW) {
-      const pendingAlert = await this.prisma.pendingJobAlert.findFirst({
-        where: {
-          userId,
-          viewedAt: null,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+      const pendingAlert = await this.getLatestNonStalePendingAlert(userId);
 
       if (pendingAlert) {
         this.logger.log(`📬 Usuario ${userId} (FREEMIUM_EXPIRED) tiene ${pendingAlert.jobCount} ofertas pendientes`);
@@ -2898,7 +2886,66 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
       },
     });
 
+    const invalidatesPendingAlerts =
+      data.role !== undefined ||
+      data.experienceLevel !== undefined ||
+      data.location !== undefined ||
+      data.workMode !== undefined ||
+      data.jobType !== undefined ||
+      data.minSalary !== undefined;
+
+    if (invalidatesPendingAlerts) {
+      const deleted = await this.prisma.pendingJobAlert.deleteMany({
+        where: {
+          userId,
+          viewedAt: null,
+        },
+      });
+
+      if (deleted.count > 0) {
+        this.logger.log(
+          `Descartadas ${deleted.count} ofertas pendientes de ${userId} por actualización de perfil`,
+        );
+      }
+    }
+
     this.logger.debug(`✅ Perfil actualizado: ${JSON.stringify(data)}`);
+  }
+
+  private async getLatestNonStalePendingAlert(userId: string) {
+    const pendingAlert = await this.prisma.pendingJobAlert.findFirst({
+      where: {
+        userId,
+        viewedAt: null,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!pendingAlert) {
+      return null;
+    }
+
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select: { updatedAt: true },
+    });
+
+    if (profile?.updatedAt && profile.updatedAt > pendingAlert.createdAt) {
+      const deleted = await this.prisma.pendingJobAlert.deleteMany({
+        where: {
+          userId,
+          viewedAt: null,
+          createdAt: { lte: profile.updatedAt },
+        },
+      });
+
+      this.logger.log(
+        `Descartadas ${deleted.count} ofertas pendientes obsoletas para ${userId} (perfil actualizado)`,
+      );
+      return null;
+    }
+
+    return pendingAlert;
   }
 
   /**
