@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../database/prisma.service';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ConversationState } from '../conversation/types/conversation-states';
 
 /**
  * Servicio de registro de usuarios
@@ -87,6 +88,7 @@ export class RegistrationService {
     });
 
     this.logger.log(`✅ Usuario freemium registrado: ${user.phone} - ${user.name} (${user.email})`);
+    await this.ensureOnboardingSessionForNewRegistration(user.id);
     void this.sendOnboardingEmailSafely(user.id, user.email, user.name);
 
     return {
@@ -148,6 +150,7 @@ export class RegistrationService {
     }
 
     this.logger.log(`✅ Registro completado para usuario existente: ${user.phone}`);
+    await this.ensureOnboardingSessionForNewRegistration(user.id);
     void this.sendOnboardingEmailSafely(user.id, user.email, user.name);
 
     return {
@@ -246,6 +249,41 @@ export class RegistrationService {
       premiumUsesLeft: subscription?.premiumUsesLeft || 0,
       premiumEndDate: subscription?.premiumEndDate || null,
     };
+  }
+
+  /**
+   * Garantiza una sesion con flags de onboarding para nuevos registros.
+   * Esto permite omitir preguntas de alertas en el flujo inicial y usar 07:00 por defecto.
+   */
+  private async ensureOnboardingSessionForNewRegistration(userId: string): Promise<void> {
+    const latestSession = await this.prisma.session.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, data: true },
+    });
+
+    const currentData = (latestSession?.data as Record<string, any>) || {};
+    const mergedData = {
+      ...currentData,
+      skipAlertConfigOnboarding: true,
+      defaultOnboardingAlertTime: '07:00',
+    };
+
+    if (!latestSession) {
+      await this.prisma.session.create({
+        data: {
+          userId,
+          state: ConversationState.NEW,
+          data: mergedData,
+        },
+      });
+      return;
+    }
+
+    await this.prisma.session.update({
+      where: { id: latestSession.id },
+      data: { data: mergedData },
+    });
   }
 
   /**

@@ -48,6 +48,7 @@ import {
 @Injectable()
 export class ConversationService {
   private readonly logger = new Logger(ConversationService.name);
+  private readonly defaultOnboardingAlertTime = '07:00';
 
   constructor(
     private readonly prisma: PrismaService,
@@ -84,6 +85,10 @@ export class ConversationService {
           data: {
             userId: newUser.id,
             state: ConversationState.WA_ASK_NAME,
+            data: {
+              skipAlertConfigOnboarding: true,
+              defaultOnboardingAlertTime: this.defaultOnboardingAlertTime,
+            },
           },
         });
 
@@ -834,7 +839,8 @@ export class ConversationService {
 
   /**
    * Estado ASK_LOCATION: Esperando ciudad/ubicación
-   * ACTUALIZADO: Ahora va a OFFER_ALERTS para preguntar si quiere alertas (antes de poder buscar)
+   * ACTUALIZADO: Para usuarios nuevos, omite preguntas de alertas y configura 07:00 por defecto.
+   * Para usuarios existentes, mantiene flujo anterior de OFFER_ALERTS.
    */
   private async handleAskLocationState(userId: string, text: string): Promise<BotReply> {
     const validation = validateAndNormalizeLocation(text);
@@ -875,6 +881,19 @@ export class ConversationService {
 
     await this.updateUserProfile(userId, { location: finalLocation });
 
+    const onboardingFlags = await this.getOnboardingFlags(userId);
+    if (onboardingFlags.skipAlertConfigOnboarding) {
+      // [PAUSADO] Flujo de preguntas de alertas para nuevos registros.
+      // Se configura por defecto y se pasa directo a READY.
+      this.logger.log(
+        `Onboarding sin preguntas de alertas para ${userId}. Hora por defecto: ${onboardingFlags.defaultOnboardingAlertTime}`,
+      );
+      await this.upsertAlertPreference(userId, onboardingFlags.defaultOnboardingAlertTime, 'daily');
+      await this.updateSessionState(userId, ConversationState.READY);
+      return await this.returnToMainMenu(userId, BotMessages.NOT_READY_YET);
+    }
+
+    // [LEGACY] Se mantiene para usuarios ya registrados (sin cambios).
     // [ACTUALIZADO] Flujo: ASK_LOCATION ? OFFER_ALERTS (preguntar si quiere alertas antes de buscar)
     await this.updateSessionState(userId, ConversationState.OFFER_ALERTS);
 
@@ -2861,6 +2880,27 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
     });
 
     this.logger.debug(`💾 Datos de sesión actualizados: ${JSON.stringify(newData)}`);
+  }
+
+  private async getOnboardingFlags(userId: string): Promise<{
+    skipAlertConfigOnboarding: boolean;
+    defaultOnboardingAlertTime: string;
+  }> {
+    const session = await this.prisma.session.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: { data: true },
+    });
+
+    const sessionData = (session?.data as Record<string, any>) || {};
+
+    return {
+      skipAlertConfigOnboarding: sessionData.skipAlertConfigOnboarding === true,
+      defaultOnboardingAlertTime:
+        typeof sessionData.defaultOnboardingAlertTime === 'string'
+          ? sessionData.defaultOnboardingAlertTime
+          : this.defaultOnboardingAlertTime,
+    };
   }
 
   /**
