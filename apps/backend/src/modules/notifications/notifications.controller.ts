@@ -34,4 +34,22 @@ export class NotificationsController {
     getProfileUpdatePreview() {
         return this.notificationsService.getProfileUpdateEmailHtml('Usuario de Prueba');
     }
+
+    @Post('test-premium-activation')
+    async sendTestPremiumActivationEmail(
+        @Body('email') email: string,
+        @Body('name') name: string,
+        @Body('planName') planName: string,
+    ) {
+        return await this.notificationsService.sendPremiumActivationEmail(
+            email,
+            name || 'Usuario',
+            planName || 'Premium',
+        );
+    }
+
+    @Get('preview-premium-activation')
+    getPremiumActivationPreview() {
+        return this.notificationsService.getPremiumActivationEmailHtml('Usuario de Prueba', 'Premium');
+    }
 }

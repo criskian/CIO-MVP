@@ -4,6 +4,7 @@ import { JobSearchService } from '../job-search/job-search.service';
 import { LlmService } from '../llm/llm.service';
 import { CvService } from '../cv/cv.service';
 import { ChatHistoryService } from './chat-history.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   NormalizedIncomingMessage,
   BotReply,
@@ -56,6 +57,7 @@ export class ConversationService {
     private readonly llmService: LlmService,
     private readonly cvService: CvService,
     private readonly chatHistoryService: ChatHistoryService,
+    private readonly notificationsService: NotificationsService,
   ) { }
 
   /**
@@ -536,6 +538,7 @@ export class ConversationService {
     });
 
     this.logger.log(`✅ Registro in-bot completado para usuario ${userId}: ${user?.name} (${email})`);
+    await this.sendOnboardingEmailSafely(userId, email, user?.name || null);
 
     // Transición a NEW para iniciar onboarding normal
     await this.updateSessionState(userId, ConversationState.NEW);
@@ -2744,6 +2747,29 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
   //
   //   return workModeMap[workMode || ''] || 'No configurado';
   // }
+
+  private async sendOnboardingEmailSafely(
+    userId: string,
+    email: string | null,
+    name: string | null,
+  ): Promise<void> {
+    if (!email || !name) {
+      this.logger.warn(
+        `No se envio onboarding email al usuario ${userId}: faltan email o nombre`,
+      );
+      return;
+    }
+
+    try {
+      await this.notificationsService.sendOnboardingEmail(email, name, { userId });
+      this.logger.log(`📧 Onboarding email enviado automatico (registro chat) a ${email}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(
+        `Error enviando onboarding email automatico (registro chat) a ${email} (usuario ${userId}): ${errorMessage}`,
+      );
+    }
+  }
 
   // ========================================
   // Métodos auxiliares de base de datos

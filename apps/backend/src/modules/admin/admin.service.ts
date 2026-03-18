@@ -26,6 +26,7 @@ import {
 @Injectable()
 export class AdminService {
     private readonly logger = new Logger(AdminService.name);
+    private readonly systemCampaignPrefix = '[SYSTEM]';
 
     constructor(
         private readonly prisma: PrismaService,
@@ -786,6 +787,12 @@ export class AdminService {
                 description: 'Correo para mejorar perfil en portales de empleo',
                 subject: '¿Ya actualizaste tu perfil en los portales de empleo?',
             },
+            {
+                name: 'Activación de Plan Premium/Pro',
+                slug: 'premium_activation_email',
+                description: 'Correo de bienvenida para usuarios que activan plan de pago',
+                subject: '¡Tu plan ya está activo en CIO! 🎉',
+            },
         ];
 
         for (const template of defaults) {
@@ -974,9 +981,17 @@ export class AdminService {
     async listEmailCampaigns(page: number = 1, limit: number = 20) {
         await this.seedDefaultEmailTemplates();
         const skip = (page - 1) * limit;
+        const where = {
+            NOT: {
+                name: {
+                    startsWith: this.systemCampaignPrefix,
+                },
+            },
+        };
 
         const [campaigns, total] = await Promise.all([
             (this.prisma as any).emailCampaign.findMany({
+                where,
                 include: {
                     template: true,
                     _count: { select: { dispatches: true } },
@@ -985,7 +1000,7 @@ export class AdminService {
                 skip,
                 take: limit,
             }),
-            (this.prisma as any).emailCampaign.count(),
+            (this.prisma as any).emailCampaign.count({ where }),
         ]);
 
         return {
@@ -1159,6 +1174,11 @@ export class AdminService {
                     name: recipient.name,
                     subject: campaign.template.subject,
                     html: campaign.template.contentHtml,
+                    metadata: {
+                        skipDispatchLog: true,
+                        userId: recipient.id,
+                        recipientName: recipient.name,
+                    },
                 });
 
                 await (this.prisma as any).emailDispatch.create({

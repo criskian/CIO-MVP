@@ -6,9 +6,10 @@ import { DatabaseModule } from '../database/database.module';
 import { JobSearchModule } from '../job-search/job-search.module';
 import { LlmModule } from '../llm/llm.module';
 import { CvModule } from '../cv/cv.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [DatabaseModule, JobSearchModule, LlmModule, CvModule],
+  imports: [DatabaseModule, JobSearchModule, LlmModule, CvModule, NotificationsModule],
   controllers: [ChatHistoryController],
   providers: [ConversationService, ChatHistoryService],
   exports: [ConversationService, ChatHistoryService],

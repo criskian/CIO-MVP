@@ -303,7 +303,7 @@ export class RegistrationService {
     }
 
     try {
-      await this.notificationsService.sendOnboardingEmail(email, name);
+      await this.notificationsService.sendOnboardingEmail(email, name, { userId });
       this.logger.log(`📧 Onboarding email enviado automaticamente a ${email}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

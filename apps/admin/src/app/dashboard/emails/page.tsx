@@ -374,6 +374,7 @@ export default function EmailsPage() {
     const previewMap: Record<string, string> = {
       onboarding_email: '/notifications/preview-onboarding',
       profile_update_email: '/notifications/preview-profile-update',
+      premium_activation_email: '/notifications/preview-premium-activation',
     };
     const previewPath = previewMap[slug] || '/notifications/preview';
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
