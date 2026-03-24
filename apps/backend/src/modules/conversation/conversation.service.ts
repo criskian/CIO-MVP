@@ -89,7 +89,7 @@ export class ConversationService {
         await this.prisma.session.create({
           data: {
             userId: newUser.id,
-            state: ConversationState.WA_ASK_NAME,
+            state: ConversationState.LEAD_COLLECT_PROFILE,
             data: {
               flowVariant: this.v2FlowVariant,
               skipAlertConfigOnboarding: true,
@@ -98,13 +98,26 @@ export class ConversationService {
           },
         });
 
-        return { text: BotMessages.NOT_REGISTERED };
+        return { text: BotMessages.V2_WELCOME_ROLE };
       }
 
       // 3. Si tiene user pero no tiene nombre (registro in-bot en progreso), continuar flujo
-      if (!user.name) {
+      if (!user.name || !user.email) {
         const session = await this.getOrCreateSession(user.id, this.v2FlowVariant);
-        await this.ensureSessionFlowVariant(user.id, session, this.v2FlowVariant);
+        const flowVariant = await this.ensureSessionFlowVariant(
+          user.id,
+          session,
+          this.v2FlowVariant,
+        );
+        if (flowVariant === this.v2FlowVariant) {
+          if (!this.isV2LeadState(session.state)) {
+            await this.updateSessionState(user.id, ConversationState.LEAD_COLLECT_PROFILE);
+            return { text: BotMessages.V2_WELCOME_ROLE };
+          }
+
+          const intent = detectIntent(text || '');
+          return await this.handleStateTransition(user.id, session.state, text || '', intent);
+        }
         // Si por alguna razón no tiene sesión en WA_ASK_NAME, ponerlo ahí
         if (session.state !== ConversationState.WA_ASK_NAME && session.state !== ConversationState.WA_ASK_EMAIL) {
           await this.updateSessionState(user.id, ConversationState.WA_ASK_NAME);
@@ -202,6 +215,33 @@ export class ConversationService {
     this.logger.debug(`Estado actual: ${currentState}, Intent: ${intent}`);
 
     switch (currentState) {
+      case ConversationState.LEAD_COLLECT_PROFILE:
+        return await this.handleLeadCollectProfileState(userId, text);
+
+      case ConversationState.LEAD_ASK_LOCATION:
+        return await this.handleLeadAskLocationState(userId, text);
+
+      case ConversationState.LEAD_ASK_EXPERIENCE:
+        return await this.handleLeadAskExperienceState(userId, text);
+
+      case ConversationState.LEAD_SHOW_FIRST_VACANCY:
+        return await this.handleLeadShowFirstVacancyState(userId);
+
+      case ConversationState.LEAD_WAIT_INTEREST:
+        return await this.handleLeadWaitInterestState(userId, text, intent);
+
+      case ConversationState.LEAD_WAIT_REJECTION_REASON:
+        return await this.handleLeadWaitRejectionReasonState(userId, text);
+
+      case ConversationState.LEAD_REGISTER_NAME:
+        return await this.handleLeadRegisterNameState(userId, text);
+
+      case ConversationState.LEAD_REGISTER_EMAIL:
+        return await this.handleLeadRegisterEmailState(userId, text);
+
+      case ConversationState.LEAD_TERMS_CONSENT:
+        return await this.handleLeadTermsConsentState(userId, text, intent);
+
       case ConversationState.WA_ASK_NAME:
         return await this.handleWaAskNameState(userId, text);
 
@@ -331,6 +371,14 @@ export class ConversationService {
   ): Promise<BotReply | null> {
     // Solo aplica en estados donde esperamos respuesta específica
     const interactiveStates = [
+      ConversationState.LEAD_COLLECT_PROFILE,
+      ConversationState.LEAD_ASK_LOCATION,
+      ConversationState.LEAD_ASK_EXPERIENCE,
+      ConversationState.LEAD_WAIT_INTEREST,
+      ConversationState.LEAD_WAIT_REJECTION_REASON,
+      ConversationState.LEAD_REGISTER_NAME,
+      ConversationState.LEAD_REGISTER_EMAIL,
+      ConversationState.LEAD_TERMS_CONSENT,
       ConversationState.ASK_ROLE,
       ConversationState.ASK_LOCATION,
       ConversationState.ASK_EXPERIENCE,
@@ -401,6 +449,30 @@ export class ConversationService {
       [ConversationState.OFFER_ALERTS]: [
         `¡Solo necesito una respuesta rápida! *¿Quieres recibir alertas diarias* de nuevas ofertas?\n\nResponde *Sí* o *No*.`,
       ],
+      [ConversationState.LEAD_COLLECT_PROFILE]: [
+        `Estoy contigo. Para empezar, dime *el cargo o rol* que estas buscando.`,
+      ],
+      [ConversationState.LEAD_ASK_LOCATION]: [
+        `Perfecto. Ahora dime *donde* quieres trabajar. Puede ser ciudad, pais o remoto.`,
+      ],
+      [ConversationState.LEAD_ASK_EXPERIENCE]: [
+        `Gracias. Para continuar, selecciona *tu nivel de experiencia* en el rol.`,
+      ],
+      [ConversationState.LEAD_WAIT_INTEREST]: [
+        `Solo necesito que elijas una opcion para seguir: *Si, me intereso* o *No me intereso*.`,
+      ],
+      [ConversationState.LEAD_WAIT_REJECTION_REASON]: [
+        `Gracias. Elige el motivo principal para ajustar la siguiente oferta.`,
+      ],
+      [ConversationState.LEAD_REGISTER_NAME]: [
+        `Para continuar con tu registro, escribeme tu *nombre completo*.`,
+      ],
+      [ConversationState.LEAD_REGISTER_EMAIL]: [
+        `Ahora necesito tu *correo electronico* para completar el registro.`,
+      ],
+      [ConversationState.LEAD_TERMS_CONSENT]: [
+        `Para activar tu prueba, necesito que elijas: *Acepto* o *No acepto*.`,
+      ],
       [ConversationState.READY]: [
         `¡Hola! 😊 Puedo ayudarte a *buscar empleo*, *editar tu perfil*, o *ver tu perfil actual*.\n\nEscribe lo que necesites o usa el menú de abajo. 👇`,
       ],
@@ -449,6 +521,452 @@ export class ConversationService {
     return {
       ...editReply,
       text: `Perfecto, te ayudo con ese ajuste antes de buscar de nuevo.\n\n${editReply.text}`,
+    };
+  }
+
+  private isV2LeadState(state: string): boolean {
+    const v2States: ConversationState[] = [
+      ConversationState.LEAD_COLLECT_PROFILE,
+      ConversationState.LEAD_ASK_LOCATION,
+      ConversationState.LEAD_ASK_EXPERIENCE,
+      ConversationState.LEAD_SHOW_FIRST_VACANCY,
+      ConversationState.LEAD_WAIT_INTEREST,
+      ConversationState.LEAD_WAIT_REJECTION_REASON,
+      ConversationState.LEAD_REGISTER_NAME,
+      ConversationState.LEAD_REGISTER_EMAIL,
+      ConversationState.LEAD_TERMS_CONSENT,
+    ];
+
+    return v2States.includes(state as ConversationState);
+  }
+
+  private getLeadExperienceListSections(): Array<{
+    title: string;
+    rows: Array<{ id: string; title: string; description: string }>;
+  }> {
+    return [
+      {
+        title: 'Nivel de Experiencia',
+        rows: [
+          {
+            id: 'exp_none',
+            title: 'Sin experiencia',
+            description: 'Recien graduado o sin experiencia laboral',
+          },
+          {
+            id: 'exp_junior',
+            title: 'Junior (1-2 anos)',
+            description: 'Experiencia inicial en el campo',
+          },
+          {
+            id: 'exp_mid',
+            title: 'Intermedio (3-5 anos)',
+            description: 'Experiencia solida',
+          },
+          {
+            id: 'exp_senior',
+            title: 'Senior (5+ anos)',
+            description: 'Experto en el area',
+          },
+          {
+            id: 'exp_lead',
+            title: 'Lead/Expert (7+ anos)',
+            description: 'Liderazgo y expertise avanzado',
+          },
+        ],
+      },
+    ];
+  }
+
+  private async routeLeadToNextMissingField(userId: string): Promise<BotReply> {
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select: { role: true, location: true, experienceLevel: true },
+    });
+
+    if (!profile?.role) {
+      await this.updateSessionState(userId, ConversationState.LEAD_COLLECT_PROFILE);
+      return { text: BotMessages.V2_WELCOME_ROLE };
+    }
+
+    if (!profile.location) {
+      await this.updateSessionState(userId, ConversationState.LEAD_ASK_LOCATION);
+      return { text: BotMessages.V2_ASK_LOCATION };
+    }
+
+    if (!profile.experienceLevel) {
+      await this.updateSessionState(userId, ConversationState.LEAD_ASK_EXPERIENCE);
+      return {
+        text: BotMessages.V2_ASK_EXPERIENCE,
+        listTitle: 'Seleccionar nivel',
+        listSections: this.getLeadExperienceListSections(),
+      };
+    }
+
+    await this.updateSessionState(userId, ConversationState.LEAD_SHOW_FIRST_VACANCY);
+    return await this.handleLeadShowFirstVacancyState(userId);
+  }
+
+  private async handleLeadCollectProfileState(userId: string, text: string): Promise<BotReply> {
+    let role = normalizeRole(text);
+
+    if (!role) {
+      const aiResult = await this.llmService.validateAndCorrectRole(text);
+      if (aiResult) {
+        if (!aiResult.isValid) {
+          return { text: aiResult.warning || aiResult.suggestion || BotMessages.ERROR_ROLE_INVALID };
+        }
+        role = aiResult.role;
+      }
+    }
+
+    if (!role) {
+      const conversational = await this.llmService.generateConversationalResponse(
+        text,
+        ConversationState.LEAD_COLLECT_PROFILE,
+      );
+      return { text: this.normalizeConversationalMessage(conversational) || BotMessages.ERROR_ROLE_INVALID };
+    }
+
+    await this.updateUserProfile(userId, { role });
+    return await this.routeLeadToNextMissingField(userId);
+  }
+
+  private async handleLeadAskLocationState(userId: string, text: string): Promise<BotReply> {
+    const validation = validateAndNormalizeLocation(text);
+    const normalizedText = text.toLowerCase().trim();
+    const remotePatterns = ['remoto', 'remote', 'trabajo remoto', 'home office', 'teletrabajo'];
+    const isRemoteIntent = remotePatterns.some((pattern) => normalizedText.includes(pattern));
+
+    let finalLocation: string | null = null;
+
+    const aiResult = await this.llmService.validateAndCorrectLocation(text);
+    if (aiResult?.isValid && aiResult.location) {
+      finalLocation = aiResult.location;
+    } else if (validation.isValid && validation.location) {
+      finalLocation = validation.location;
+    } else if (isRemoteIntent) {
+      finalLocation = 'Remoto';
+    }
+
+    if (!finalLocation) {
+      if (validation.errorType === 'too_vague') {
+        return { text: this.getTooVagueLocationMessage(text) };
+      }
+      return { text: BotMessages.ERROR_LOCATION_INVALID };
+    }
+
+    await this.updateUserProfile(userId, { location: finalLocation });
+    return await this.routeLeadToNextMissingField(userId);
+  }
+
+  private async handleLeadAskExperienceState(userId: string, text: string): Promise<BotReply> {
+    const experienceLevel = normalizeExperienceLevel(text);
+
+    if (!experienceLevel) {
+      return {
+        text: BotMessages.ERROR_EXPERIENCE_INVALID,
+        listTitle: 'Seleccionar nivel',
+        listSections: this.getLeadExperienceListSections(),
+      };
+    }
+
+    await this.updateUserProfile(userId, { experienceLevel });
+    await this.updateSessionState(userId, ConversationState.LEAD_SHOW_FIRST_VACANCY);
+    return await this.handleLeadShowFirstVacancyState(userId);
+  }
+
+  private buildLeadVacancyMessage(job: any): string {
+    const company = job?.company || 'una empresa';
+    const title = job?.title || 'un cargo';
+    const location = job?.locationRaw || 'una ubicacion sin especificar';
+    const source = job?.source || 'un portal de empleo';
+    const cleanUrl = this.jobSearchService.cleanJobUrl(job?.url || '');
+
+    let snippet = (job?.snippet || '').trim();
+    if (snippet.length > 220) {
+      snippet = `${snippet.slice(0, 217)}...`;
+    }
+
+    const summary = snippet || 'Esta vacante puede encajar con tu perfil.';
+
+    return `Hola, te cuento que ${company} esta buscando ${title} en ${location}.\n\nPosteada por ${source}\n\n${summary}\n\n${cleanUrl}`;
+  }
+
+  private async handleLeadShowFirstVacancyState(userId: string): Promise<BotReply> {
+    try {
+      const result = await this.jobSearchService.searchJobsForUser(userId, 1);
+      const firstJob = result.jobs[0];
+
+      if (!firstJob) {
+        const profile = await this.prisma.userProfile.findUnique({
+          where: { userId },
+          select: { role: true },
+        });
+
+        const role = profile?.role || 'tu perfil';
+        const suggestions = await this.llmService.suggestRelatedRoles(role);
+        const suggestionsText = suggestions.length > 0
+          ? `\n\nPuedes probar con: ${suggestions.slice(0, 3).join(', ')}.`
+          : '';
+
+        await this.updateSessionState(userId, ConversationState.LEAD_COLLECT_PROFILE);
+
+        return {
+          text: `No encontre ofertas para "${role}" en este momento.${suggestionsText}\n\nEscribeme otro rol para intentarlo de nuevo.`,
+        };
+      }
+
+      await this.jobSearchService.markJobsAsSent(userId, [firstJob]);
+      await this.updateSessionData(userId, {
+        leadCurrentVacancy: {
+          title: firstJob.title,
+          company: firstJob.company,
+          locationRaw: firstJob.locationRaw,
+          url: firstJob.url,
+          source: firstJob.source,
+        },
+      });
+      await this.updateSessionState(userId, ConversationState.LEAD_WAIT_INTEREST);
+
+      return {
+        text: this.buildLeadVacancyMessage(firstJob),
+        buttons: [
+          { id: 'lead_interest_yes', title: 'Si, me intereso' },
+          { id: 'lead_interest_no', title: 'No me intereso' },
+        ],
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error mostrando primera vacante V2 para ${userId}: ${errorMessage}`);
+      return {
+        text: `No pude buscar una vacante en este momento. Intenta de nuevo en unos minutos.`,
+      };
+    }
+  }
+
+  private resolveLeadRejectionReason(text: string): 'role' | 'location' | 'company' | 'salary' | 'remote' | 'other' {
+    const normalized = text.toLowerCase();
+
+    if (normalized.includes('cargo') || normalized.includes('rol') || normalized.includes('puesto')) return 'role';
+    if (normalized.includes('ciudad') || normalized.includes('ubicacion') || normalized.includes('ubicación')) return 'location';
+    if (normalized.includes('empresa')) return 'company';
+    if (normalized.includes('salario') || normalized.includes('sueldo')) return 'salary';
+    if (normalized.includes('remoto') || normalized.includes('remote') || normalized.includes('casa')) return 'remote';
+
+    return 'other';
+  }
+
+  private async handleLeadWaitInterestState(
+    userId: string,
+    text: string,
+    _intent: UserIntent,
+  ): Promise<BotReply> {
+    if (isAcceptance(text)) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true, email: true },
+      });
+
+      if (user?.name && user?.email) {
+        const onboardingFlags = await this.getOnboardingFlags(userId);
+        await this.activateFreemiumTrialFromLead(userId, onboardingFlags.defaultOnboardingAlertTime);
+        await this.updateSessionState(userId, ConversationState.READY);
+
+        return await this.returnToMainMenu(
+          userId,
+          `Perfecto, seguimos con tu busqueda y ya puedes explorar mas ofertas.`,
+        );
+      }
+
+      await this.updateSessionState(userId, ConversationState.LEAD_REGISTER_NAME);
+      return { text: BotMessages.V2_REGISTER_NAME };
+    }
+
+    if (isRejection(text)) {
+      await this.updateSessionState(userId, ConversationState.LEAD_WAIT_REJECTION_REASON);
+      return {
+        text: BotMessages.V2_REJECTION_REASON,
+        listTitle: 'Elegir motivo',
+        listSections: [
+          {
+            title: 'Motivo principal',
+            rows: [
+              { id: 'reason_role', title: 'No me gusto el cargo' },
+              { id: 'reason_location', title: 'No me gusto la ciudad' },
+              { id: 'reason_company', title: 'No me gusto la empresa' },
+              { id: 'reason_salary', title: 'No me gusto el salario' },
+              { id: 'reason_remote', title: 'Busco algo remoto' },
+              { id: 'reason_other', title: 'Otro motivo' },
+            ],
+          },
+        ],
+      };
+    }
+
+    return {
+      text: `Para seguir, elige una opcion:`,
+      buttons: [
+        { id: 'lead_interest_yes', title: 'Si, me intereso' },
+        { id: 'lead_interest_no', title: 'No me intereso' },
+      ],
+    };
+  }
+
+  private async handleLeadWaitRejectionReasonState(userId: string, text: string): Promise<BotReply> {
+    const reason = this.resolveLeadRejectionReason(text);
+    await this.updateSessionData(userId, { leadLastRejectionReason: reason });
+
+    if (reason === 'role') {
+      await this.updateSessionState(userId, ConversationState.LEAD_COLLECT_PROFILE);
+      return { text: `Entendido. Dime el rol que quieres priorizar y ajusto la busqueda.` };
+    }
+
+    if (reason === 'location') {
+      await this.updateSessionState(userId, ConversationState.LEAD_ASK_LOCATION);
+      return { text: BotMessages.V2_ASK_LOCATION };
+    }
+
+    if (reason === 'remote') {
+      await this.updateUserProfile(userId, { location: 'Remoto' });
+    }
+
+    await this.updateSessionState(userId, ConversationState.LEAD_SHOW_FIRST_VACANCY);
+    const nextVacancyReply = await this.handleLeadShowFirstVacancyState(userId);
+    return {
+      ...nextVacancyReply,
+      text: `Gracias, sigo ajustando la busqueda segun tu perfil.\n\n${nextVacancyReply.text}`,
+    };
+  }
+
+  private async handleLeadRegisterNameState(userId: string, text: string): Promise<BotReply> {
+    const name = text.trim();
+
+    if (name.length < 2 || name.length > 50 || !/[a-zA-Z]/.test(name)) {
+      return {
+        text: `Por favor escribe tu nombre completo (entre 2 y 50 caracteres).`,
+      };
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { name },
+    });
+
+    await this.updateSessionState(userId, ConversationState.LEAD_REGISTER_EMAIL);
+    return { text: BotMessages.V2_REGISTER_EMAIL(getFirstName(name)) };
+  }
+
+  private async handleLeadRegisterEmailState(userId: string, text: string): Promise<BotReply> {
+    const email = text.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(email)) {
+      return {
+        text: `Ese correo no parece valido. Escribelo de nuevo, por favor.`,
+      };
+    }
+
+    const existingByEmail = await this.prisma.user.findFirst({
+      where: {
+        email,
+        NOT: { id: userId },
+      },
+      select: { id: true },
+    });
+
+    if (existingByEmail) {
+      return {
+        text: `Ese correo ya esta en uso con otro numero. Escribe un correo diferente.`,
+      };
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { email },
+    });
+
+    await this.updateSessionState(userId, ConversationState.LEAD_TERMS_CONSENT);
+
+    return {
+      text: BotMessages.V2_TERMS_CONSENT,
+      buttons: [
+        { id: 'lead_terms_accept', title: 'Acepto' },
+        { id: 'lead_terms_reject', title: 'No acepto' },
+      ],
+    };
+  }
+
+  private async activateFreemiumTrialFromLead(
+    userId: string,
+    defaultAlertTime: string,
+  ): Promise<void> {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!subscription) {
+      await this.prisma.subscription.create({
+        data: {
+          userId,
+          plan: 'FREEMIUM',
+          freemiumUsesLeft: 5,
+          freemiumStartDate: new Date(),
+          freemiumExpired: false,
+          status: 'ACTIVE',
+        },
+      });
+    }
+
+    const alertPreference = await this.prisma.alertPreference.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!alertPreference) {
+      await this.upsertAlertPreference(userId, defaultAlertTime, 'daily');
+    }
+  }
+
+  private async handleLeadTermsConsentState(
+    userId: string,
+    text: string,
+    _intent: UserIntent,
+  ): Promise<BotReply> {
+    if (isAcceptance(text)) {
+      const onboardingFlags = await this.getOnboardingFlags(userId);
+      await this.activateFreemiumTrialFromLead(userId, onboardingFlags.defaultOnboardingAlertTime);
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true, email: true },
+      });
+
+      await this.sendOnboardingEmailSafely(userId, user?.email || null, user?.name || null);
+      await this.updateSessionState(userId, ConversationState.READY);
+
+      return await this.returnToMainMenu(
+        userId,
+        `Listo. Active tu prueba gratuita por 7 dias.`,
+      );
+    }
+
+    if (isRejection(text)) {
+      await this.updateSessionState(userId, ConversationState.LEAD_SHOW_FIRST_VACANCY);
+      const nextVacancyReply = await this.handleLeadShowFirstVacancyState(userId);
+      return {
+        ...nextVacancyReply,
+        text: `${BotMessages.V2_TERMS_REJECTED}\n\n${nextVacancyReply.text}`,
+      };
+    }
+
+    return {
+      text: BotMessages.V2_TERMS_CONSENT,
+      buttons: [
+        { id: 'lead_terms_accept', title: 'Acepto' },
+        { id: 'lead_terms_reject', title: 'No acepto' },
+      ],
     };
   }
 
@@ -615,6 +1133,13 @@ export class ConversationService {
           freemiumStartDate: new Date(),
         },
       });
+    }
+
+    const onboardingFlags = await this.getOnboardingFlags(userId);
+    if (onboardingFlags.flowVariant === this.v2FlowVariant) {
+      this.logger.log(`Usuario ${userId} onboarding freemium_v2`);
+      await this.updateSessionState(userId, ConversationState.LEAD_COLLECT_PROFILE);
+      return { text: BotMessages.V2_WELCOME_ROLE };
     }
 
     // CASO 4: Usuario freemium activo → dar bienvenida con botón Continuar
@@ -1456,6 +1981,14 @@ Por favor intenta de nuevo en unos minutos.`,
     if (isAcceptance(text)) {
       // Usuario confirmó reinicio
       await this.restartUserProfile(userId);
+      const onboardingFlags = await this.getOnboardingFlags(userId);
+      if (onboardingFlags.flowVariant === this.v2FlowVariant) {
+        await this.updateSessionState(userId, ConversationState.LEAD_COLLECT_PROFILE);
+        return {
+          text: `${BotMessages.RESTARTED}\n\n${BotMessages.V2_WELCOME_ROLE}`,
+        };
+      }
+
       await this.updateSessionState(userId, ConversationState.ASK_ROLE);
       // Ir directamente a preguntar rol
       return {

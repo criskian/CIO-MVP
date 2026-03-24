@@ -82,6 +82,37 @@ Escribe *"buscar"* cuando estés listo y te mostraré las mejores ofertas que en
   TERMS_REJECTED: `Entiendo. Si cambias de opinión, puedes escribirme de nuevo cuando quieras. ¡Éxito en tu búsqueda de empleo! 👋`,
 
   // Preguntas del onboarding
+  V2_WELCOME_ROLE: `Hola, soy CIO, tu cazador inteligente de ofertas.
+
+¿Qué cargo o rol estás buscando?`,
+
+  V2_ASK_LOCATION: `¿Dónde te gustaría trabajar?
+
+Puedes escribir una ciudad, un país o "remoto".`,
+
+  V2_ASK_EXPERIENCE: `¿Cuánta experiencia tienes en este rol?
+
+Elige una opción 👇`,
+
+  V2_REGISTER_NAME: `Listo. Para seguir enviándote ofertas, vamos a registrarte en CIO.
+
+Primero, ¿cuál es tu nombre?`,
+
+  V2_REGISTER_EMAIL: (name: string) => `Gracias, ${name}.
+
+Ahora, ¿cuál es tu correo?`,
+
+  V2_TERMS_CONSENT: `Gracias por compartir tu nombre y correo.
+
+Al hacerlo, autorizas el tratamiento de tus datos según nuestra política.
+Revisa aquí: ${TERMS_URL}`,
+
+  V2_TERMS_REJECTED: `Para continuar con tu registro y activar tu prueba, necesito que aceptes los términos.`,
+
+  V2_REJECTION_REASON: `Gracias, eso me ayuda a ajustar mejor la búsqueda.
+
+¿Por qué no te interesó?`,
+
   ASK_ROLE: `¡Genial! 🎯
 
 *¿Cuál es el cargo o profesión PRINCIPAL en el que estás buscando empleo?*

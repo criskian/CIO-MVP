@@ -8,6 +8,19 @@
 export enum ConversationState {
   NEW = 'NEW',
 
+  // ========================================
+  // FLUJO FREEMIUM V2 (valor antes de registro)
+  // ========================================
+  LEAD_COLLECT_PROFILE = 'LEAD_COLLECT_PROFILE', // Captura rol inicial (texto libre)
+  LEAD_ASK_LOCATION = 'LEAD_ASK_LOCATION', // Captura ubicación faltante
+  LEAD_ASK_EXPERIENCE = 'LEAD_ASK_EXPERIENCE', // Captura experiencia faltante
+  LEAD_SHOW_FIRST_VACANCY = 'LEAD_SHOW_FIRST_VACANCY', // Muestra primera vacante (1 resultado)
+  LEAD_WAIT_INTEREST = 'LEAD_WAIT_INTEREST', // Espera interés/no interés
+  LEAD_WAIT_REJECTION_REASON = 'LEAD_WAIT_REJECTION_REASON', // Motivo de rechazo para ajustar
+  LEAD_REGISTER_NAME = 'LEAD_REGISTER_NAME', // Registro diferido: nombre
+  LEAD_REGISTER_EMAIL = 'LEAD_REGISTER_EMAIL', // Registro diferido: email
+  LEAD_TERMS_CONSENT = 'LEAD_TERMS_CONSENT', // Consentimiento posterior al correo
+
   // Estados de registro in-bot (usuario no registrado escribe al bot)
   WA_ASK_NAME = 'WA_ASK_NAME', // Pidiendo nombre al usuario no registrado
   WA_ASK_EMAIL = 'WA_ASK_EMAIL', // Pidiendo email al usuario no registrado
