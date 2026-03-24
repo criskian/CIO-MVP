@@ -40,6 +40,8 @@ import {
   shouldExpireFreemium,
 } from './helpers/date-utils';
 
+type FlowVariant = 'legacy' | 'freemium_v2';
+
 /**
  * Servicio de conversación (Orquestador)
  * Implementa la máquina de estados del flujo conversacional con el usuario
@@ -49,6 +51,8 @@ import {
 export class ConversationService {
   private readonly logger = new Logger(ConversationService.name);
   private readonly defaultOnboardingAlertTime = '07:00';
+  private readonly defaultFlowVariant: FlowVariant = 'legacy';
+  private readonly v2FlowVariant: FlowVariant = 'freemium_v2';
 
   constructor(
     private readonly prisma: PrismaService,
@@ -87,6 +91,7 @@ export class ConversationService {
             userId: newUser.id,
             state: ConversationState.WA_ASK_NAME,
             data: {
+              flowVariant: this.v2FlowVariant,
               skipAlertConfigOnboarding: true,
               defaultOnboardingAlertTime: this.defaultOnboardingAlertTime,
             },
@@ -98,7 +103,8 @@ export class ConversationService {
 
       // 3. Si tiene user pero no tiene nombre (registro in-bot en progreso), continuar flujo
       if (!user.name) {
-        const session = await this.getOrCreateSession(user.id);
+        const session = await this.getOrCreateSession(user.id, this.v2FlowVariant);
+        await this.ensureSessionFlowVariant(user.id, session, this.v2FlowVariant);
         // Si por alguna razón no tiene sesión en WA_ASK_NAME, ponerlo ahí
         if (session.state !== ConversationState.WA_ASK_NAME && session.state !== ConversationState.WA_ASK_EMAIL) {
           await this.updateSessionState(user.id, ConversationState.WA_ASK_NAME);
@@ -110,6 +116,12 @@ export class ConversationService {
 
       // 4. Obtener o crear sesión activa
       const session = await this.getOrCreateSession(user.id);
+      const flowVariant = await this.ensureSessionFlowVariant(
+        user.id,
+        session,
+        this.defaultFlowVariant,
+      );
+      this.logger.debug(`Variante de flujo para ${user.id}: ${flowVariant}`);
 
       // NOTA: Los mensajes entrantes y salientes se guardan centralizadamente en WhatsappService
 
@@ -2799,7 +2811,10 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
   /**
    * Obtiene o crea una sesión activa
    */
-  private async getOrCreateSession(userId: string) {
+  private async getOrCreateSession(
+    userId: string,
+    flowVariantOnCreate: FlowVariant = this.defaultFlowVariant,
+  ) {
     let session = await this.prisma.session.findFirst({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -2810,13 +2825,59 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
         data: {
           userId,
           state: ConversationState.NEW,
-          data: {},
+          data: {
+            flowVariant: flowVariantOnCreate,
+          },
         },
       });
       this.logger.log(`✅ Sesión creada para usuario ${userId}`);
     }
 
     return session;
+  }
+
+  private parseFlowVariant(value: unknown): FlowVariant | null {
+    if (value === 'legacy' || value === 'freemium_v2') {
+      return value;
+    }
+    return null;
+  }
+
+  /**
+   * Garantiza que la sesión tenga una variante de flujo explícita.
+   * - Si ya tiene variante válida, la respeta.
+   * - Si no tiene, persiste la variante preferida.
+   */
+  private async ensureSessionFlowVariant(
+    userId: string,
+    session: { id: string; data: any },
+    preferredVariant: FlowVariant,
+  ): Promise<FlowVariant> {
+    const currentData = (session.data as Record<string, any>) || {};
+    const existingVariant = this.parseFlowVariant(currentData.flowVariant);
+
+    if (existingVariant) {
+      return existingVariant;
+    }
+
+    const nextData = {
+      ...currentData,
+      flowVariant: preferredVariant,
+    };
+
+    await this.prisma.session.update({
+      where: { id: session.id },
+      data: {
+        data: nextData,
+        updatedAt: new Date(),
+      },
+    });
+
+    this.logger.log(
+      `Variante de flujo inicializada para ${userId}: ${preferredVariant}`,
+    );
+
+    return preferredVariant;
   }
 
   // [ELIMINADO] getDeviceType ya no se usa, todos son tratados como móvil
@@ -2900,6 +2961,7 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
   }
 
   private async getOnboardingFlags(userId: string): Promise<{
+    flowVariant: FlowVariant;
     skipAlertConfigOnboarding: boolean;
     defaultOnboardingAlertTime: string;
   }> {
@@ -2910,8 +2972,10 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
     });
 
     const sessionData = (session?.data as Record<string, any>) || {};
+    const flowVariant = this.parseFlowVariant(sessionData.flowVariant) || this.defaultFlowVariant;
 
     return {
+      flowVariant,
       skipAlertConfigOnboarding: sessionData.skipAlertConfigOnboarding === true,
       defaultOnboardingAlertTime:
         typeof sessionData.defaultOnboardingAlertTime === 'string'
@@ -3057,7 +3121,15 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
     // Resetear sesión a NEW
     await this.prisma.session.updateMany({
       where: { userId },
-      data: { state: ConversationState.NEW, data: {}, updatedAt: new Date() },
+      data: {
+        state: ConversationState.NEW,
+        data: {
+          flowVariant: this.v2FlowVariant,
+          skipAlertConfigOnboarding: true,
+          defaultOnboardingAlertTime: this.defaultOnboardingAlertTime,
+        },
+        updatedAt: new Date(),
+      },
     });
 
     this.logger.log(`🔄 Perfil reiniciado para usuario ${userId}`);

@@ -271,6 +271,7 @@ export class RegistrationService {
     const currentData = (latestSession?.data as Record<string, any>) || {};
     const mergedData = {
       ...currentData,
+      flowVariant: 'freemium_v2',
       skipAlertConfigOnboarding: true,
       defaultOnboardingAlertTime: '07:00',
     };
