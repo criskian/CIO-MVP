@@ -32,6 +32,7 @@ import { JobSearchService } from '../job-search/job-search.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { AdminService } from '../admin/admin.service';
 import { getFirstName } from '../conversation/helpers/input-validators';
+import { shouldExpireFreemium } from '../conversation/helpers/date-utils';
 import * as cron from 'node-cron';
 import * as dayjs from 'dayjs';
 import * as utc from 'dayjs/plugin/utc';
@@ -194,8 +195,10 @@ export class SchedulerService implements OnModuleInit {
 
       let expiredCount = 0;
       for (const subscription of candidates) {
-        const businessDays = this.countBusinessDays(subscription.freemiumStartDate, new Date());
-        const shouldExpire = businessDays >= 5 || subscription.freemiumUsesLeft <= 0;
+        const shouldExpire = shouldExpireFreemium(
+          subscription.freemiumStartDate,
+          subscription.freemiumUsesLeft,
+        );
 
         if (!shouldExpire) continue;
 
@@ -733,10 +736,7 @@ export class SchedulerService implements OnModuleInit {
       };
     }
 
-    // Verificar si pasaron 5 dÃ­as hÃ¡biles
-    const businessDays = this.countBusinessDays(subscription.freemiumStartDate, new Date());
-
-    if (businessDays >= 5 || subscription.freemiumUsesLeft <= 0) {
+    if (shouldExpireFreemium(subscription.freemiumStartDate, subscription.freemiumUsesLeft)) {
       // Marcar freemium como expirado
       await this.prisma.subscription.update({
         where: { userId },
@@ -857,28 +857,6 @@ Una vez realices el pago, escrÃ­beme por este chat para activar tu cuenta.`;
     return new Date(date);
   }
 
-  /**
-   * Cuenta los dÃ­as hÃ¡biles (lunes a viernes) entre dos fechas
-   */
-  private countBusinessDays(startDate: Date, endDate: Date): number {
-    let count = 0;
-    const current = new Date(startDate);
-    current.setHours(0, 0, 0, 0);
-
-    const end = new Date(endDate);
-    end.setHours(0, 0, 0, 0);
-
-    while (current < end) {
-      const dayOfWeek = current.getDay();
-      // 0 = Domingo, 6 = SÃ¡bado
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        count++;
-      }
-      current.setDate(current.getDate() + 1);
-    }
-
-    return count;
-  }
 }
 
 

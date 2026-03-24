@@ -1,6 +1,7 @@
 /**
  * Utilidades de fecha para el sistema de suscripciones
  */
+export const FREEMIUM_BUSINESS_DAYS_LIMIT = 5;
 
 /**
  * Cuenta los días hábiles (lunes a viernes) entre dos fechas
@@ -35,8 +36,12 @@ export function countBusinessDays(startDate: Date, endDate: Date): number {
  * @param limitDays - Número de días hábiles del límite
  * @returns Días hábiles restantes
  */
-export function getBusinessDaysRemaining(startDate: Date, limitDays: number): number {
-    const businessDaysElapsed = countBusinessDays(startDate, new Date());
+export function getBusinessDaysRemaining(
+    startDate: Date,
+    limitDays: number = FREEMIUM_BUSINESS_DAYS_LIMIT,
+    now: Date = new Date(),
+): number {
+    const businessDaysElapsed = countBusinessDays(startDate, now);
     return Math.max(0, limitDays - businessDaysElapsed);
 }
 
@@ -45,6 +50,27 @@ export function getBusinessDaysRemaining(startDate: Date, limitDays: number): nu
  * @param startDate - Fecha de inicio del freemium
  * @param limitDays - Límite en días hábiles (default: 5)
  */
-export function isFreemiumExpiredByBusinessDays(startDate: Date, limitDays: number = 5): boolean {
-    return countBusinessDays(startDate, new Date()) >= limitDays;
+export function isFreemiumExpiredByBusinessDays(
+    startDate: Date,
+    limitDays: number = FREEMIUM_BUSINESS_DAYS_LIMIT,
+    now: Date = new Date(),
+): boolean {
+    return countBusinessDays(startDate, now) >= limitDays;
+}
+
+/**
+ * Regla canónica de expiración freemium vigente:
+ * - Expira si se agotaron los usos.
+ * - Expira si se alcanzaron 5 días hábiles desde el inicio.
+ */
+export function shouldExpireFreemium(
+    startDate: Date,
+    usesLeft: number,
+    now: Date = new Date(),
+): boolean {
+    if (usesLeft <= 0) {
+        return true;
+    }
+
+    return isFreemiumExpiredByBusinessDays(startDate, FREEMIUM_BUSINESS_DAYS_LIMIT, now);
 }

@@ -8,7 +8,7 @@
 import { PrismaService } from '../database/prisma.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { countBusinessDays } from '../conversation/helpers/date-utils';
+import { shouldExpireFreemium } from '../conversation/helpers/date-utils';
 import {
     UpdateUserDto,
     UpdateSubscriptionDto,
@@ -1395,8 +1395,10 @@ export class AdminService {
 
         const usersToExpire: string[] = [];
         for (const subscription of candidates) {
-            const businessDays = countBusinessDays(subscription.freemiumStartDate, new Date());
-            const shouldExpire = businessDays >= 5 || subscription.freemiumUsesLeft <= 0;
+            const shouldExpire = shouldExpireFreemium(
+                subscription.freemiumStartDate,
+                subscription.freemiumUsesLeft,
+            );
             if (shouldExpire) {
                 usersToExpire.push(subscription.userId);
             }

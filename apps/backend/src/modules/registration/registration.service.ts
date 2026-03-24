@@ -9,6 +9,10 @@ import { PrismaService } from '../database/prisma.service';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ConversationState } from '../conversation/types/conversation-states';
+import {
+  getBusinessDaysRemaining,
+  shouldExpireFreemium,
+} from '../conversation/helpers/date-utils';
 
 /**
  * Servicio de registro de usuarios
@@ -221,11 +225,13 @@ export class RegistrationService {
     // Calcular días hábiles restantes de freemium
     let freemiumDaysLeft = 0;
     if (subscription && !subscription.freemiumExpired && subscription.plan === 'FREEMIUM') {
-      const businessDays = this.countBusinessDays(subscription.freemiumStartDate, new Date());
-      freemiumDaysLeft = Math.max(0, 5 - businessDays);
+      freemiumDaysLeft = getBusinessDaysRemaining(subscription.freemiumStartDate);
 
       // Si pasaron los 5 días hábiles, marcar como expirado
-      if (freemiumDaysLeft === 0 && !subscription.freemiumExpired) {
+      if (
+        shouldExpireFreemium(subscription.freemiumStartDate, subscription.freemiumUsesLeft)
+        && !subscription.freemiumExpired
+      ) {
         await this.prisma.subscription.update({
           where: { id: subscription.id },
           data: {
@@ -313,26 +319,5 @@ export class RegistrationService {
     }
   }
 
-  /**
-   * Cuenta los días hábiles (lunes a viernes) entre dos fechas
-   */
-  private countBusinessDays(startDate: Date, endDate: Date): number {
-    let count = 0;
-    const current = new Date(startDate);
-    current.setHours(0, 0, 0, 0);
-
-    const end = new Date(endDate);
-    end.setHours(0, 0, 0, 0);
-
-    while (current < end) {
-      const dayOfWeek = current.getDay();
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        count++;
-      }
-      current.setDate(current.getDate() + 1);
-    }
-
-    return count;
-  }
 }
 

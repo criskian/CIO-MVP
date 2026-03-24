@@ -37,8 +37,7 @@ import {
   getFirstName,
 } from './helpers/input-validators';
 import {
-  countBusinessDays,
-  isFreemiumExpiredByBusinessDays,
+  shouldExpireFreemium,
 } from './helpers/date-utils';
 
 /**
@@ -2074,13 +2073,11 @@ Ejemplo: "Toronto", "Miami", "New York", "Canadá", "Estados Unidos".`;
       return subscription.premiumUsesLeft > 0;
     }
 
-    // Freemium: verificar usos disponibles y que no haya expirado por tiempo
-    const daysSinceStart = Math.floor(
-      (Date.now() - subscription.freemiumStartDate.getTime()) / (1000 * 60 * 60 * 24),
+    // Freemium: usar la misma regla canónica en todo el sistema.
+    return !shouldExpireFreemium(
+      subscription.freemiumStartDate,
+      subscription.freemiumUsesLeft,
     );
-
-    // Si tiene usos Y no han pasado 3 días, puede usar
-    return subscription.freemiumUsesLeft > 0 && daysSinceStart < 3;
   }
 
   /**
@@ -2454,10 +2451,7 @@ Ejemplo: "Toronto", "Miami", "New York", "Canadá", "Estados Unidos".`;
     }
 
     // PLAN FREEMIUM
-    // Verificar si pasaron 5 días hábiles (expiración por tiempo)
-    const businessDays = countBusinessDays(subscription.freemiumStartDate, new Date());
-
-    if (businessDays >= 5 || subscription.freemiumUsesLeft <= 0) {
+    if (shouldExpireFreemium(subscription.freemiumStartDate, subscription.freemiumUsesLeft)) {
       await this.prisma.subscription.update({
         where: { userId },
         data: {
@@ -2625,10 +2619,7 @@ Ejemplo: "Toronto", "Miami", "New York", "Canadá", "Estados Unidos".`;
     }
 
     // PLAN FREEMIUM
-    // Verificar si pasaron 5 días hábiles (expiración por tiempo)
-    const businessDays = countBusinessDays(subscription.freemiumStartDate, new Date());
-
-    if (businessDays >= 5 || subscription.freemiumUsesLeft <= 0) {
+    if (shouldExpireFreemium(subscription.freemiumStartDate, subscription.freemiumUsesLeft)) {
       // Marcar freemium como expirado
       await this.prisma.subscription.update({
         where: { userId },
