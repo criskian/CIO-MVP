@@ -42,6 +42,17 @@ export interface SearchFailureDiagnosisResult {
   userMessage: string;
 }
 
+export interface InitialProfileExtractionResult {
+  role: string | null;
+  location: string | null;
+  modality: 'remote' | 'hybrid' | 'onsite' | null;
+  experienceLevel: 'none' | 'junior' | 'mid' | 'senior' | 'lead' | null;
+  experienceYears: number | null;
+  seniority: string | null;
+  sector: string | null;
+  confidence: number;
+}
+
 @Injectable()
 export class LlmService {
   private readonly logger = new Logger(LlmService.name);
@@ -278,6 +289,34 @@ export class LlmService {
     }
 
     return result.suggestions;
+  }
+
+  /**
+   * Extrae variables de perfil inicial desde texto libre del usuario.
+   * Retorna null si el LLM no esta disponible.
+   */
+  async extractInitialProfileFromFreeText(
+    text: string,
+  ): Promise<InitialProfileExtractionResult | null> {
+    const raw = await this.callOpenAI(SYSTEM_PROMPTS.INITIAL_PROFILE_EXTRACTION, text);
+    if (!raw) return null;
+
+    const result = this.parseJSON<InitialProfileExtractionResult>(raw, {
+      role: null,
+      location: null,
+      modality: null,
+      experienceLevel: null,
+      experienceYears: null,
+      seniority: null,
+      sector: null,
+      confidence: 0,
+    });
+
+    this.logger.log(
+      `🧩 Extraccion inicial perfil: role=${result.role || '-'}, location=${result.location || '-'}, modality=${result.modality || '-'}, exp=${result.experienceLevel || '-'} (conf=${result.confidence ?? 0})`,
+    );
+
+    return result;
   }
 
   /**

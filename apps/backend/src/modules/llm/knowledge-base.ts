@@ -139,6 +139,80 @@ Input: "Cali o Palmira" → {"isValid": false, "location": null, "wasCorrected":
 Input: "remoto" → {"isValid": false, "location": null, "wasCorrected": false, "suggestion": "Entiendo que quieres trabajo remoto. 😊\n\nEn esta pregunta debes escribir *una ubicación válida* (ciudad o país) para continuar.\n\nEjemplo: \"Bogotá\", \"Colombia\", \"Lima\".\n\nPor favor vuelve a ingresar tu ubicación."}`,
 
    /**
+    * Prompt para extraer perfil inicial desde texto libre del usuario (fase 4).
+    * Retorna JSON con: role, location, modality, experienceLevel, experienceYears, seniority, sector, confidence
+    */
+   INITIAL_PROFILE_EXTRACTION: `Eres un extractor semantico para CIO (bot de empleo en WhatsApp).
+
+Tu tarea es leer un mensaje de texto libre y extraer SOLO lo que este explicitamente presente sobre el perfil laboral.
+
+Campos a extraer:
+1) role: cargo objetivo o profesion principal (string o null)
+2) location: ciudad o pais objetivo (string o null)
+3) modality: "remote" | "hybrid" | "onsite" | null
+4) experienceLevel: "none" | "junior" | "mid" | "senior" | "lead" | null
+5) experienceYears: numero de anos si aparece (0, 1, 2, 3...) o null
+6) seniority: texto corto de seniority si aparece (ej: "junior", "senior", "lead") o null
+7) sector: sector/industria si aparece (ej: "fintech", "salud", "retail") o null
+8) confidence: numero entre 0 y 1
+
+REGLAS ESTRICTAS:
+- No inventes datos. Si no aparece, usa null.
+- No promociones ni cambies jerarquía del cargo (ej: no convertir "analista" en "director").
+- Si el mensaje contiene saludos o texto social, ignoralos.
+- Si detectas "remoto", "remote", "home office", "teletrabajo", modality="remote".
+- Si detectas "hibrido/híbrido", modality="hybrid".
+- Si detectas "presencial", modality="onsite".
+- Si hay ciudad y pais, prioriza ciudad en "location".
+- Si hay varias ubicaciones o varios roles sin priorizacion clara, devuelve null para ese campo.
+- Si hay "ciudad A o ciudad B", devuelve location=null.
+- Si detectas multiples roles separados por "/", ",", " y ", " o ", devuelve role=null.
+- role debe quedar limpio y breve (max 4 palabras idealmente).
+- experienceYears:
+  - "sin experiencia" => 0
+  - "1-2 anos" => 1
+  - "3-5 anos" => 3
+  - "mas de 5" => 6
+  - "7+ anos" => 7
+- experienceLevel por defecto desde years:
+  - 0 => none
+  - 1-2 => junior
+  - 3-5 => mid
+  - 6 => senior
+  - >=7 => lead
+
+RESPONDE SIEMPRE JSON VALIDO con esta estructura exacta:
+{
+  "role": string | null,
+  "location": string | null,
+  "modality": "remote" | "hybrid" | "onsite" | null,
+  "experienceLevel": "none" | "junior" | "mid" | "senior" | "lead" | null,
+  "experienceYears": number | null,
+  "seniority": string | null,
+  "sector": string | null,
+  "confidence": number
+}
+
+Ejemplos:
+Input: "Busco analista de datos en Bogota, tengo 3 anos y prefiero remoto"
+Output: {"role":"Analista de Datos","location":"Bogotá","modality":"remote","experienceLevel":"mid","experienceYears":3,"seniority":"mid","sector":null,"confidence":0.95}
+
+Input: "Quiero trabajar en marketing"
+Output: {"role":"Marketing","location":null,"modality":null,"experienceLevel":null,"experienceYears":null,"seniority":null,"sector":null,"confidence":0.72}
+
+Input: "Hola, soy analista de credito senior en Medellin"
+Output: {"role":"Analista de Crédito","location":"Medellín","modality":null,"experienceLevel":"senior","experienceYears":null,"seniority":"senior","sector":"finanzas","confidence":0.86}
+
+Input: "Necesito algo remoto, no tengo experiencia"
+Output: {"role":null,"location":null,"modality":"remote","experienceLevel":"none","experienceYears":0,"seniority":"none","sector":null,"confidence":0.9}
+
+Input: "Asesor comercial / call center en Barranquilla"
+Output: {"role":null,"location":"Barranquilla","modality":null,"experienceLevel":null,"experienceYears":null,"seniority":null,"sector":null,"confidence":0.88}
+
+Input: "Gerente de operaciones en Lima o Arequipa, 10 anos"
+Output: {"role":"Gerente de Operaciones","location":null,"modality":null,"experienceLevel":"lead","experienceYears":10,"seniority":"lead","sector":null,"confidence":0.9}`,
+
+   /**
     * Prompt para detectar la intención del usuario en estado READY.
     * Retorna JSON con: intent, confidence
     */
@@ -317,6 +391,29 @@ REGLAS ESTRICTAS:
 - Adapta tu respuesta al CONTENIDO ESPECÍFICO del mensaje del usuario
 
 ESTADOS Y QUÉ ESPERAS EN CADA UNO:
+
+LEAD_COLLECT_PROFILE: Necesitas el cargo/rol objetivo inicial.
+→ Puede venir mezclado con ubicación, experiencia o modalidad en el mismo texto.
+→ Si no hay rol claro, pide solo el rol.
+
+LEAD_ASK_LOCATION: Necesitas ubicación objetivo para buscar.
+→ Puede ser ciudad, país o remoto.
+
+LEAD_ASK_EXPERIENCE: Necesitas nivel de experiencia.
+→ Opciones: Sin experiencia, Junior, Intermedio, Senior, Lead/Expert.
+
+LEAD_WAIT_INTEREST: El usuario debe indicar si la vacante le interesó o no.
+→ Responde guiando a elegir una de esas dos opciones.
+
+LEAD_WAIT_REJECTION_REASON: El usuario debe indicar por qué no le interesó.
+→ Guiar a seleccionar un motivo concreto.
+
+LEAD_REGISTER_NAME: Necesitas nombre para registro diferido.
+
+LEAD_REGISTER_EMAIL: Necesitas correo para registro diferido.
+
+LEAD_TERMS_CONSENT: Necesitas aceptación de términos para activar prueba.
+→ Solo Acepto / No acepto.
 
 ASK_TERMS: El usuario debe aceptar los términos para continuar.
 → Solo necesitas que presione el botón de aceptar
