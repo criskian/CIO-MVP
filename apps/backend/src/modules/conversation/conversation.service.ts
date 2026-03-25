@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { JobSearchService } from '../job-search/job-search.service';
 import { JobPosting } from '../job-search/types/job-posting';
@@ -892,6 +892,23 @@ export class ConversationService {
     const summary = snippet || 'Esta vacante puede encajar con tu perfil.';
 
     return `Hola, te cuento que ${company} esta buscando ${title} en ${location}.\n\nPosteada por ${source}\n\n${summary}\n\n${cleanUrl}`;
+  }
+
+  private buildReadySearchSingleVacancyMessage(job: JobPosting): string {
+    const company = job?.company || 'Empresa confidencial';
+    const title = job?.title || 'Vacante disponible';
+    const location = job?.locationRaw || 'Ubicacion por confirmar';
+    const source = job?.source || 'portal de empleo';
+    const cleanUrl = this.jobSearchService.cleanJobUrl(job?.url || '');
+
+    let snippet = (job?.snippet || '').trim();
+    if (snippet.length > 220) {
+      snippet = `${snippet.slice(0, 217)}...`;
+    }
+
+    const summary = snippet || 'Esta vacante puede encajar con tu perfil.';
+
+    return `Te comparto una vacante que se ajusta a tu perfil:\n\n*${title}*\nEmpresa: ${company}\nUbicaci\u00F3n: ${location}\nFuente: ${source}\n\n${summary}\n\n${cleanUrl}`;
   }
 
   private normalizeLeadTextForComparison(text: string | null | undefined): string {
@@ -2106,22 +2123,22 @@ Actualmente tienes el Plan Free: 5 bÃºsquedas por una semana.
           rows: [
             {
               id: 'cmd_buscar',
-              title: 'ðŸ” Buscar empleos',
+              title: 'Buscar empleos',
               description: 'Encontrar ofertas ahora',
             },
             {
               id: 'cmd_editar',
-              title: 'âœï¸ Editar perfil',
+              title: 'Editar perfil',
               description: 'Cambiar tus preferencias',
             },
             {
               id: 'cmd_reiniciar',
-              title: 'ðŸ”„ Reiniciar',
+              title: 'Reiniciar',
               description: 'Reconfigurar desde cero',
             },
             {
               id: 'cmd_cancelar',
-              title: 'âŒ Cancelar servicio',
+              title: 'Cancelar servicio',
               description: 'Dejar de usar el servicio',
             },
           ],
@@ -2257,22 +2274,22 @@ Actualmente tienes el Plan Free: 5 bÃºsquedas por una semana.
           rows: [
             {
               id: 'cmd_buscar',
-              title: 'ðŸ” Buscar empleos',
+              title: 'Buscar empleos',
               description: 'Encontrar ofertas ahora',
             },
             {
               id: 'cmd_editar',
-              title: 'âœï¸ Editar perfil',
+              title: 'Editar perfil',
               description: 'Cambiar tus preferencias',
             },
             {
               id: 'cmd_reiniciar',
-              title: 'ðŸ”„ Reiniciar',
+              title: 'Reiniciar',
               description: 'Reconfigurar desde cero',
             },
             {
               id: 'cmd_cancelar',
-              title: 'âŒ Cancelar servicio',
+              title: 'Cancelar servicio',
               description: 'Dejar de usar el servicio',
             },
           ],
@@ -2318,6 +2335,10 @@ Actualmente tienes el Plan Free: 5 bÃºsquedas por una semana.
 
       // Formatear ofertas para WhatsApp
       const formattedJobs = this.jobSearchService.formatJobsForWhatsApp(result.jobs);
+      const primarySearchMessage =
+        result.jobs.length === 1
+          ? this.buildReadySearchSingleVacancyMessage(result.jobs[0])
+          : formattedJobs;
 
       // Marcar ofertas como enviadas
       await this.jobSearchService.markJobsAsSent(userId, result.jobs);
@@ -2345,33 +2366,33 @@ Actualmente tienes el Plan Free: 5 bÃºsquedas por una semana.
       let menuText: string;
 
       if (usesLeft === 0 && !isPremium) {
-        // Mensaje especial cuando se agotan las bÃºsquedas del Plan Free
+        // Mensaje especial cuando se agotan las busquedas del Plan Free
         const profile = await this.prisma.userProfile.findUnique({ where: { userId } });
         const userRole = profile?.role || 'tu perfil';
         const checkoutLink = process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ';
 
-        menuText = `*BÃºsquedas restantes esta semana:* 0 (Plan Free)
+        menuText = `*B\u00FAsquedas restantes esta semana:* 0 (Plan Free)
 
-ðŸš€ Hay muchas ofertas que podemos cazar por ti en internet para tu rol (*${userRole}*).
-Si quieres seguir recibiÃ©ndolas de forma automÃ¡tica y filtradas segÃºn tu perfil, activa CIO por solo *$20.000 COP al mes* y continÃºa tu bÃºsqueda sin lÃ­mites.
-ðŸŽ¯ ActÃ­valo aquÃ­:
+Hay muchas ofertas que podemos cazar por ti en internet para tu rol (*${userRole}*).
+Si quieres seguir recibi\u00E9ndolas de forma autom\u00E1tica y filtradas seg\u00FAn tu perfil, activa CIO por solo *$20.000 COP al mes* y contin\u00FAa tu b\u00FAsqueda sin l\u00EDmites.
+Act\u00EDvalo aqu\u00ED:
 
-ðŸ‘‰ ${checkoutLink}
+${checkoutLink}
 
-Estoy lista para ayudarte a cazar tu prÃ³xima oportunidad.`;
+Estoy lista para ayudarte a cazar tu pr\u00F3xima oportunidad.`;
       } else {
-        const searchWord = usesLeft === 1 ? 'bÃºsqueda' : 'bÃºsquedas';
-        menuText = `ðŸ“Œ Te quedan *${usesLeft} ${searchWord} esta semana* (${planLabel}).
+        const searchWord = usesLeft === 1 ? 'b\u00FAsqueda' : 'b\u00FAsquedas';
+        menuText = `\uD83D\uDCCC Te quedan *${usesLeft} ${searchWord} esta semana* (${planLabel}).
 
-âš ï¸ Â¿Las ofertas no encajan del todo?
+\u26A0\uFE0F \u00BFLas ofertas no encajan del todo?
 
 Puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
 
-Â¿QuÃ© quieres hacer ahora?`;
+\u00BFQu\u00E9 quieres hacer ahora?`;
       }
 
       return {
-        text: formattedJobs + exhaustedMessage,
+        text: primarySearchMessage + exhaustedMessage,
         delayedMessage: {
           text: menuText,
           delayMs: DELAY_MS,
@@ -2380,10 +2401,10 @@ Puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
             {
               title: 'Acciones disponibles',
               rows: [
-                { id: 'cmd_buscar', title: 'ðŸ” Buscar empleos', description: 'Encontrar mÃ¡s ofertas' },
-                { id: 'cmd_editar', title: 'âœï¸ Editar perfil', description: 'Cambiar tus preferencias' },
-                { id: 'cmd_reiniciar', title: 'ðŸ”„ Reiniciar', description: 'Reconfigurar tu perfil' },
-                { id: 'cmd_cancelar', title: 'âŒ Cancelar servicio', description: 'Dejar de usar el CIO' },
+                { id: 'cmd_buscar', title: 'Buscar empleos', description: 'Encontrar m\u00E1s ofertas' },
+                { id: 'cmd_editar', title: 'Editar perfil', description: 'Cambiar tus preferencias' },
+                { id: 'cmd_reiniciar', title: 'Reiniciar', description: 'Reconfigurar tu perfil' },
+                { id: 'cmd_cancelar', title: 'Cancelar servicio', description: 'Dejar de usar el CIO' },
               ],
             },
           ],

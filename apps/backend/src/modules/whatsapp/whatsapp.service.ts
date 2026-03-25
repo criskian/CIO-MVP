@@ -39,17 +39,29 @@ export class WhatsappService {
 
   private repairMojibakeText(text: string): string {
     if (!text) return text;
-    if (!/[ÃÂâð]|ï¿½/.test(text)) return text;
 
-    try {
-      const repaired = Buffer.from(text, 'latin1').toString('utf8');
-      if (!repaired || repaired.includes('\uFFFD')) {
-        return text;
+    const hasSuspiciousChars =
+      /[\u00C2\u00C3\u00E2\u00F0]/.test(text) || text.includes('\uFFFD');
+    if (!hasSuspiciousChars) return text;
+
+    let candidate = text;
+    for (let i = 0; i < 3; i += 1) {
+      try {
+        const repaired = Buffer.from(candidate, 'latin1').toString('utf8');
+        if (!repaired || repaired === candidate) {
+          break;
+        }
+        candidate = repaired;
+      } catch {
+        break;
       }
-      return repaired;
-    } catch {
+    }
+
+    if (candidate.includes('\uFFFD')) {
       return text;
     }
+
+    return candidate;
   }
 
   private sanitizeBotReply(reply: BotReply): BotReply {
