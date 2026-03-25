@@ -37,6 +37,60 @@ export class WhatsappService {
     setInterval(() => this.cleanupMessageCache(), 5 * 60 * 1000);
   }
 
+  private repairMojibakeText(text: string): string {
+    if (!text) return text;
+    if (!/[ÃÂâð]|ï¿½/.test(text)) return text;
+
+    try {
+      const repaired = Buffer.from(text, 'latin1').toString('utf8');
+      if (!repaired || repaired.includes('\uFFFD')) {
+        return text;
+      }
+      return repaired;
+    } catch {
+      return text;
+    }
+  }
+
+  private sanitizeBotReply(reply: BotReply): BotReply {
+    const sanitizeText = (value?: string) => (value ? this.repairMojibakeText(value) : value);
+
+    return {
+      ...reply,
+      text: sanitizeText(reply.text) || '',
+      listTitle: sanitizeText(reply.listTitle),
+      buttons: reply.buttons?.map((btn) => ({
+        ...btn,
+        title: sanitizeText(btn.title) || btn.title,
+      })),
+      listSections: reply.listSections?.map((section) => ({
+        ...section,
+        title: sanitizeText(section.title),
+        rows: section.rows.map((row) => ({
+          ...row,
+          title: sanitizeText(row.title) || row.title,
+          description: sanitizeText(row.description),
+        })),
+      })),
+      delayedMessage: reply.delayedMessage
+        ? {
+          ...reply.delayedMessage,
+          text: sanitizeText(reply.delayedMessage.text) || '',
+          listTitle: sanitizeText(reply.delayedMessage.listTitle),
+          listSections: reply.delayedMessage.listSections?.map((section) => ({
+            ...section,
+            title: sanitizeText(section.title),
+            rows: section.rows.map((row) => ({
+              ...row,
+              title: sanitizeText(row.title) || row.title,
+              description: sanitizeText(row.description),
+            })),
+          })),
+        }
+        : undefined,
+    };
+  }
+
   /**
    * Guarda un mensaje saliente en el historial (para mostrar en admin)
    */
@@ -236,8 +290,10 @@ export class WhatsappService {
     options?: { userId?: string; source?: 'conversation' | 'scheduler' | 'admin' }
   ): Promise<void> {
     try {
+      const sanitizedReply = this.sanitizeBotReply(reply);
+
       // Enviar mensaje principal (sin el delayedMessage)
-      const { delayedMessage, ...mainReply } = reply;
+      const { delayedMessage, ...mainReply } = sanitizedReply;
       await this.provider.sendMessage(to, mainReply);
       this.logger.log(`✅ Mensaje enviado a ${to}`);
 
@@ -245,18 +301,18 @@ export class WhatsappService {
       const userId = options?.userId || await this.findUserIdByPhone(to);
       if (userId) {
         const metadata: any = {
-          type: reply.buttons ? 'interactive' : 'text',
+          type: sanitizedReply.buttons ? 'interactive' : 'text',
           source: options?.source || 'scheduler',
         };
-        if (reply.buttons) {
-          metadata.buttons = reply.buttons;
+        if (sanitizedReply.buttons) {
+          metadata.buttons = sanitizedReply.buttons;
         }
-        if (reply.listTitle) {
-          metadata.listTitle = reply.listTitle;
-          metadata.listSections = reply.listSections;
+        if (sanitizedReply.listTitle) {
+          metadata.listTitle = sanitizedReply.listTitle;
+          metadata.listSections = sanitizedReply.listSections;
           metadata.type = 'interactive';
         }
-        await this.saveOutboundMessage(userId, reply.text || '', metadata);
+        await this.saveOutboundMessage(userId, sanitizedReply.text || '', metadata);
       }
 
       // Si hay mensaje retrasado, programar su envío
@@ -274,15 +330,15 @@ export class WhatsappService {
               listTitle: delayedMessage.listTitle,
               listSections: delayedMessage.listSections,
             };
-            await this.provider.sendMessage(to, delayedReply);
+            await this.provider.sendMessage(to, this.sanitizeBotReply(delayedReply));
             this.logger.log(`✅ Mensaje retrasado enviado a ${to}`);
 
             // Guardar mensaje retrasado en historial (siempre, ya que no viene de ConversationService)
             if (delayedUserId) {
-              await this.saveOutboundMessage(delayedUserId, delayedMessage.text || '', {
+              await this.saveOutboundMessage(delayedUserId, this.repairMojibakeText(delayedMessage.text || ''), {
                 type: 'delayed',
                 source: options?.source || 'scheduler',
-                listTitle: delayedMessage.listTitle,
+                listTitle: delayedMessage.listTitle ? this.repairMojibakeText(delayedMessage.listTitle) : delayedMessage.listTitle,
                 listSections: delayedMessage.listSections,
               });
             }
@@ -317,13 +373,14 @@ export class WhatsappService {
     options?: { userId?: string; source?: 'conversation' | 'scheduler' | 'admin' }
   ): Promise<void> {
     try {
-      await this.cloudApiProvider.sendTemplateMessage(to, templateName, languageCode, bodyParams);
+      const sanitizedBodyParams = bodyParams.map((param) => this.repairMojibakeText(param));
+      await this.cloudApiProvider.sendTemplateMessage(to, templateName, languageCode, sanitizedBodyParams);
       this.logger.log(`✅ Template "${templateName}" enviado a ${to}`);
 
       // Guardar en historial
       const userId = options?.userId || await this.findUserIdByPhone(to);
       if (userId) {
-        const templateContent = `[TEMPLATE: ${templateName}] ${bodyParams.join(' | ')}`;
+        const templateContent = `[TEMPLATE: ${templateName}] ${sanitizedBodyParams.join(' | ')}`;
         await this.saveOutboundMessage(userId, templateContent, {
           type: 'template',
           source: options?.source || 'scheduler',

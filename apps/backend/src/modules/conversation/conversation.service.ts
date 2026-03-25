@@ -1,6 +1,7 @@
 ﻿import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { JobSearchService } from '../job-search/job-search.service';
+import { JobPosting } from '../job-search/types/job-posting';
 import { LlmService } from '../llm/llm.service';
 import { CvService } from '../cv/cv.service';
 import { ChatHistoryService } from './chat-history.service';
@@ -42,6 +43,8 @@ import {
 } from './helpers/date-utils';
 
 type FlowVariant = 'legacy' | 'freemium_v2';
+type LeadRejectionReason = 'role' | 'location' | 'company' | 'salary' | 'remote' | 'other';
+type LeadVacancySearchMode = 'default' | 'reuse_cache' | 'force_fresh';
 
 /**
  * Servicio de conversaciÃ³n (Orquestador)
@@ -54,6 +57,8 @@ export class ConversationService {
   private readonly defaultOnboardingAlertTime = '07:00';
   private readonly defaultFlowVariant: FlowVariant = 'legacy';
   private readonly v2FlowVariant: FlowVariant = 'freemium_v2';
+  private readonly leadReuseScoreThreshold = 0.65;
+  private readonly leadReuseCandidateLimit = 4;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -889,49 +894,303 @@ export class ConversationService {
     return `Hola, te cuento que ${company} esta buscando ${title} en ${location}.\n\nPosteada por ${source}\n\n${summary}\n\n${cleanUrl}`;
   }
 
-  private async handleLeadShowFirstVacancyState(userId: string): Promise<BotReply> {
+  private normalizeLeadTextForComparison(text: string | null | undefined): string {
+    if (!text) return '';
+    return text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .trim();
+  }
+
+  private async getLatestSessionData(userId: string): Promise<Record<string, any>> {
+    const session = await this.prisma.session.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: { data: true },
+    });
+
+    return (session?.data as Record<string, any>) || {};
+  }
+
+  private buildLeadVacancySnapshot(job: Partial<JobPosting> | null | undefined) {
+    if (!job) return null;
+    return {
+      title: job.title || null,
+      company: job.company || null,
+      locationRaw: job.locationRaw || null,
+      salaryRaw: job.salaryRaw || null,
+      source: job.source || null,
+      url: job.url || null,
+      score: typeof job.score === 'number' ? job.score : null,
+    };
+  }
+
+  private async getLeadReuseCandidatesFromCache(userId: string, limit: number): Promise<Array<{
+    title?: string | null;
+    company?: string | null;
+    locationRaw?: string | null;
+    salaryRaw?: string | null;
+    source?: string | null;
+    score?: number | null;
+  }>> {
+    const sessionData = await this.getLatestSessionData(userId);
+    const cachedJobs = Array.isArray(sessionData?.jobSearchCache?.cachedJobs)
+      ? sessionData.jobSearchCache.cachedJobs
+      : [];
+
+    return cachedJobs
+      .slice(0, limit)
+      .map((job: any) => ({
+        title: job?.title || null,
+        company: job?.company || null,
+        locationRaw: job?.locationRaw || null,
+        salaryRaw: job?.salaryRaw || null,
+        source: job?.source || null,
+        score: typeof job?.score === 'number' ? job.score : null,
+      }));
+  }
+
+  private calculateLeadReuseHeuristic(
+    reason: LeadRejectionReason,
+    rejectedVacancy: Record<string, any> | null,
+    candidateVacancies: Array<Record<string, any>>,
+  ): number {
+    if (candidateVacancies.length === 0) return 0;
+
+    let score = 0.55;
+    const firstCandidate = candidateVacancies[0];
+    const rejectedCompany = this.normalizeLeadTextForComparison(rejectedVacancy?.company);
+    const candidateCompany = this.normalizeLeadTextForComparison(firstCandidate?.company);
+
+    if (reason === 'company') {
+      score += rejectedCompany && candidateCompany && rejectedCompany !== candidateCompany ? 0.28 : -0.22;
+    } else if (reason === 'salary') {
+      const withSalary = candidateVacancies.filter((job) => Boolean(job?.salaryRaw)).length;
+      score += withSalary > 0 ? 0.16 : -0.12;
+    } else if (reason === 'other') {
+      score += 0.05;
+    } else if (reason === 'remote') {
+      score -= 0.1;
+    }
+
+    if (candidateVacancies.length >= 2) {
+      score += 0.05;
+    }
+
+    const rejectedTitle = this.normalizeLeadTextForComparison(rejectedVacancy?.title);
+    const candidateTitle = this.normalizeLeadTextForComparison(firstCandidate?.title);
+    if (rejectedTitle && candidateTitle && rejectedTitle === candidateTitle) {
+      score -= 0.08;
+    }
+
+    return Math.min(1, Math.max(0, score));
+  }
+
+  private async scoreLeadReuse(
+    userId: string,
+    reason: LeadRejectionReason,
+    candidateVacancies: Array<{
+      title?: string | null;
+      company?: string | null;
+      locationRaw?: string | null;
+      salaryRaw?: string | null;
+      source?: string | null;
+      score?: number | null;
+    }>,
+  ): Promise<{ score: number; scoreSource: 'ai' | 'heuristic'; rationale: string }> {
+    const sessionData = await this.getLatestSessionData(userId);
+    const rejectedVacancy = (sessionData?.leadCurrentVacancy as Record<string, any>) || null;
+
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select: {
+        role: true,
+        location: true,
+        experienceLevel: true,
+      },
+    });
+
+    const aiScore = await this.llmService.scoreVacancyReuse({
+      rejectionReason: reason,
+      userProfile: {
+        role: profile?.role || null,
+        location: profile?.location || null,
+        experienceLevel: profile?.experienceLevel || null,
+      },
+      rejectedVacancy: {
+        title: rejectedVacancy?.title || null,
+        company: rejectedVacancy?.company || null,
+        locationRaw: rejectedVacancy?.locationRaw || null,
+        salaryRaw: rejectedVacancy?.salaryRaw || null,
+        source: rejectedVacancy?.source || null,
+      },
+      candidateVacancies,
+    });
+
+    if (aiScore) {
+      return {
+        score: aiScore.reuseScore,
+        scoreSource: 'ai',
+        rationale: aiScore.rationale || '',
+      };
+    }
+
+    const heuristic = this.calculateLeadReuseHeuristic(reason, rejectedVacancy, candidateVacancies);
+    return {
+      score: heuristic,
+      scoreSource: 'heuristic',
+      rationale: 'Score heuristico por fallback local (LLM no disponible).',
+    };
+  }
+
+  private async decideLeadVacancyStrategy(
+    userId: string,
+    reason: LeadRejectionReason,
+  ): Promise<{
+    searchMode: LeadVacancySearchMode;
+    score: number;
+    scoreSource: 'ai' | 'heuristic' | 'no_candidates';
+    rationale: string;
+    candidatesEvaluated: number;
+  }> {
+    const candidates = await this.getLeadReuseCandidatesFromCache(userId, this.leadReuseCandidateLimit);
+    if (candidates.length === 0) {
+      return {
+        searchMode: 'force_fresh',
+        score: 0,
+        scoreSource: 'no_candidates',
+        rationale: 'No hay candidatas en cache para reutilizar.',
+        candidatesEvaluated: 0,
+      };
+    }
+
+    const scored = await this.scoreLeadReuse(userId, reason, candidates);
+    const searchMode: LeadVacancySearchMode =
+      scored.score >= this.leadReuseScoreThreshold ? 'reuse_cache' : 'force_fresh';
+
+    this.logger.log(
+      `🎯 Decisión de vacante V2 para ${userId}: mode=${searchMode}, score=${scored.score.toFixed(2)}, source=${scored.scoreSource}, candidates=${candidates.length}`,
+    );
+
+    return {
+      searchMode,
+      score: scored.score,
+      scoreSource: scored.scoreSource,
+      rationale: scored.rationale,
+      candidatesEvaluated: candidates.length,
+    };
+  }
+
+  private async searchLeadSingleVacancy(
+    userId: string,
+    searchMode: LeadVacancySearchMode,
+  ): Promise<JobPosting | null> {
+    const result =
+      searchMode === 'reuse_cache'
+        ? await this.jobSearchService.searchJobsForUser(userId, 1, { cacheOnlyIfAvailable: true })
+        : searchMode === 'force_fresh'
+          ? await this.jobSearchService.searchJobsForUser(userId, 1, { forceFreshSearch: true })
+          : await this.jobSearchService.searchJobsForUser(userId, 1);
+
+    return result.jobs[0] || null;
+  }
+
+  private async buildLeadNoVacancyFoundReply(userId: string): Promise<BotReply> {
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select: { role: true },
+    });
+
+    const role = profile?.role || 'tu perfil';
+    const suggestions = await this.llmService.suggestRelatedRoles(role);
+    const suggestionsText = suggestions.length > 0
+      ? `\n\nPuedes probar con: ${suggestions.slice(0, 3).join(', ')}.`
+      : '';
+
+    await this.updateSessionState(userId, ConversationState.LEAD_COLLECT_PROFILE);
+
+    return {
+      text: `No encontre ofertas para "${role}" en este momento.${suggestionsText}\n\nEscribeme otro rol para intentarlo de nuevo.`,
+    };
+  }
+
+  private async deliverLeadVacancy(
+    userId: string,
+    job: JobPosting,
+    context: Record<string, any> = {},
+  ): Promise<BotReply> {
+    await this.jobSearchService.markJobsAsSent(userId, [job]);
+
+    await this.updateSessionData(userId, {
+      leadCurrentVacancy: this.buildLeadVacancySnapshot(job),
+      leadVacancyDecision: {
+        ...context,
+        deliveredAt: new Date().toISOString(),
+      },
+    });
+    await this.updateSessionState(userId, ConversationState.LEAD_WAIT_INTEREST);
+
+    return {
+      text: this.buildLeadVacancyMessage(job),
+      buttons: [
+        { id: 'lead_interest_yes', title: 'Si, me intereso' },
+        { id: 'lead_interest_no', title: 'No me intereso' },
+      ],
+    };
+  }
+
+  private async handleLeadShowFirstVacancyState(
+    userId: string,
+    searchMode: LeadVacancySearchMode = 'default',
+    context: Record<string, any> = {},
+  ): Promise<BotReply> {
     try {
-      const result = await this.jobSearchService.searchJobsForUser(userId, 1);
-      const firstJob = result.jobs[0];
+      let firstJob = await this.searchLeadSingleVacancy(userId, searchMode);
 
-      if (!firstJob) {
-        const profile = await this.prisma.userProfile.findUnique({
-          where: { userId },
-          select: { role: true },
-        });
-
-        const role = profile?.role || 'tu perfil';
-        const suggestions = await this.llmService.suggestRelatedRoles(role);
-        const suggestionsText = suggestions.length > 0
-          ? `\n\nPuedes probar con: ${suggestions.slice(0, 3).join(', ')}.`
-          : '';
-
-        await this.updateSessionState(userId, ConversationState.LEAD_COLLECT_PROFILE);
-
-        return {
-          text: `No encontre ofertas para "${role}" en este momento.${suggestionsText}\n\nEscribeme otro rol para intentarlo de nuevo.`,
-        };
+      if (!firstJob && searchMode === 'reuse_cache') {
+        this.logger.log(`♻️ Cache vacía para ${userId}; pasando a nueva búsqueda forzada`);
+        firstJob = await this.searchLeadSingleVacancy(userId, 'force_fresh');
+        searchMode = 'force_fresh';
       }
 
-      await this.jobSearchService.markJobsAsSent(userId, [firstJob]);
-      await this.updateSessionData(userId, {
-        leadCurrentVacancy: {
-          title: firstJob.title,
-          company: firstJob.company,
-          locationRaw: firstJob.locationRaw,
-          url: firstJob.url,
-          source: firstJob.source,
-        },
-      });
-      await this.updateSessionState(userId, ConversationState.LEAD_WAIT_INTEREST);
+      if (!firstJob) {
+        return await this.buildLeadNoVacancyFoundReply(userId);
+      }
 
-      return {
-        text: this.buildLeadVacancyMessage(firstJob),
-        buttons: [
-          { id: 'lead_interest_yes', title: 'Si, me intereso' },
-          { id: 'lead_interest_no', title: 'No me intereso' },
-        ],
+      const contextWithMode: Record<string, any> = {
+        ...context,
+        searchMode,
       };
+
+      if (searchMode === 'force_fresh' && context?.recalculateReason) {
+        const recalculated = await this.scoreLeadReuse(
+          userId,
+          context.recalculateReason as LeadRejectionReason,
+          [
+            {
+              title: firstJob.title,
+              company: firstJob.company || null,
+              locationRaw: firstJob.locationRaw || null,
+              salaryRaw: firstJob.salaryRaw || null,
+              source: firstJob.source || null,
+              score: typeof firstJob.score === 'number' ? firstJob.score : null,
+            },
+          ],
+        );
+
+        contextWithMode.freshScore = recalculated.score;
+        contextWithMode.freshScoreSource = recalculated.scoreSource;
+        contextWithMode.freshRationale = recalculated.rationale;
+
+        if (recalculated.score < this.leadReuseScoreThreshold) {
+          this.logger.log(
+            `📌 Nueva búsqueda también quedó bajo umbral para ${userId} (score=${recalculated.score.toFixed(2)}). Se muestra la mejor coincidencia disponible.`,
+          );
+        }
+      }
+
+      return await this.deliverLeadVacancy(userId, firstJob, contextWithMode);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Error mostrando primera vacante V2 para ${userId}: ${errorMessage}`);
@@ -941,7 +1200,7 @@ export class ConversationService {
     }
   }
 
-  private resolveLeadRejectionReason(text: string): 'role' | 'location' | 'company' | 'salary' | 'remote' | 'other' {
+  private resolveLeadRejectionReason(text: string): LeadRejectionReason {
     const normalized = text.toLowerCase();
 
     if (normalized.includes('cargo') || normalized.includes('rol') || normalized.includes('puesto')) return 'role';
@@ -1025,6 +1284,40 @@ export class ConversationService {
 
     if (reason === 'remote') {
       await this.updateUserProfile(userId, { location: 'Remoto' });
+      await this.updateSessionState(userId, ConversationState.LEAD_SHOW_FIRST_VACANCY);
+      const nextVacancyReply = await this.handleLeadShowFirstVacancyState(
+        userId,
+        'force_fresh',
+        { rejectionReason: reason },
+      );
+      return {
+        ...nextVacancyReply,
+        text: `Gracias, sigo ajustando la busqueda segun tu perfil.\n\n${nextVacancyReply.text}`,
+      };
+    }
+
+    if (reason === 'company' || reason === 'salary' || reason === 'other') {
+      const decision = await this.decideLeadVacancyStrategy(userId, reason);
+      await this.updateSessionState(userId, ConversationState.LEAD_SHOW_FIRST_VACANCY);
+
+      const nextVacancyReply = await this.handleLeadShowFirstVacancyState(
+        userId,
+        decision.searchMode,
+        {
+          rejectionReason: reason,
+          decisionScore: decision.score,
+          decisionSource: decision.scoreSource,
+          decisionRationale: decision.rationale,
+          decisionThreshold: this.leadReuseScoreThreshold,
+          decisionCandidates: decision.candidatesEvaluated,
+          recalculateReason: decision.searchMode === 'force_fresh' ? reason : undefined,
+        },
+      );
+
+      return {
+        ...nextVacancyReply,
+        text: `Gracias, sigo ajustando la busqueda segun tu perfil.\n\n${nextVacancyReply.text}`,
+      };
     }
 
     await this.updateSessionState(userId, ConversationState.LEAD_SHOW_FIRST_VACANCY);
@@ -1995,9 +2288,13 @@ Actualmente tienes el Plan Free: 5 bÃºsquedas por una semana.
     try {
       this.logger.log(`ðŸ” Usuario ${userId} solicitÃ³ bÃºsqueda de empleos`);
 
-      // Determinar maxResults segÃºn el plan (3 para FREE, 5 para PREMIUM/PRO)
+      // Determinar maxResults segun plan y variante de flujo.
+      // V2 freemium: 1 vacante por interaccion.
       const subscription = await this.prisma.subscription.findUnique({ where: { userId } });
-      const maxResults = (subscription?.plan === 'PREMIUM' || subscription?.plan === 'PRO') ? 5 : 3;
+      const onboardingFlags = await this.getOnboardingFlags(userId);
+      const isPaidPlan = subscription?.plan === 'PREMIUM' || subscription?.plan === 'PRO';
+      const isFreemiumV2 = subscription?.plan === 'FREEMIUM' && onboardingFlags.flowVariant === this.v2FlowVariant;
+      const maxResults = isPaidPlan ? 5 : (isFreemiumV2 ? 1 : 3);
 
       // Ejecutar bÃºsqueda
       const result = await this.jobSearchService.searchJobsForUser(userId, maxResults);
@@ -3645,7 +3942,7 @@ Entra a *Editar perfil*, ajusta tu ciudad o paÃ­s y vuelve a buscar.`;
   private async returnToMainMenu(_userId: string, message: string): Promise<BotReply> {
     // Siempre retornar lista interactiva
     return {
-      text: `${message}\n\nÂ¿QuÃ© te gustarÃ­a hacer?`,
+      text: `${message}\n\n\u00bfQu\u00e9 te gustar\u00eda hacer?`,
       listTitle: 'Ver opciones',
       listSections: [
         {
@@ -3653,22 +3950,22 @@ Entra a *Editar perfil*, ajusta tu ciudad o paÃ­s y vuelve a buscar.`;
           rows: [
             {
               id: 'cmd_buscar',
-              title: 'ðŸ” Buscar empleos',
+              title: 'Buscar empleos',
               description: 'Encontrar ofertas ahora',
             },
             {
               id: 'cmd_editar',
-              title: 'âœï¸ Editar perfil',
+              title: 'Editar perfil',
               description: 'Cambiar tus preferencias',
             },
             {
               id: 'cmd_reiniciar',
-              title: 'ðŸ”„ Reiniciar',
+              title: 'Reiniciar',
               description: 'Reconfigurar desde cero',
             },
             {
               id: 'cmd_cancelar',
-              title: 'âŒ Cancelar servicio',
+              title: 'Cancelar servicio',
               description: 'Dejar de usar el servicio',
             },
           ],

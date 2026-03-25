@@ -42,6 +42,11 @@ export interface SearchFailureDiagnosisResult {
   userMessage: string;
 }
 
+export interface VacancyReuseScoreResult {
+  reuseScore: number;
+  rationale: string;
+}
+
 export interface InitialProfileExtractionResult {
   role: string | null;
   location: string | null;
@@ -348,6 +353,56 @@ export class LlmService {
     }
 
     return result;
+  }
+
+  /**
+   * Calcula score de reutilizacion de vacantes tras rechazo del usuario.
+   * Retorna null si el LLM no esta disponible.
+   */
+  async scoreVacancyReuse(input: {
+    rejectionReason: 'role' | 'location' | 'company' | 'salary' | 'remote' | 'other';
+    userProfile: {
+      role?: string | null;
+      location?: string | null;
+      experienceLevel?: string | null;
+    };
+    rejectedVacancy?: {
+      title?: string | null;
+      company?: string | null;
+      locationRaw?: string | null;
+      salaryRaw?: string | null;
+      source?: string | null;
+    } | null;
+    candidateVacancies: Array<{
+      title?: string | null;
+      company?: string | null;
+      locationRaw?: string | null;
+      salaryRaw?: string | null;
+      source?: string | null;
+      score?: number | null;
+    }>;
+  }): Promise<VacancyReuseScoreResult | null> {
+    const raw = await this.callOpenAI(
+      SYSTEM_PROMPTS.VACANCY_REUSE_SCORING,
+      JSON.stringify(input),
+    );
+    if (!raw) return null;
+
+    const result = this.parseJSON<VacancyReuseScoreResult>(raw, {
+      reuseScore: 0.5,
+      rationale: 'No hubo suficiente contexto para estimar con alta confianza.',
+    });
+
+    const boundedScore = Number.isFinite(result.reuseScore)
+      ? Math.min(1, Math.max(0, result.reuseScore))
+      : 0.5;
+
+    this.logger.log(`🎯 Score IA de reutilizacion: ${boundedScore.toFixed(2)}`);
+
+    return {
+      reuseScore: boundedScore,
+      rationale: result.rationale || '',
+    };
   }
 
   // ===== Método conversacional =====
