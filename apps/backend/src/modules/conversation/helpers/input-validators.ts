@@ -64,6 +64,7 @@ export function isAcceptance(text: string): boolean {
   const exactPatterns = [
     'si', 'sÃ­', 'ok', 'okay', 'dale', 'claro', 's', 'y', 'yes',
     'alerts_yes', 'accept_alerts',
+    'lead_interest_yes', 'lead_terms_accept',
   ];
 
   // Patrones que permiten startsWith (frases largas e inequÃ­vocas)
@@ -84,6 +85,7 @@ export function isRejection(text: string): boolean {
   const exactPatterns = [
     'no', 'nop', 'nope', 'n',
     'alerts_no', 'reject_alerts',
+    'lead_interest_no', 'lead_terms_reject',
   ];
 
   // Patrones que permiten startsWith (frases largas e inequÃ­vocas)

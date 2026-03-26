@@ -11,7 +11,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ConversationState } from '../conversation/types/conversation-states';
 import {
   getBusinessDaysRemaining,
-  shouldExpireFreemium,
+  shouldExpireFreemiumByPolicy,
 } from '../conversation/helpers/date-utils';
 
 /**
@@ -21,6 +21,8 @@ import {
 @Injectable()
 export class RegistrationService {
   private readonly logger = new Logger(RegistrationService.name);
+  private readonly privacyPolicyVersion =
+    process.env.PRIVACY_POLICY_VERSION || '2026-03-25';
 
   constructor(
     private readonly prisma: PrismaService,
@@ -71,11 +73,14 @@ export class RegistrationService {
     }
 
     // Crear usuario con suscripción freemium
-    const user = await this.prisma.user.create({
+    const user = await (this.prisma.user as any).create({
       data: {
         phone: dto.phone,
         name: dto.name.trim(),
         email: dto.email.toLowerCase().trim(),
+        dataAuthorizationAccepted: true,
+        dataAuthorizationAcceptedAt: new Date(),
+        privacyPolicyVersion: this.privacyPolicyVersion,
         subscription: {
           create: {
             plan: 'FREEMIUM',
@@ -129,11 +134,14 @@ export class RegistrationService {
     }
 
     // Actualizar usuario
-    const user = await this.prisma.user.update({
+    const user = await (this.prisma.user as any).update({
       where: { id: userId },
       data: {
         name: dto.name.trim(),
         email: dto.email.toLowerCase().trim(),
+        dataAuthorizationAccepted: true,
+        dataAuthorizationAcceptedAt: new Date(),
+        privacyPolicyVersion: this.privacyPolicyVersion,
       },
       include: { subscription: true },
     });
@@ -229,7 +237,12 @@ export class RegistrationService {
 
       // Si pasaron los 5 días hábiles, marcar como expirado
       if (
-        shouldExpireFreemium(subscription.freemiumStartDate, subscription.freemiumUsesLeft)
+        shouldExpireFreemiumByPolicy({
+          startDate: subscription.freemiumStartDate,
+          usesLeft: subscription.freemiumUsesLeft,
+          freemiumPolicy: (subscription as any).freemiumPolicy,
+          freemiumExpiresAt: (subscription as any).freemiumExpiresAt,
+        })
         && !subscription.freemiumExpired
       ) {
         await this.prisma.subscription.update({

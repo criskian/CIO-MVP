@@ -39,7 +39,8 @@ import {
   getFirstName,
 } from './helpers/input-validators';
 import {
-  shouldExpireFreemium,
+  FREEMIUM_POLICY_V2,
+  shouldExpireFreemiumByPolicy,
 } from './helpers/date-utils';
 
 type FlowVariant = 'legacy' | 'freemium_v2';
@@ -56,6 +57,8 @@ type LeadRejectionReasonSource = 'button' | 'free_text' | 'llm';
 export class ConversationService {
   private readonly logger = new Logger(ConversationService.name);
   private readonly defaultOnboardingAlertTime = '07:00';
+  private readonly leadPolicyVersion =
+    process.env.PRIVACY_POLICY_VERSION || '2026-03-25';
   private readonly defaultFlowVariant: FlowVariant = 'legacy';
   private readonly v2FlowVariant: FlowVariant = 'freemium_v2';
   private readonly leadReuseScoreThreshold = 0.65;
@@ -939,6 +942,15 @@ export class ConversationService {
     return (session?.data as Record<string, any>) || {};
   }
 
+  private getPreRegistrationSearchesUsed(sessionData: Record<string, any> | null | undefined): number {
+    const value = sessionData?.preRegistrationSearchesUsed;
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+      return 0;
+    }
+    if (value < 0) return 0;
+    return Math.floor(value);
+  }
+
   private buildLeadVacancySnapshot(job: Partial<JobPosting> | null | undefined) {
     if (!job) return null;
     return {
@@ -1164,12 +1176,20 @@ export class ConversationService {
   ): Promise<BotReply> {
     await this.jobSearchService.markJobsAsSent(userId, [job]);
 
+    const sessionData = await this.getLatestSessionData(userId);
+    const alreadyActivatedTrial = sessionData?.leadTrialActivated === true;
+    const previousPreRegistrationSearchesUsed = this.getPreRegistrationSearchesUsed(sessionData);
+    const nextPreRegistrationSearchesUsed = alreadyActivatedTrial
+      ? previousPreRegistrationSearchesUsed
+      : previousPreRegistrationSearchesUsed + 1;
+
     await this.updateSessionData(userId, {
       leadCurrentVacancy: this.buildLeadVacancySnapshot(job),
       leadVacancyDecision: {
         ...context,
         deliveredAt: new Date().toISOString(),
       },
+      preRegistrationSearchesUsed: nextPreRegistrationSearchesUsed,
     });
     await this.updateSessionState(userId, ConversationState.LEAD_WAIT_INTEREST);
 
@@ -1472,14 +1492,27 @@ export class ConversationService {
         reasonSource: 'button',
       });
 
-      const user = await this.prisma.user.findUnique({
+      const user = await (this.prisma.user as any).findUnique({
         where: { id: userId },
-        select: { name: true, email: true },
+        select: {
+          name: true,
+          email: true,
+          dataAuthorizationAccepted: true,
+        },
       });
 
-      if (user?.name && user?.email) {
-        const onboardingFlags = await this.getOnboardingFlags(userId);
-        await this.activateFreemiumTrialFromLead(userId, onboardingFlags.defaultOnboardingAlertTime);
+      if (!user?.name) {
+        await this.updateSessionState(userId, ConversationState.LEAD_REGISTER_NAME);
+        return { text: BotMessages.V2_REGISTER_NAME };
+      }
+
+      if (!user.email) {
+        await this.updateSessionState(userId, ConversationState.LEAD_REGISTER_EMAIL);
+        return { text: BotMessages.V2_REGISTER_EMAIL(getFirstName(user.name)) };
+      }
+
+      if (user.dataAuthorizationAccepted) {
+        await this.activateFreemiumTrialFromLead(userId, this.defaultOnboardingAlertTime);
         await this.updateSessionState(userId, ConversationState.READY);
 
         return await this.returnToMainMenu(
@@ -1488,8 +1521,8 @@ export class ConversationService {
         );
       }
 
-      await this.updateSessionState(userId, ConversationState.LEAD_REGISTER_NAME);
-      return { text: BotMessages.V2_REGISTER_NAME };
+      await this.updateSessionState(userId, ConversationState.LEAD_TERMS_CONSENT);
+      return this.buildLeadTermsConsentReply();
     }
 
     if (isRejection(text)) {
@@ -1570,6 +1603,16 @@ export class ConversationService {
     });
   }
 
+  private buildLeadTermsConsentReply(): BotReply {
+    return {
+      text: BotMessages.V2_TERMS_CONSENT,
+      buttons: [
+        { id: 'lead_terms_accept', title: 'Acepto' },
+        { id: 'lead_terms_reject', title: 'No acepto' },
+      ],
+    };
+  }
+
   private async handleLeadRegisterNameState(userId: string, text: string): Promise<BotReply> {
     const name = text.trim();
 
@@ -1618,46 +1661,64 @@ export class ConversationService {
     });
 
     await this.updateSessionState(userId, ConversationState.LEAD_TERMS_CONSENT);
-
-    return {
-      text: BotMessages.V2_TERMS_CONSENT,
-      buttons: [
-        { id: 'lead_terms_accept', title: 'Acepto' },
-        { id: 'lead_terms_reject', title: 'No acepto' },
-      ],
-    };
+    return this.buildLeadTermsConsentReply();
   }
 
   private async activateFreemiumTrialFromLead(
     userId: string,
     defaultAlertTime: string,
   ): Promise<void> {
+    const now = new Date();
+    const freemiumExpiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const sessionData = await this.getLatestSessionData(userId);
+    const preRegistrationSearchesUsed = this.getPreRegistrationSearchesUsed(sessionData);
+    const initialFreemiumUsesLeft = Math.max(0, 5 - preRegistrationSearchesUsed);
+
     const subscription = await this.prisma.subscription.findUnique({
       where: { userId },
-      select: { id: true },
+      select: { id: true, plan: true, status: true },
     });
 
+    const hasPaidPlan =
+      subscription
+      && (subscription.plan === 'PREMIUM' || subscription.plan === 'PRO')
+      && subscription.status === 'ACTIVE';
+
     if (!subscription) {
-      await this.prisma.subscription.create({
+      await (this.prisma.subscription as any).create({
         data: {
           userId,
           plan: 'FREEMIUM',
-          freemiumUsesLeft: 5,
-          freemiumStartDate: new Date(),
+          freemiumUsesLeft: initialFreemiumUsesLeft,
+          freemiumStartDate: now,
+          freemiumPolicy: FREEMIUM_POLICY_V2,
+          freemiumExpiresAt,
+          freemiumExpired: false,
+          status: 'ACTIVE',
+        },
+      });
+    } else if (!hasPaidPlan) {
+      await (this.prisma.subscription as any).update({
+        where: { userId },
+        data: {
+          plan: 'FREEMIUM',
+          freemiumUsesLeft: initialFreemiumUsesLeft,
+          freemiumStartDate: now,
+          freemiumPolicy: FREEMIUM_POLICY_V2,
+          freemiumExpiresAt,
           freemiumExpired: false,
           status: 'ACTIVE',
         },
       });
     }
 
-    const alertPreference = await this.prisma.alertPreference.findUnique({
-      where: { userId },
-      select: { id: true },
+    await this.upsertAlertPreference(userId, defaultAlertTime, 'daily');
+    await this.updateSessionData(userId, {
+      preRegistrationSearchesUsed,
+      leadTrialActivated: true,
+      leadTrialActivatedAt: now.toISOString(),
+      leadTrialInitialUsesLeft: initialFreemiumUsesLeft,
     });
-
-    if (!alertPreference) {
-      await this.upsertAlertPreference(userId, defaultAlertTime, 'daily');
-    }
   }
 
   private async handleLeadTermsConsentState(
@@ -1666,8 +1727,16 @@ export class ConversationService {
     _intent: UserIntent,
   ): Promise<BotReply> {
     if (isAcceptance(text)) {
-      const onboardingFlags = await this.getOnboardingFlags(userId);
-      await this.activateFreemiumTrialFromLead(userId, onboardingFlags.defaultOnboardingAlertTime);
+      await (this.prisma.user as any).update({
+        where: { id: userId },
+        data: {
+          dataAuthorizationAccepted: true,
+          dataAuthorizationAcceptedAt: new Date(),
+          privacyPolicyVersion: this.leadPolicyVersion,
+        },
+      });
+
+      await this.activateFreemiumTrialFromLead(userId, this.defaultOnboardingAlertTime);
 
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -1684,6 +1753,7 @@ export class ConversationService {
     }
 
     if (isRejection(text)) {
+      await this.updateSessionData(userId, { leadTrialActivated: false });
       await this.updateSessionState(userId, ConversationState.LEAD_SHOW_FIRST_VACANCY);
       const nextVacancyReply = await this.handleLeadShowFirstVacancyState(userId);
       return {
@@ -1692,13 +1762,7 @@ export class ConversationService {
       };
     }
 
-    return {
-      text: BotMessages.V2_TERMS_CONSENT,
-      buttons: [
-        { id: 'lead_terms_accept', title: 'Acepto' },
-        { id: 'lead_terms_reject', title: 'No acepto' },
-      ],
-    };
+    return this.buildLeadTermsConsentReply();
   }
 
   // ========================================
@@ -3384,10 +3448,12 @@ Ejemplo: "Toronto", "Miami", "New York", "CanadÃ¡", "Estados Unidos".`;
     }
 
     // Freemium: usar la misma regla canÃ³nica en todo el sistema.
-    return !shouldExpireFreemium(
-      subscription.freemiumStartDate,
-      subscription.freemiumUsesLeft,
-    );
+    return !shouldExpireFreemiumByPolicy({
+      startDate: subscription.freemiumStartDate,
+      usesLeft: subscription.freemiumUsesLeft,
+      freemiumPolicy: (subscription as any).freemiumPolicy,
+      freemiumExpiresAt: (subscription as any).freemiumExpiresAt,
+    });
   }
 
   /**
@@ -3761,7 +3827,12 @@ Ejemplo: "Toronto", "Miami", "New York", "CanadÃ¡", "Estados Unidos".`;
     }
 
     // PLAN FREEMIUM
-    if (shouldExpireFreemium(subscription.freemiumStartDate, subscription.freemiumUsesLeft)) {
+    if (shouldExpireFreemiumByPolicy({
+      startDate: subscription.freemiumStartDate,
+      usesLeft: subscription.freemiumUsesLeft,
+      freemiumPolicy: (subscription as any).freemiumPolicy,
+      freemiumExpiresAt: (subscription as any).freemiumExpiresAt,
+    })) {
       await this.prisma.subscription.update({
         where: { userId },
         data: {
@@ -3929,7 +4000,12 @@ Ejemplo: "Toronto", "Miami", "New York", "CanadÃ¡", "Estados Unidos".`;
     }
 
     // PLAN FREEMIUM
-    if (shouldExpireFreemium(subscription.freemiumStartDate, subscription.freemiumUsesLeft)) {
+    if (shouldExpireFreemiumByPolicy({
+      startDate: subscription.freemiumStartDate,
+      usesLeft: subscription.freemiumUsesLeft,
+      freemiumPolicy: (subscription as any).freemiumPolicy,
+      freemiumExpiresAt: (subscription as any).freemiumExpiresAt,
+    })) {
       // Marcar freemium como expirado
       await this.prisma.subscription.update({
         where: { userId },

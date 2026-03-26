@@ -32,7 +32,7 @@ import { JobSearchService } from '../job-search/job-search.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { AdminService } from '../admin/admin.service';
 import { getFirstName } from '../conversation/helpers/input-validators';
-import { shouldExpireFreemium } from '../conversation/helpers/date-utils';
+import { shouldExpireFreemiumByPolicy } from '../conversation/helpers/date-utils';
 import * as cron from 'node-cron';
 import * as dayjs from 'dayjs';
 import * as utc from 'dayjs/plugin/utc';
@@ -195,10 +195,12 @@ export class SchedulerService implements OnModuleInit {
 
       let expiredCount = 0;
       for (const subscription of candidates) {
-        const shouldExpire = shouldExpireFreemium(
-          subscription.freemiumStartDate,
-          subscription.freemiumUsesLeft,
-        );
+        const shouldExpire = shouldExpireFreemiumByPolicy({
+          startDate: subscription.freemiumStartDate,
+          usesLeft: subscription.freemiumUsesLeft,
+          freemiumPolicy: (subscription as any).freemiumPolicy,
+          freemiumExpiresAt: (subscription as any).freemiumExpiresAt,
+        });
 
         if (!shouldExpire) continue;
 
@@ -736,7 +738,12 @@ export class SchedulerService implements OnModuleInit {
       };
     }
 
-    if (shouldExpireFreemium(subscription.freemiumStartDate, subscription.freemiumUsesLeft)) {
+    if (shouldExpireFreemiumByPolicy({
+      startDate: subscription.freemiumStartDate,
+      usesLeft: subscription.freemiumUsesLeft,
+      freemiumPolicy: (subscription as any).freemiumPolicy,
+      freemiumExpiresAt: (subscription as any).freemiumExpiresAt,
+    })) {
       // Marcar freemium como expirado
       await this.prisma.subscription.update({
         where: { userId },

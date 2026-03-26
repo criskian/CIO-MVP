@@ -8,7 +8,7 @@
 import { PrismaService } from '../database/prisma.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { shouldExpireFreemium } from '../conversation/helpers/date-utils';
+import { shouldExpireFreemiumByPolicy } from '../conversation/helpers/date-utils';
 import {
     UpdateUserDto,
     UpdateSubscriptionDto,
@@ -1374,7 +1374,7 @@ export class AdminService {
      * Marca EXPIRED cuando pasaron 5 dÃ­as hÃ¡biles o no hay usos.
      */
     private async syncFreemiumExpirationStatus(): Promise<void> {
-        const candidates = await this.prisma.subscription.findMany({
+        const candidates = await (this.prisma.subscription as any).findMany({
             where: {
                 plan: 'FREEMIUM',
                 OR: [
@@ -1386,6 +1386,8 @@ export class AdminService {
                 userId: true,
                 freemiumStartDate: true,
                 freemiumUsesLeft: true,
+                freemiumPolicy: true,
+                freemiumExpiresAt: true,
                 freemiumExpired: true,
                 status: true,
             },
@@ -1395,10 +1397,12 @@ export class AdminService {
 
         const usersToExpire: string[] = [];
         for (const subscription of candidates) {
-            const shouldExpire = shouldExpireFreemium(
-                subscription.freemiumStartDate,
-                subscription.freemiumUsesLeft,
-            );
+            const shouldExpire = shouldExpireFreemiumByPolicy({
+                startDate: subscription.freemiumStartDate,
+                usesLeft: subscription.freemiumUsesLeft,
+                freemiumPolicy: subscription.freemiumPolicy,
+                freemiumExpiresAt: subscription.freemiumExpiresAt,
+            });
             if (shouldExpire) {
                 usersToExpire.push(subscription.userId);
             }
