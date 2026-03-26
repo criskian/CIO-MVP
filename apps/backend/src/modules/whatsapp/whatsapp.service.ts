@@ -4,6 +4,7 @@ import { IWhatsappProvider, BotReply } from './interfaces/whatsapp-provider.inte
 import { CloudApiProvider } from './providers/cloud-api.provider';
 import { BotMessages } from '../conversation/helpers/bot-messages';
 import { PrismaService } from '../database/prisma.service';
+import { repairMojibakeText as repairMojibakeUtil } from '../../common/text/mojibake.util';
 
 /**
  * Servicio principal de WhatsApp
@@ -195,7 +196,7 @@ export class WhatsappService {
   }
 
   private sanitizeBotReply(reply: BotReply): BotReply {
-    const sanitizeText = (value?: string) => (value ? this.repairMojibakeText(value) : value);
+    const sanitizeText = (value?: string) => (value ? repairMojibakeUtil(value) : value);
     const sanitizeButtonTitle = (id: string, title: string) =>
       this.canonicalButtonTitles[id] ?? sanitizeText(title) ?? title;
     const sanitizeRowTitle = (id: string, title: string) =>
@@ -522,7 +523,7 @@ export class WhatsappService {
     options?: { userId?: string; source?: 'conversation' | 'scheduler' | 'admin' }
   ): Promise<void> {
     try {
-      const sanitizedBodyParams = bodyParams.map((param) => this.repairMojibakeText(param));
+      const sanitizedBodyParams = bodyParams.map((param) => repairMojibakeUtil(param));
       await this.cloudApiProvider.sendTemplateMessage(to, templateName, languageCode, sanitizedBodyParams);
       this.logger.log(`âœ… Template "${templateName}" enviado a ${to}`);
 

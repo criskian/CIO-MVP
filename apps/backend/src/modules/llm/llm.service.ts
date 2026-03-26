@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+﻿import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { SYSTEM_PROMPTS } from './knowledge-base';
@@ -76,14 +76,14 @@ export class LlmService {
     if (apiKey) {
       this.openai = new OpenAI({ apiKey });
       this.isEnabled = true;
-      this.logger.log('✅ LlmService inicializado con OpenAI GPT-4o-mini');
+      this.logger.log('âœ… LlmService inicializado con OpenAI GPT-4o-mini');
     } else {
       this.isEnabled = false;
-      this.logger.warn('⚠️ OPENAI_API_KEY no configurada — LlmService desactivado, usando solo regex');
+      this.logger.warn('âš ï¸ OPENAI_API_KEY no configurada â€” LlmService desactivado, usando solo regex');
     }
   }
 
-  // ===== Método core de llamada a OpenAI =====
+  // ===== MÃ©todo core de llamada a OpenAI =====
 
   private async callOpenAI(systemPrompt: string, userMessage: string): Promise<string | null> {
     if (!this.openai || !this.isEnabled) {
@@ -104,15 +104,15 @@ export class LlmService {
 
       const content = response.choices[0]?.message?.content;
       if (!content) {
-        this.logger.warn('OpenAI devolvió respuesta vacía');
+        this.logger.warn('OpenAI devolviÃ³ respuesta vacÃ­a');
         return null;
       }
 
-      this.logger.debug(`🤖 Tokens usados: input=${response.usage?.prompt_tokens}, output=${response.usage?.completion_tokens}`);
+      this.logger.debug(`ðŸ¤– Tokens usados: input=${response.usage?.prompt_tokens}, output=${response.usage?.completion_tokens}`);
       return content;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`❌ Error llamando a OpenAI: ${errorMessage}`);
+      this.logger.error(`âŒ Error llamando a OpenAI: ${errorMessage}`);
       return null;
     }
   }
@@ -120,7 +120,7 @@ export class LlmService {
   /**
    * Llama a OpenAI en modo TEXTO (no JSON).
    * Usado para respuestas conversacionales naturales.
-   * Temperature más alta para variedad en las respuestas.
+   * Temperature mÃ¡s alta para variedad en las respuestas.
    */
   private async callOpenAIText(systemPrompt: string, userMessage: string): Promise<string | null> {
     if (!this.openai || !this.isEnabled) {
@@ -134,22 +134,22 @@ export class LlmService {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
         ],
-        temperature: 0.7, // Más alta para variedad conversacional
+        temperature: 0.7, // MÃ¡s alta para variedad conversacional
         max_tokens: 500,
-        // SIN response_format: json_object — queremos texto natural
+        // SIN response_format: json_object â€” queremos texto natural
       });
 
       const content = response.choices[0]?.message?.content?.trim();
       if (!content) {
-        this.logger.warn('OpenAI devolvió respuesta de texto vacía');
+        this.logger.warn('OpenAI devolviÃ³ respuesta de texto vacÃ­a');
         return null;
       }
 
-      this.logger.debug(`💬 Respuesta conversacional generada (${content.length} chars)`);
+      this.logger.debug(`ðŸ’¬ Respuesta conversacional generada (${content.length} chars)`);
       return content;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`❌ Error en llamada de texto a OpenAI: ${errorMessage}`);
+      this.logger.error(`âŒ Error en llamada de texto a OpenAI: ${errorMessage}`);
       return null;
     }
   }
@@ -164,12 +164,12 @@ export class LlmService {
     }
   }
 
-  // ===== Métodos públicos =====
+  // ===== MÃ©todos pÃºblicos =====
 
   /**
-   * Valida y corrige el cargo/rol que escribió el usuario.
-   * Detecta: múltiples roles, roles genéricos, frases largas, typos.
-   * Retorna null si el LLM no está disponible (fallback a regex).
+   * Valida y corrige el cargo/rol que escribiÃ³ el usuario.
+   * Detecta: mÃºltiples roles, roles genÃ©ricos, frases largas, typos.
+   * Retorna null si el LLM no estÃ¡ disponible (fallback a regex).
    */
   async validateAndCorrectRole(text: string): Promise<RoleValidationResult | null> {
     const raw = await this.callOpenAI(SYSTEM_PROMPTS.ROLE_VALIDATION, text);
@@ -183,18 +183,18 @@ export class LlmService {
     });
 
     if (result.isValid && result.role) {
-      this.logger.log(`✅ Rol validado por IA: "${text}" → "${result.role}"`);
+      this.logger.log(`âœ… Rol validado por IA: "${text}" â†’ "${result.role}"`);
     } else {
-      this.logger.log(`⚠️ Rol rechazado por IA: "${text}" — ${result.warning || result.suggestion}`);
+      this.logger.log(`âš ï¸ Rol rechazado por IA: "${text}" â€” ${result.warning || result.suggestion}`);
     }
 
     return result;
   }
 
   /**
-   * Valida y corrige la ubicación geográfica.
+   * Valida y corrige la ubicaciÃ³n geogrÃ¡fica.
    * Corrige typos, rechaza ubicaciones vagas, extrae de texto largo.
-   * Retorna null si el LLM no está disponible (fallback a regex).
+   * Retorna null si el LLM no estÃ¡ disponible (fallback a regex).
    */
   async validateAndCorrectLocation(text: string): Promise<LocationValidationResult | null> {
     const raw = await this.callOpenAI(SYSTEM_PROMPTS.LOCATION_VALIDATION, text);
@@ -208,18 +208,18 @@ export class LlmService {
     });
 
     if (result.isValid && result.location) {
-      this.logger.log(`✅ Ubicación validada por IA: "${text}" → "${result.location}"${result.wasCorrected ? ' (corregida)' : ''}`);
+      this.logger.log(`âœ… UbicaciÃ³n validada por IA: "${text}" â†’ "${result.location}"${result.wasCorrected ? ' (corregida)' : ''}`);
     } else {
-      this.logger.log(`⚠️ Ubicación rechazada por IA: "${text}"`);
+      this.logger.log(`âš ï¸ UbicaciÃ³n rechazada por IA: "${text}"`);
     }
 
     return result;
   }
 
   /**
-   * Detecta la intención del usuario cuando el regex no pudo.
+   * Detecta la intenciÃ³n del usuario cuando el regex no pudo.
    * Solo se llama cuando detectIntent() de input-validators retorna UNKNOWN.
-   * Retorna null si el LLM no está disponible (fallback a UNKNOWN).
+   * Retorna null si el LLM no estÃ¡ disponible (fallback a UNKNOWN).
    */
   async detectIntent(text: string, currentState: string): Promise<UserIntent | null> {
     const prompt = SYSTEM_PROMPTS.INTENT_DETECTION;
@@ -235,7 +235,7 @@ export class LlmService {
 
     // Solo aceptar si la confianza es >= 0.7
     if (result.confidence >= 0.7 && result.intent !== UserIntent.UNKNOWN) {
-      this.logger.log(`🧠 Intent detectado por IA: "${text}" → ${result.intent} (confianza: ${result.confidence})`);
+      this.logger.log(`ðŸ§  Intent detectado por IA: "${text}" â†’ ${result.intent} (confianza: ${result.confidence})`);
 
       // Mapear string a enum
       const intentMap: Record<string, UserIntent> = {
@@ -251,14 +251,14 @@ export class LlmService {
       return intentMap[result.intent] || UserIntent.UNKNOWN;
     }
 
-    this.logger.debug(`🤷 IA no pudo detectar intent con confianza suficiente: "${text}" → ${result.intent} (${result.confidence})`);
+    this.logger.debug(`ðŸ¤· IA no pudo detectar intent con confianza suficiente: "${text}" â†’ ${result.intent} (${result.confidence})`);
     return null;
   }
 
   /**
    * Maneja mensajes fuera de flujo durante el onboarding.
-   * Detecta si el mensaje contiene una respuesta válida, es una pregunta, o es irrelevante.
-   * Retorna null si el LLM no está disponible.
+   * Detecta si el mensaje contiene una respuesta vÃ¡lida, es una pregunta, o es irrelevante.
+   * Retorna null si el LLM no estÃ¡ disponible.
    */
   async handleOutOfFlowMessage(text: string, currentState: string): Promise<OutOfFlowResult | null> {
     const prompt = SYSTEM_PROMPTS.OUT_OF_FLOW;
@@ -274,9 +274,9 @@ export class LlmService {
     });
 
     if (result.isValidAnswer) {
-      this.logger.log(`🎯 IA extrajo respuesta válida de out-of-flow: "${text}" → "${result.extractedAnswer}"`);
+      this.logger.log(`ðŸŽ¯ IA extrajo respuesta vÃ¡lida de out-of-flow: "${text}" â†’ "${result.extractedAnswer}"`);
     } else {
-      this.logger.log(`💬 IA manejó out-of-flow: "${text}" en estado ${currentState}`);
+      this.logger.log(`ðŸ’¬ IA manejÃ³ out-of-flow: "${text}" en estado ${currentState}`);
     }
 
     return result;
@@ -284,7 +284,7 @@ export class LlmService {
 
   /**
    * Sugiere roles alternativos cuando hay pocas vacantes.
-   * Retorna array vacío si el LLM no está disponible.
+   * Retorna array vacÃ­o si el LLM no estÃ¡ disponible.
    */
   async suggestRelatedRoles(role: string): Promise<string[]> {
     const raw = await this.callOpenAI(SYSTEM_PROMPTS.SUGGEST_RELATED_ROLES, role);
@@ -296,7 +296,7 @@ export class LlmService {
     });
 
     if (result.suggestions.length > 0) {
-      this.logger.log(`💡 Roles sugeridos para "${role}": ${result.suggestions.join(', ')} (categoría: ${result.category})`);
+      this.logger.log(`ðŸ’¡ Roles sugeridos para "${role}": ${result.suggestions.join(', ')} (categorÃ­a: ${result.category})`);
     }
 
     return result.suggestions;
@@ -324,15 +324,15 @@ export class LlmService {
     });
 
     this.logger.log(
-      `🧩 Extraccion inicial perfil: role=${result.role || '-'}, location=${result.location || '-'}, modality=${result.modality || '-'}, exp=${result.experienceLevel || '-'} (conf=${result.confidence ?? 0})`,
+      `ðŸ§© Extraccion inicial perfil: role=${result.role || '-'}, location=${result.location || '-'}, modality=${result.modality || '-'}, exp=${result.experienceLevel || '-'} (conf=${result.confidence ?? 0})`,
     );
 
     return result;
   }
 
   /**
-   * Diagnostica la posible causa de un fallo de búsqueda y sugiere acción al usuario.
-   * Retorna null si el LLM no está disponible.
+   * Diagnostica la posible causa de un fallo de bÃºsqueda y sugiere acciÃ³n al usuario.
+   * Retorna null si el LLM no estÃ¡ disponible.
    */
   async diagnoseSearchFailure(input: {
     errorMessage: string;
@@ -355,7 +355,7 @@ export class LlmService {
     });
 
     if (result.userMessage) {
-      this.logger.log(`🩺 Diagnóstico IA de fallo de búsqueda: ${result.reason}`);
+      this.logger.log(`ðŸ©º DiagnÃ³stico IA de fallo de bÃºsqueda: ${result.reason}`);
     }
 
     return result;
@@ -403,7 +403,7 @@ export class LlmService {
       ? Math.min(1, Math.max(0, result.reuseScore))
       : 0.5;
 
-    this.logger.log(`🎯 Score IA de reutilizacion: ${boundedScore.toFixed(2)}`);
+    this.logger.log(`ðŸŽ¯ Score IA de reutilizacion: ${boundedScore.toFixed(2)}`);
 
     return {
       reuseScore: boundedScore,
@@ -437,7 +437,7 @@ export class LlmService {
       : 0.5;
 
     this.logger.log(
-      `🧠 Clasificacion IA de rechazo: reason=${reason}, confidence=${confidence.toFixed(2)}`,
+      `ðŸ§  Clasificacion IA de rechazo: reason=${reason}, confidence=${confidence.toFixed(2)}`,
     );
 
     return {
@@ -447,32 +447,32 @@ export class LlmService {
     };
   }
 
-  // ===== Método conversacional =====
+  // ===== MÃ©todo conversacional =====
 
   /**
-   * Genera una respuesta conversacional natural y única para el usuario.
-   * NO retorna JSON — retorna texto directo listo para WhatsApp.
+   * Genera una respuesta conversacional natural y Ãºnica para el usuario.
+   * NO retorna JSON â€” retorna texto directo listo para WhatsApp.
    * Usado cuando el input del usuario no es lo esperado en el paso actual.
    * 
-   * @param text - Lo que escribió el usuario
+   * @param text - Lo que escribiÃ³ el usuario
    * @param currentState - El estado actual del onboarding (ASK_ROLE, ASK_LOCATION, etc.)
-   * @returns Texto natural para responder al usuario, o null si LLM no está disponible
+   * @returns Texto natural para responder al usuario, o null si LLM no estÃ¡ disponible
    */
   async generateConversationalResponse(text: string, currentState: string): Promise<string | null> {
     const userMessage = `ESTADO_ACTUAL: ${currentState}\nMENSAJE_DEL_USUARIO: ${text}`;
     const response = await this.callOpenAIText(SYSTEM_PROMPTS.CONVERSATIONAL_REDIRECT, userMessage);
 
     if (response) {
-      this.logger.log(`🗣️ Respuesta conversacional para "${text}" en ${currentState}`);
+      this.logger.log(`ðŸ—£ï¸ Respuesta conversacional para "${text}" en ${currentState}`);
     }
 
     return response;
   }
 
-  // ===== Métodos legacy (mantenidos por compatibilidad) =====
+  // ===== MÃ©todos legacy (mantenidos por compatibilidad) =====
 
   /**
-   * Parsea un texto libre de salario a un número
+   * Parsea un texto libre de salario a un nÃºmero
    * @deprecated Usar normalizeSalary de input-validators en su lugar
    */
   async parseSalaryFreeText(text: string): Promise<number | null> {
@@ -482,7 +482,7 @@ export class LlmService {
 
   /**
    * Resume una oferta para el usuario
-   * @deprecated Pendiente de implementación en fase futura
+   * @deprecated Pendiente de implementaciÃ³n en fase futura
    */
   async summarizeJobForUser(jobPosting: any, userProfile: any): Promise<string> {
     this.logger.log('Resumiendo oferta para usuario');
@@ -490,11 +490,11 @@ export class LlmService {
   }
 
   /**
-   * Infiere la intención del usuario
+   * Infiere la intenciÃ³n del usuario
    * @deprecated Usar detectIntent(text, state) en su lugar
    */
   async inferIntentFromMessage(text: string): Promise<string> {
-    this.logger.log(`Infiriendo intención: ${text}`);
+    this.logger.log(`Infiriendo intenciÃ³n: ${text}`);
     return 'unknown';
   }
 }

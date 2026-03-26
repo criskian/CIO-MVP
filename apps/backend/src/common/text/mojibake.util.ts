@@ -170,6 +170,14 @@ function applyKnownMojibakeReplacements(value: string): string {
 export function repairMojibakeText(text: string): string {
   if (!text) return text;
 
+  // Early exit: if no classic mojibake indicators are present, the text is already clean.
+  // Without this guard, the iterative latin1 decode loop converts clean chars (✅, •, á) to
+  // their double-decoded forms which score 0, incorrectly "winning" over the original.
+  const hasClassicMojibake = countSuspiciousChars(text) > 0 || text.includes('\uFFFD');
+  if (!hasClassicMojibake) {
+    return applyKnownMojibakeReplacements(text).replace(CONTROL_CHARS_PATTERN, '');
+  }
+
   let best = text;
   let bestScore = scoreCandidate(text);
   const seen = new Set<string>([text]);

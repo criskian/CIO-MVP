@@ -1,29 +1,29 @@
-﻿/**
+/**
  * SCHEDULER SERVICE - Sistema de Alertas de Empleo
  * 
- * EnvÃ­a alertas automÃ¡ticas de ofertas de empleo a usuarios segÃºn sus preferencias.
+ * Env?a alertas autom?ticas de ofertas de empleo a usuarios seg?n sus preferencias.
  * 
- * CARACTERÃSTICAS:
- * âœ… Procesamiento por lotes (10 usuarios en paralelo por defecto)
- * âœ… Delays entre lotes para respetar rate limits de WhatsApp/Twilio
- * âœ… ProtecciÃ³n contra ejecuciones concurrentes (overlapping)
- * âœ… Ventana de tiempo amplia (10 minutos) para procesar mÃºltiples usuarios
- * âœ… PrevenciÃ³n de alertas duplicadas en la misma ventana
- * âœ… Manejo individual de errores (un usuario fallido no afecta a otros)
- * âœ… Logging detallado para monitoreo
- * âœ… Respeto de zonas horarias individuales
- * âœ… VerificaciÃ³n de planes y lÃ­mites de uso
+ * CARACTER?STICAS:
+ * ?S& Procesamiento por lotes (10 usuarios en paralelo por defecto)
+ * ?S& Delays entre lotes para respetar rate limits de WhatsApp/Twilio
+ * ?S& Protecci?n contra ejecuciones concurrentes (overlapping)
+ * ?S& Ventana de tiempo amplia (10 minutos) para procesar m?ltiples usuarios
+ * ?S& Prevenci?n de alertas duplicadas en la misma ventana
+ * ?S& Manejo individual de errores (un usuario fallido no afecta a otros)
+ * ?S& Logging detallado para monitoreo
+ * ?S& Respeto de zonas horarias individuales
+ * ?S& Verificaci?n de planes y l?mites de uso
  * 
- * CONFIGURACIÃ“N AJUSTABLE:
+ * CONFIGURACI?N AJUSTABLE:
  * - BATCH_SIZE: Usuarios a procesar en paralelo (default: 10)
  * - DELAY_BETWEEN_BATCHES_MS: Delay entre lotes en ms (default: 2000)
- * - MAX_PROCESSING_TIME_MINUTES: Tiempo mÃ¡ximo de procesamiento (default: 4)
+ * - MAX_PROCESSING_TIME_MINUTES: Tiempo m?ximo de procesamiento (default: 4)
  * - Ventana de tiempo: 10 minutos desde hora configurada
- * - ProtecciÃ³n anti-duplicados: 15 minutos mÃ­nimo entre alertas
+ * - Protecci?n anti-duplicados: 15 minutos m?nimo entre alertas
  * 
  * ESCALABILIDAD:
- * Con configuraciÃ³n actual puede manejar ~120 usuarios por hora sin problemas.
- * Para mÃ¡s usuarios, ajustar BATCH_SIZE y/o reducir DELAY_BETWEEN_BATCHES_MS.
+ * Con configuraci?n actual puede manejar ~120 usuarios por hora sin problemas.
+ * Para m?s usuarios, ajustar BATCH_SIZE y/o reducir DELAY_BETWEEN_BATCHES_MS.
  */
 
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
@@ -47,10 +47,10 @@ export class SchedulerService implements OnModuleInit {
   private readonly logger = new Logger(SchedulerService.name);
   private isProcessing = false; // [FIX] Bandera para evitar overlapping
 
-  // [CONFIGURACIÃ“N] Ajustar segÃºn necesidades de producciÃ³n
+  // [CONFIGURACI?N] Ajustar seg?n necesidades de producci?n
   private readonly BATCH_SIZE = 10; // Procesar 10 usuarios en paralelo
   private readonly DELAY_BETWEEN_BATCHES_MS = 2000; // 2 segundos entre lotes para respetar rate limits
-  private readonly MAX_PROCESSING_TIME_MINUTES = 4; // MÃ¡ximo tiempo de procesamiento para estar dentro de ventana
+  private readonly MAX_PROCESSING_TIME_MINUTES = 4; // M?ximo tiempo de procesamiento para estar dentro de ventana
 
   constructor(
     private readonly prisma: PrismaService,
@@ -61,7 +61,7 @@ export class SchedulerService implements OnModuleInit {
 
   onModuleInit() {
     this.startJobAlertsCron();
-    // [DESACTIVADO] ViolaciÃ³n de polÃ­tica WhatsApp - envÃ­a mensajes proactivos sin template aprobado
+    // [DESACTIVADO] Violaci?n de pol?tica WhatsApp - env?a mensajes proactivos sin template aprobado
     // this.startFreemiumReminderCron();
     this.startFreemiumExpirationCron();
     this.startPremiumExpirationCron();
@@ -73,7 +73,7 @@ export class SchedulerService implements OnModuleInit {
    */
   private startJobAlertsCron() {
     // Ejecutar cada 5 minutos (para demo)
-    // En producciÃ³n: ajustar segÃºn necesidades
+    // En producci?n: ajustar seg?n necesidades
     cron.schedule('*/5 * * * *', async () => {
       this.logger.log('Ejecutando tarea de alertas de empleo...');
       await this.checkAndSendAlerts();
@@ -83,7 +83,7 @@ export class SchedulerService implements OnModuleInit {
   }
 
   /**
-   * Inicia el cron para procesar campañas de email programadas.
+   * Inicia el cron para procesar campa?as de email programadas.
    */
   private startScheduledEmailsCron() {
     cron.schedule('* * * * *', async () => {
@@ -91,29 +91,29 @@ export class SchedulerService implements OnModuleInit {
         await this.adminService.processScheduledEmailCampaigns();
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        this.logger.error(`Error procesando campañas de email programadas: ${errorMessage}`);
+        this.logger.error(`Error procesando campa?as de email programadas: ${errorMessage}`);
       }
     });
 
-    this.logger.log('Scheduler de campañas de email iniciado (cada minuto)');
+    this.logger.log('Scheduler de campa?as de email iniciado (cada minuto)');
   }
   /**
-   * Inicia el cron para enviar recordatorios de freemium (23 horas despuÃ©s)
+   * Inicia el cron para enviar recordatorios de freemium (23 horas despu?s)
    */
-  // [DESACTIVADO] ViolaciÃ³n de polÃ­tica WhatsApp - envÃ­a mensajes promocionales con links de pago fuera de la ventana 24h sin template
+  // [DESACTIVADO] Violaci?n de pol?tica WhatsApp - env?a mensajes promocionales con links de pago fuera de la ventana 24h sin template
   // private startFreemiumReminderCron() {
   //   cron.schedule('0 * * * *', async () => {
-  //     this.logger.log('â° Revisando recordatorios de freemium...');
+  //     this.logger.log('? Revisando recordatorios de freemium...');
   //     await this.sendFreemiumReminders();
   //   });
-  //   this.logger.log('âœ… Scheduler de recordatorios freemium iniciado (cada hora)');
+  //   this.logger.log('?S& Scheduler de recordatorios freemium iniciado (cada hora)');
   // }
 
   /**
-   * EnvÃ­a recordatorios a usuarios que recibieron FREEMIUM_EXPIRED hace 23+ horas
+   * Env?a recordatorios a usuarios que recibieron FREEMIUM_EXPIRED hace 23+ horas
    * y no han respondido ni pagado
    */
-  // [DESACTIVADO] ViolaciÃ³n de polÃ­tica WhatsApp - envÃ­a mensajes promocionales con links de pago fuera de la ventana 24h sin template
+  // [DESACTIVADO] Violaci?n de pol?tica WhatsApp - env?a mensajes promocionales con links de pago fuera de la ventana 24h sin template
   // private async sendFreemiumReminders() {
   //   try {
   //     const twentyThreeHoursAgo = new Date(Date.now() - 23 * 60 * 60 * 1000);
@@ -140,13 +140,13 @@ export class SchedulerService implements OnModuleInit {
   //       });
   //     }
   //   } catch (error) {
-  //     this.logger.error(`âŒ Error en sendFreemiumReminders: ${error}`);
+  //     this.logger.error(`?R Error en sendFreemiumReminders: ${error}`);
   //   }
   // }
 
   /**
-   * Inicia el cron para verificar y expirar usuarios premium que cumplieron 30 dÃ­as
-   * Se ejecuta 2 veces al dÃ­a: a medianoche (00:00) y al mediodÃ­a (12:00)
+   * Inicia el cron para verificar y expirar usuarios premium que cumplieron 30 d?as
+   * Se ejecuta 2 veces al d?a: a medianoche (00:00) y al mediod?a (12:00)
    */
   private startPremiumExpirationCron() {
     // Ejecutar a las 00:00 y 12:00 (zona horaria del servidor - Colombia)
@@ -160,7 +160,7 @@ export class SchedulerService implements OnModuleInit {
 
   /**
    * Inicia el cron para expirar planes freemium por tiempo/usos.
-   * Se ejecuta 2 veces al dÃ­a para mantener consistencia de mÃ©tricas en admin.
+   * Se ejecuta 2 veces al d?a para mantener consistencia de m?tricas en admin.
    */
   private startFreemiumExpirationCron() {
     cron.schedule('30 0,12 * * *', async () => {
@@ -173,7 +173,7 @@ export class SchedulerService implements OnModuleInit {
 
   /**
    * Expira suscripciones FREEMIUM por:
-   * - 5 dÃ­as hÃ¡biles transcurridos
+   * - 5 d?as h?biles transcurridos
    * - 0 usos restantes
    */
   private async expireFreemiumSubscriptions() {
@@ -221,9 +221,9 @@ export class SchedulerService implements OnModuleInit {
   }
 
   /**
-   * Verifica y expira suscripciones pagadas (PREMIUM y PRO) que cumplieron su perÃ­odo
-   * - PREMIUM: 30 dÃ­as
-   * - PRO: 90 dÃ­as
+   * Verifica y expira suscripciones pagadas (PREMIUM y PRO) que cumplieron su per?odo
+   * - PREMIUM: 30 d?as
+   * - PRO: 90 d?as
    * Maneja dos casos:
    * 1. Usuarios con premiumEndDate poblado
    * 2. Usuarios antiguos que solo tienen premiumStartDate (sin premiumEndDate)
@@ -268,15 +268,15 @@ export class SchedulerService implements OnModuleInit {
         }
       }
 
-      // CASO 2: Usuarios antiguos sin premiumEndDate pero con premiumStartDate > 30 dÃ­as (solo PREMIUM antiguo)
+      // CASO 2: Usuarios antiguos sin premiumEndDate pero con premiumStartDate > 30 d?as (solo PREMIUM antiguo)
       const expiredByStartDate = await this.prisma.subscription.findMany({
         where: {
           plan: 'PREMIUM',
           status: 'ACTIVE',
-          premiumEndDate: null, // No tienen fecha de expiraciÃ³n
+          premiumEndDate: null, // No tienen fecha de expiraci?n
           premiumStartDate: {
             not: null,
-            lte: thirtyDaysAgo, // premiumStartDate fue hace mÃ¡s de 30 dÃ­as
+            lte: thirtyDaysAgo, // premiumStartDate fue hace m?s de 30 d?as
           },
         },
         include: {
@@ -314,7 +314,7 @@ export class SchedulerService implements OnModuleInit {
   }
 
   /**
-   * Revisa quÃ© usuarios deben recibir alertas ahora y las envÃ­a
+   * Revisa qu? usuarios deben recibir alertas ahora y las env?a
    * [MEJORADO] Procesamiento por lotes con delays para evitar rate limiting
    */
   private async checkAndSendAlerts() {
@@ -390,13 +390,13 @@ export class SchedulerService implements OnModuleInit {
         });
 
         // [FIX] Delay entre lotes para respetar rate limits de WhatsApp/Twilio
-        // Solo si no es el Ãºltimo lote
+        // Solo si no es el ?ltimo lote
         if (i + this.BATCH_SIZE < totalUsers) {
           this.logger.debug(`Esperando ${this.DELAY_BETWEEN_BATCHES_MS}ms antes del siguiente lote...`);
           await this.sleep(this.DELAY_BETWEEN_BATCHES_MS);
         }
 
-        // [FIX] Verificar si estamos excediendo el tiempo mÃ¡ximo
+        // [FIX] Verificar si estamos excediendo el tiempo m?ximo
         const elapsedMinutes = (Date.now() - startTime) / (1000 * 60);
         if (elapsedMinutes > this.MAX_PROCESSING_TIME_MINUTES) {
           this.logger.warn(`Tiempo maximo de procesamiento alcanzado (${elapsedMinutes.toFixed(1)} min). Usuarios restantes: ${totalUsers - (i + this.BATCH_SIZE)}`);
@@ -430,16 +430,16 @@ export class SchedulerService implements OnModuleInit {
 
   /**
    * Determina si un usuario debe recibir alerta ahora
-   * Considera: hora configurada, frecuencia, Ãºltima notificaciÃ³n Y dÃ­as hÃ¡biles
-   * [MEJORADO] Ventana ampliada, mejor logging y solo dÃ­as hÃ¡biles
+   * Considera: hora configurada, frecuencia, ?ltima notificaci?n Y d?as h?biles
+   * [MEJORADO] Ventana ampliada, mejor logging y solo d?as h?biles
    */
   private shouldSendAlertNow(alertPref: any): boolean {
     try {
       const now = dayjs().tz(alertPref.timezone || 'America/Bogota');
       const userId = alertPref.userId;
 
-      // [NUEVO] Solo dÃ­as hÃ¡biles (lunes=1 a viernes=5)
-      const dayOfWeek = now.day(); // 0=domingo, 1=lunes, ..., 6=sÃ¡bado
+      // [NUEVO] Solo d?as h?biles (lunes=1 a viernes=5)
+      const dayOfWeek = now.day(); // 0=domingo, 1=lunes, ..., 6=s?bado
       if (dayOfWeek === 0 || dayOfWeek === 6) {
         this.logger.debug(
           `Usuario ${userId}: Hoy es ${dayOfWeek === 0 ? 'domingo' : 'sabado'} -> NO ENVIAR (solo dias habiles)`,
@@ -453,13 +453,13 @@ export class SchedulerService implements OnModuleInit {
       const currentHour = now.hour();
       const currentMinute = now.minute();
 
-      // [FIX] Ampliar ventana a 10 minutos para dar mÃ¡s margen de procesamiento
-      // Calcular minutos totales desde medianoche para comparaciÃ³n mÃ¡s precisa
+      // [FIX] Ampliar ventana a 10 minutos para dar m?s margen de procesamiento
+      // Calcular minutos totales desde medianoche para comparaci?n m?s precisa
       const currentTotalMinutes = currentHour * 60 + currentMinute;
       const targetTotalMinutes = targetHour * 60 + targetMinute;
       const minutesDiff = currentTotalMinutes - targetTotalMinutes;
 
-      // Ventana: desde la hora exacta hasta 10 minutos despuÃ©s
+      // Ventana: desde la hora exacta hasta 10 minutos despu?s
       const isWithinTimeWindow = minutesDiff >= 0 && minutesDiff < 10;
 
       if (!isWithinTimeWindow) {
@@ -473,18 +473,18 @@ export class SchedulerService implements OnModuleInit {
         `Usuario ${userId}: Dentro de ventana horaria (diff: ${minutesDiff} min desde objetivo)`,
       );
 
-      // Si no hay Ãºltima notificaciÃ³n, es la primera vez â†’ enviar
+      // Si no hay ?ltima notificaci?n, es la primera vez ?  enviar
       if (!alertPref.lastNotification) {
         this.logger.log(`Usuario ${userId}: Primera notificacion (${alertPref.alertFrequency}) -> ENVIAR`);
         return true;
       }
 
-      // Calcular tiempo desde Ãºltima notificaciÃ³n
+      // Calcular tiempo desde ?ltima notificaci?n
       const lastNotif = dayjs(alertPref.lastNotification).tz(
         alertPref.timezone || 'America/Bogota',
       );
 
-      // [FIX] Usar diferencia en DÃAS para mayor precisiÃ³n
+      // [FIX] Usar diferencia en D?AS para mayor precisi?n
       const daysSinceLastAlert = now.diff(lastNotif, 'day', true); // true = con decimales
       const hoursSinceLastAlert = now.diff(lastNotif, 'hour');
       const minutesSinceLastAlert = now.diff(lastNotif, 'minute');
@@ -493,8 +493,8 @@ export class SchedulerService implements OnModuleInit {
         `Usuario ${userId}: Ultima alerta hace ${daysSinceLastAlert.toFixed(2)} dias (${hoursSinceLastAlert}h ${minutesSinceLastAlert % 60}m)`,
       );
 
-      // [FIX CRÃTICO] Evitar enviar mÃºltiples veces en la misma ventana horaria
-      // Si la Ãºltima alerta fue hace menos de 15 minutos, NO enviar (incluso si cumple frecuencia)
+      // [FIX CR?TICO] Evitar enviar m?ltiples veces en la misma ventana horaria
+      // Si la ?ltima alerta fue hace menos de 15 minutos, NO enviar (incluso si cumple frecuencia)
       if (minutesSinceLastAlert < 15) {
         this.logger.debug(
           `Usuario ${userId}: Ya recibio alerta hace ${minutesSinceLastAlert} minutos (muy reciente) -> NO ENVIAR`,
@@ -502,28 +502,28 @@ export class SchedulerService implements OnModuleInit {
         return false;
       }
 
-      // Verificar segÃºn frecuencia configurada
+      // Verificar seg?n frecuencia configurada
       let shouldSend = false;
 
       switch (alertPref.alertFrequency) {
         case 'daily':
-          // [FIX] Enviar si pasaron al menos 23 horas (casi un dÃ­a completo)
-          // Esto evita enviar 2 veces el mismo dÃ­a pero asegura que se envÃ­e diariamente
+          // [FIX] Enviar si pasaron al menos 23 horas (casi un d?a completo)
+          // Esto evita enviar 2 veces el mismo d?a pero asegura que se env?e diariamente
           shouldSend = hoursSinceLastAlert >= 23;
           break;
 
         case 'every_3_days':
-          // Enviar si pasaron al menos 2.9 dÃ­as (~70 horas)
+          // Enviar si pasaron al menos 2.9 d?as (~70 horas)
           shouldSend = daysSinceLastAlert >= 2.9;
           break;
 
         case 'weekly':
-          // Enviar si pasaron al menos 6.9 dÃ­as (~166 horas)
+          // Enviar si pasaron al menos 6.9 d?as (~166 horas)
           shouldSend = daysSinceLastAlert >= 6.9;
           break;
 
         case 'monthly':
-          // Enviar si pasaron al menos 29 dÃ­as
+          // Enviar si pasaron al menos 29 d?as
           shouldSend = daysSinceLastAlert >= 29;
           break;
 
@@ -533,7 +533,7 @@ export class SchedulerService implements OnModuleInit {
           shouldSend = hoursSinceLastAlert >= 23;
       }
 
-      // Loguear decisiÃ³n para debug
+      // Loguear decisi?n para debug
       if (shouldSend) {
         this.logger.log(
           `Usuario ${userId}: Frecuencia=${alertPref.alertFrequency}, ultima alerta hace ${daysSinceLastAlert.toFixed(1)} dias (${hoursSinceLastAlert}h) -> ENVIAR`,
@@ -553,9 +553,9 @@ export class SchedulerService implements OnModuleInit {
   }
 
   /**
-   * Ejecuta bÃºsqueda de empleos y notifica a un usuario especÃ­fico
-   * MÃ©todo reutilizable para scheduler Y bÃºsquedas manuales
-   * INCLUYE: VerificaciÃ³n de plan y descuento de uso
+   * Ejecuta b?squeda de empleos y notifica a un usuario espec?fico
+   * M?todo reutilizable para scheduler Y b?squedas manuales
+   * INCLUYE: Verificaci?n de plan y descuento de uso
    */
   async runJobSearchAndNotifyUser(userId: string): Promise<void> {
     try {
@@ -566,7 +566,7 @@ export class SchedulerService implements OnModuleInit {
 
       if (!usageCheck.allowed) {
         this.logger.log(`Usuario ${userId}: ${usageCheck.reason || 'Sin usos disponibles'}`);
-        // Si el plan expirÃ³, opcionalmente notificar al usuario
+        // Si el plan expir?, opcionalmente notificar al usuario
         if (usageCheck.shouldNotify) {
           await this.notifyPlanExpired(userId, usageCheck.plan);
         }
@@ -587,12 +587,12 @@ export class SchedulerService implements OnModuleInit {
       const searchResult = await this.jobSearchService.searchJobsForUser(userId);
 
       if (searchResult.jobs.length === 0) {
-        // No hay ofertas nuevas â†’ enviar mensaje simple
+        // No hay ofertas nuevas ?  enviar mensaje simple
         this.logger.log(`Usuario ${userId}: Sin ofertas nuevas, no se envia notificacion`);
         return;
       }
 
-      // 4. Guardar ofertas en PendingJobAlert para que el usuario las pida despuÃ©s
+      // 4. Guardar ofertas en PendingJobAlert para que el usuario las pida despu?s
       await this.prisma.pendingJobAlert.create({
         data: {
           userId,
@@ -603,7 +603,7 @@ export class SchedulerService implements OnModuleInit {
 
       this.logger.log(`${searchResult.jobs.length} ofertas guardadas como pendientes para ${userId}`);
 
-      // 5. Enviar template de notificaciÃ³n (fuera de ventana 24h)
+      // 5. Enviar template de notificaci?n (fuera de ventana 24h)
       const userName = getFirstName(user.name);
       const jobCount = String(searchResult.jobs.length);
       const roleName = user.profile?.role || 'tu perfil';
@@ -635,7 +635,7 @@ export class SchedulerService implements OnModuleInit {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Error en runJobSearchAndNotifyUser para ${userId}: ${errorMessage}`);
 
-      // [DESACTIVADO] ViolaciÃ³n de polÃ­tica WhatsApp - envÃ­a mensaje proactivo sin template fuera de la ventana 24h
+      // [DESACTIVADO] Violaci?n de pol?tica WhatsApp - env?a mensaje proactivo sin template fuera de la ventana 24h
       // try {
       //   const user = await this.prisma.user.findUnique({
       //     where: { id: userId },
@@ -643,7 +643,7 @@ export class SchedulerService implements OnModuleInit {
       //   });
       //   if (user) {
       //     await this.whatsappService.sendBotReply(user.phone, {
-      //       text: 'Lo siento, hubo un problema temporal al buscar ofertas. IntentarÃ© de nuevo en la prÃ³xima alerta. ðŸ”„',
+      //       text: 'Lo siento, hubo un problema temporal al buscar ofertas. Intentar? de nuevo en la pr?xima alerta. ?x',
       //     });
       //   }
       // } catch (sendError) {
@@ -669,16 +669,16 @@ export class SchedulerService implements OnModuleInit {
       where: { userId },
     });
 
-    // Si no tiene suscripciÃ³n, no deberÃ­a tener alertas activas
+    // Si no tiene suscripci?n, no deber?a tener alertas activas
     if (!subscription) {
-      return { allowed: false, reason: 'Sin suscripciÃ³n' };
+      return { allowed: false, reason: 'Sin suscripci?n' };
     }
 
     // PLAN PAGADO (PREMIUM o PRO)
     if ((subscription.plan === 'PREMIUM' || subscription.plan === 'PRO') && subscription.status === 'ACTIVE') {
       const now = new Date();
 
-      // Verificar si el plan expirÃ³ (basado en premiumEndDate)
+      // Verificar si el plan expir? (basado en premiumEndDate)
       if (subscription.premiumEndDate && now > subscription.premiumEndDate) {
         await this.prisma.subscription.update({
           where: { userId },
@@ -696,7 +696,7 @@ export class SchedulerService implements OnModuleInit {
         };
       }
 
-      // Verificar si es nueva semana (cada 7 dÃ­as desde premiumWeekStart)
+      // Verificar si es nueva semana (cada 7 d?as desde premiumWeekStart)
       const weekStart = subscription.premiumWeekStart;
 
       if (!weekStart || this.isNewWeek(weekStart, now)) {
@@ -704,7 +704,7 @@ export class SchedulerService implements OnModuleInit {
         await this.prisma.subscription.update({
           where: { userId },
           data: {
-            premiumUsesLeft: 4, // 5 - 1 que estÃ¡ usando ahora
+            premiumUsesLeft: 4, // 5 - 1 que est? usando ahora
             premiumWeekStart: now, // Nueva semana empieza desde ahora
           },
         });
@@ -722,13 +722,13 @@ export class SchedulerService implements OnModuleInit {
 
       return {
         allowed: false,
-        reason: `LÃ­mite semanal ${subscription.plan} alcanzado`,
+        reason: `L?mite semanal ${subscription.plan} alcanzado`,
         plan: subscription.plan as 'PREMIUM' | 'PRO',
       };
     }
 
     // PLAN FREEMIUM
-    // Verificar si ya expirÃ³ (flag o dÃ­as)
+    // Verificar si ya expir? (flag o d?as)
     if (subscription.freemiumExpired) {
       return {
         allowed: false,
@@ -772,10 +772,10 @@ export class SchedulerService implements OnModuleInit {
   }
 
   /**
-   * Notifica al usuario que su plan expirÃ³
-   * @param expiredPlan - El plan que expirÃ³ ('PREMIUM', 'PRO' o 'FREEMIUM')
+   * Notifica al usuario que su plan expir?
+   * @param expiredPlan - El plan que expir? ('PREMIUM', 'PRO' o 'FREEMIUM')
    */
-  // [DESACTIVADO] ViolaciÃ³n de polÃ­tica WhatsApp - envÃ­a mensajes con links de pago fuera de la ventana 24h sin template
+  // [DESACTIVADO] Violaci?n de pol?tica WhatsApp - env?a mensajes con links de pago fuera de la ventana 24h sin template
   private async notifyPlanExpired(userId: string, expiredPlan?: 'FREEMIUM' | 'PREMIUM' | 'PRO'): Promise<void> {
     this.logger.log(`notifyPlanExpired desactivado para usuario ${userId} (plan: ${expiredPlan || 'desconocido'}). Requiere template aprobado por Meta.`);
 
@@ -790,7 +790,7 @@ export class SchedulerService implements OnModuleInit {
     }
     return;
 
-    // --- CÃ“DIGO ORIGINAL COMENTADO (viola polÃ­tica WhatsApp) ---
+    // --- C?DIGO ORIGINAL COMENTADO (viola pol?tica WhatsApp) ---
     /*
     try {
       const user = await this.prisma.user.findUnique({
@@ -804,34 +804,34 @@ export class SchedulerService implements OnModuleInit {
       const planName = expiredPlan === 'PRO' ? 'Pro' : 'Premium';
 
       const message = isPaidPlanExpired
-        ? `â° *Hola ${getFirstName(user.name)}*
+        ? `? *Hola ${getFirstName(user.name)}*
 
 Tu *Plan ${planName}* ha finalizado.
 
-ðŸš€ *No frenes tu bÃºsqueda ahora.*
+?xa? *No frenes tu b?squeda ahora.*
 
 *Elige tu plan para continuar:*
 
-ðŸŽ‰ *CIO Premium* â€“ $20.000 COP / 30 dÃ­as
-ðŸ‘‰ ${process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ'}
+?x}0 *CIO Premium* ? $20.000 COP / 30 d?as
+?x0 ${process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ'}
 
-ðŸŒŸ *CIO Pro* â€“ $54.000 COP / 90 dÃ­as _(Mejor valor)_
-ðŸ‘‰ ${process.env.WOMPI_CHECKOUT_LINK_PRO || 'https://checkout.wompi.co/l/3XLQMl'}
+?xRx *CIO Pro* ? $54.000 COP / 90 d?as _(Mejor valor)_
+?x0 ${process.env.WOMPI_CHECKOUT_LINK_PRO || 'https://checkout.wompi.co/l/3XLQMl'}
 
-Una vez realices el pago, escrÃ­beme por este chat para activar tu cuenta.`
-        : `â° *Hola ${getFirstName(user.name)}*
+Una vez realices el pago, escr?beme por este chat para activar tu cuenta.`
+        : `? *Hola ${getFirstName(user.name)}*
 
-Tu perÃ­odo de prueba gratuita ha terminado y no puedo seguir enviÃ¡ndote alertas de empleo.
+Tu per?odo de prueba gratuita ha terminado y no puedo seguir envi?ndote alertas de empleo.
 
 *Elige tu plan para continuar:*
 
-ðŸŽ‰ *CIO Premium* â€“ $20.000 COP / 30 dÃ­as
-ðŸ‘‰ ${process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ'}
+?x}0 *CIO Premium* ? $20.000 COP / 30 d?as
+?x0 ${process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ'}
 
-ðŸŒŸ *CIO Pro* â€“ $54.000 COP / 90 dÃ­as _(Mejor valor)_
-ðŸ‘‰ ${process.env.WOMPI_CHECKOUT_LINK_PRO || 'https://checkout.wompi.co/l/3XLQMl'}
+?xRx *CIO Pro* ? $54.000 COP / 90 d?as _(Mejor valor)_
+?x0 ${process.env.WOMPI_CHECKOUT_LINK_PRO || 'https://checkout.wompi.co/l/3XLQMl'}
 
-Una vez realices el pago, escrÃ­beme por este chat para activar tu cuenta.`;
+Una vez realices el pago, escr?beme por este chat para activar tu cuenta.`;
 
       await this.whatsappService.sendBotReply(user.phone, { text: message });
 
@@ -848,7 +848,7 @@ Una vez realices el pago, escrÃ­beme por este chat para activar tu cuenta.`;
   }
 
   /**
-   * Verifica si han pasado 7 dÃ­as desde el inicio de la semana premium
+   * Verifica si han pasado 7 d?as desde el inicio de la semana premium
    */
   private isNewWeek(weekStart: Date, now: Date): boolean {
     const weekEnd = new Date(weekStart);
