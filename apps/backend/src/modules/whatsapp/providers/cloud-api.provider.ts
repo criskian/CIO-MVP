@@ -6,10 +6,11 @@ import {
   NormalizedIncomingMessage,
   BotReply,
 } from '../interfaces/whatsapp-provider.interface';
+import { repairMojibakeText } from '../../../common/text/mojibake.util';
 
 /**
  * Provider para WhatsApp Cloud API (Meta/Facebook)
- * Documentación: https://developers.facebook.com/docs/whatsapp/cloud-api
+ * DocumentaciÃ³n: https://developers.facebook.com/docs/whatsapp/cloud-api
  */
 @Injectable()
 export class CloudApiProvider implements IWhatsappProvider {
@@ -26,23 +27,24 @@ export class CloudApiProvider implements IWhatsappProvider {
   }
 
   /**
-   * Envía un mensaje (texto simple o interactivo con botones/listas)
+   * EnvÃ­a un mensaje (texto simple o interactivo con botones/listas)
    */
   async sendMessage(to: string, reply: BotReply): Promise<void> {
     try {
       const url = `${this.apiUrl}/${this.phoneNumberId}/messages`;
+      const safeReply = this.sanitizeOutgoingReply(reply);
 
-      // Asegurar que el número tenga el formato correcto (+número)
+      // Asegurar que el nÃºmero tenga el formato correcto (+nÃºmero)
       const formattedTo = to.startsWith('+') ? to : `+${to}`;
 
-      this.logger.debug(`📤 Enviando mensaje a ${formattedTo}`);
+      this.logger.debug(`ðŸ“¤ Enviando mensaje a ${formattedTo}`);
       this.logger.debug(`URL: ${url}`);
 
       let messageBody: any;
 
-      // Si tiene botones de respuesta rápida (máximo 3)
-      if (reply.buttons && reply.buttons.length > 0) {
-        this.logger.debug(`🔘 Enviando mensaje con ${reply.buttons.length} botones`);
+      // Si tiene botones de respuesta rÃ¡pida (mÃ¡ximo 3)
+      if (safeReply.buttons && safeReply.buttons.length > 0) {
+        this.logger.debug(`ðŸ”˜ Enviando mensaje con ${safeReply.buttons.length} botones`);
         messageBody = {
           messaging_product: 'whatsapp',
           to: formattedTo,
@@ -50,14 +52,14 @@ export class CloudApiProvider implements IWhatsappProvider {
           interactive: {
             type: 'button',
             body: {
-              text: reply.text,
+              text: safeReply.text,
             },
             action: {
-              buttons: reply.buttons.slice(0, 3).map((btn) => ({
+              buttons: safeReply.buttons.slice(0, 3).map((btn) => ({
                 type: 'reply',
                 reply: {
                   id: btn.id,
-                  title: btn.title.substring(0, 20), // Máximo 20 caracteres
+                  title: btn.title.substring(0, 20), // MÃ¡ximo 20 caracteres
                 },
               })),
             },
@@ -65,8 +67,8 @@ export class CloudApiProvider implements IWhatsappProvider {
         };
       }
       // Si tiene lista desplegable
-      else if (reply.listSections && reply.listSections.length > 0) {
-        this.logger.debug(`📋 Enviando mensaje con lista desplegable`);
+      else if (safeReply.listSections && safeReply.listSections.length > 0) {
+        this.logger.debug(`ðŸ“‹ Enviando mensaje con lista desplegable`);
         messageBody = {
           messaging_product: 'whatsapp',
           to: formattedTo,
@@ -74,16 +76,16 @@ export class CloudApiProvider implements IWhatsappProvider {
           interactive: {
             type: 'list',
             body: {
-              text: reply.text,
+              text: safeReply.text,
             },
             action: {
-              button: reply.listTitle || 'Ver opciones',
-              sections: reply.listSections.map((section) => ({
+              button: safeReply.listTitle || 'Ver opciones',
+              sections: safeReply.listSections.map((section) => ({
                 title: section.title,
                 rows: section.rows.slice(0, 10).map((row) => ({
                   id: row.id,
-                  title: row.title.substring(0, 24), // Máximo 24 caracteres
-                  description: row.description?.substring(0, 72), // Máximo 72 caracteres
+                  title: row.title.substring(0, 24), // MÃ¡ximo 24 caracteres
+                  description: row.description?.substring(0, 72), // MÃ¡ximo 72 caracteres
                 })),
               })),
             },
@@ -92,19 +94,19 @@ export class CloudApiProvider implements IWhatsappProvider {
       }
       // Mensaje de texto simple (caso por defecto)
       else {
-        this.logger.debug(`💬 Enviando mensaje de texto simple`);
+        this.logger.debug(`ðŸ’¬ Enviando mensaje de texto simple`);
         messageBody = {
           messaging_product: 'whatsapp',
           to: formattedTo,
           type: 'text',
           text: {
-            body: reply.text,
+            body: safeReply.text,
           },
         };
       }
 
-      // Timeout más largo para mensajes interactivos (listas y botones)
-      const isInteractive = reply.buttons || reply.listSections;
+      // Timeout mÃ¡s largo para mensajes interactivos (listas y botones)
+      const isInteractive = safeReply.buttons || safeReply.listSections;
       const timeout = isInteractive ? 30000 : 10000; // 30s para interactivos, 10s para texto
 
       await axios.post(url, messageBody, {
@@ -115,14 +117,14 @@ export class CloudApiProvider implements IWhatsappProvider {
         timeout,
       });
 
-      this.logger.log(`✅ Mensaje enviado a ${formattedTo}`);
+      this.logger.log(`âœ… Mensaje enviado a ${formattedTo}`);
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
 
       // Log detallado del error de Meta
       if (error?.response?.data) {
-        this.logger.error(`❌ Error de Meta API: ${JSON.stringify(error.response.data, null, 2)}`);
+        this.logger.error(`âŒ Error de Meta API: ${JSON.stringify(error.response.data, null, 2)}`);
       }
 
       this.logger.error(`Error enviando mensaje: ${errorMessage}`, errorStack);
@@ -131,13 +133,13 @@ export class CloudApiProvider implements IWhatsappProvider {
   }
 
   /**
-   * Envía un mensaje de template de WhatsApp
+   * EnvÃ­a un mensaje de template de WhatsApp
    * Usado para notificaciones fuera de la ventana de 24 horas
    * 
-   * @param to - Número de teléfono destino
+   * @param to - NÃºmero de telÃ©fono destino
    * @param templateName - Nombre del template aprobado en Meta
-   * @param languageCode - Código de idioma (ej: 'es_CO')
-   * @param bodyParams - Parámetros para el body del template
+   * @param languageCode - CÃ³digo de idioma (ej: 'es_CO')
+   * @param bodyParams - ParÃ¡metros para el body del template
    * @param buttonPayload - Payload opcional para botones Quick Reply (por defecto: 'SEARCH_NOW')
    */
   async sendTemplateMessage(
@@ -152,9 +154,9 @@ export class CloudApiProvider implements IWhatsappProvider {
       // Formato correcto: sin + al inicio para la API de WhatsApp
       const formattedTo = to.replace(/^\+/, '');
 
-      this.logger.debug(`📤 Enviando template "${templateName}" a ${formattedTo}`);
+      this.logger.debug(`ðŸ“¤ Enviando template "${templateName}" a ${formattedTo}`);
 
-      // Estructura del mensaje según documentación oficial de Meta
+      // Estructura del mensaje segÃºn documentaciÃ³n oficial de Meta
       // https://developers.facebook.com/docs/whatsapp/cloud-api/guides/send-message-templates
       const messageBody = {
         messaging_product: 'whatsapp',
@@ -164,10 +166,10 @@ export class CloudApiProvider implements IWhatsappProvider {
           name: templateName,
           language: { code: languageCode },
           components: [
-            // Componente BODY con los parámetros variables
+            // Componente BODY con los parÃ¡metros variables
             {
               type: 'body',
-              parameters: bodyParams.map(text => ({ type: 'text', text }))
+              parameters: bodyParams.map(text => ({ type: 'text', text: repairMojibakeText(text) }))
             },
             // Componente BUTTON para Quick Reply (requerido para templates con botones)
             {
@@ -185,7 +187,7 @@ export class CloudApiProvider implements IWhatsappProvider {
         }
       };
 
-      this.logger.debug(`📤 Request body: ${JSON.stringify(messageBody, null, 2)}`);
+      this.logger.debug(`ðŸ“¤ Request body: ${JSON.stringify(messageBody, null, 2)}`);
 
       const response = await axios.post(url, messageBody, {
         headers: {
@@ -196,21 +198,21 @@ export class CloudApiProvider implements IWhatsappProvider {
       });
 
       // Log completo de respuesta de Meta para debug
-      this.logger.log(`📨 Respuesta de Meta: ${JSON.stringify(response.data, null, 2)}`);
+      this.logger.log(`ðŸ“¨ Respuesta de Meta: ${JSON.stringify(response.data, null, 2)}`);
 
       // Verificar si el mensaje fue aceptado
       if (response.data?.messages?.[0]?.id) {
-        this.logger.log(`✅ Template "${templateName}" enviado exitosamente. Message ID: ${response.data.messages[0].id}`);
+        this.logger.log(`âœ… Template "${templateName}" enviado exitosamente. Message ID: ${response.data.messages[0].id}`);
       } else if (response.data?.error) {
-        this.logger.error(`⚠️ Meta devolvió error en respuesta: ${JSON.stringify(response.data.error)}`);
+        this.logger.error(`âš ï¸ Meta devolviÃ³ error en respuesta: ${JSON.stringify(response.data.error)}`);
       } else {
-        this.logger.log(`✅ Template "${templateName}" enviado a ${formattedTo}`);
+        this.logger.log(`âœ… Template "${templateName}" enviado a ${formattedTo}`);
       }
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
       if (error?.response?.data) {
-        this.logger.error(`❌ Error enviando template: ${JSON.stringify(error.response.data, null, 2)}`);
+        this.logger.error(`âŒ Error enviando template: ${JSON.stringify(error.response.data, null, 2)}`);
       }
 
       this.logger.error(`Error enviando template: ${errorMessage}`);
@@ -220,7 +222,7 @@ export class CloudApiProvider implements IWhatsappProvider {
 
   /**
    * Normaliza el payload de Cloud API al formato interno
-   * Soporta mensajes de texto, interactivos (botones/listas), imágenes y documentos
+   * Soporta mensajes de texto, interactivos (botones/listas), imÃ¡genes y documentos
    */
   normalizeIncomingMessage(payload: any): NormalizedIncomingMessage | null {
     try {
@@ -230,7 +232,7 @@ export class CloudApiProvider implements IWhatsappProvider {
       const message = change?.value?.messages?.[0];
 
       if (!message) {
-        this.logger.warn('No se encontró mensaje en el payload');
+        this.logger.warn('No se encontrÃ³ mensaje en el payload');
         return null;
       }
 
@@ -239,13 +241,13 @@ export class CloudApiProvider implements IWhatsappProvider {
       const messageId = message.id;
       const timestamp = new Date(parseInt(message.timestamp) * 1000);
 
-      // Extraer el Phone Number ID del payload (está en metadata.phone_number_id)
+      // Extraer el Phone Number ID del payload (estÃ¡ en metadata.phone_number_id)
       const incomingPhoneNumberId = change?.value?.metadata?.phone_number_id;
 
-      // FILTRO: Solo procesar mensajes del número configurado en .env
+      // FILTRO: Solo procesar mensajes del nÃºmero configurado en .env
       if (incomingPhoneNumberId && incomingPhoneNumberId !== this.phoneNumberId) {
         this.logger.debug(
-          `🚫 Mensaje ignorado: llegó al número ${incomingPhoneNumberId}, pero este backend está configurado para ${this.phoneNumberId}`,
+          `ðŸš« Mensaje ignorado: llegÃ³ al nÃºmero ${incomingPhoneNumberId}, pero este backend estÃ¡ configurado para ${this.phoneNumberId}`,
         );
         return null;
       }
@@ -253,20 +255,34 @@ export class CloudApiProvider implements IWhatsappProvider {
       let text: string | undefined;
       let mediaUrl: string | undefined;
 
-      // Extraer contenido según el tipo
+      // Extraer contenido segÃºn el tipo
       switch (messageType) {
         case 'text':
           text = message.text?.body;
           break;
 
         case 'interactive':
-          // Usuario respondió a un botón o lista interactiva
+          // Usuario respondiÃ³ a un botÃ³n o lista interactiva
           const interactiveType = message.interactive?.type;
 
           if (interactiveType === 'button_reply') {
-            // Respuesta de botón
+            // Respuesta de botÃ³n
             const buttonId = message.interactive.button_reply.id;
             const buttonTitle = message.interactive.button_reply.title;
+            const buttonTextById: Record<string, string> = {
+              confirm_restart: 'sÃ­, reiniciar',
+              cancel_restart: 'no, cancelar',
+              confirm_cancel: 'sÃ­, confirmar',
+              abort_cancel: 'no, continuar',
+              accept_alerts: 'sÃ­, activar',
+              reject_alerts: 'no, gracias',
+              alerts_yes: 'sÃ­, activar',
+              alerts_no: 'no, gracias',
+              lead_interest_yes: 'sÃ­, me interesÃ³',
+              lead_interest_no: 'no me interesÃ³',
+              lead_terms_accept: 'acepto',
+              lead_terms_reject: 'no acepto',
+            };
 
             // Si el ID es de frecuencia (ej: freq_daily), extraer el valor
             if (buttonId.startsWith('freq_')) {
@@ -274,7 +290,7 @@ export class CloudApiProvider implements IWhatsappProvider {
               // Mapear al texto esperado por el validador
               const freqMap: Record<string, string> = {
                 daily: 'diariamente',
-                every_3_days: 'cada 3 días',
+                every_3_days: 'cada 3 dÃ­as',
                 weekly: 'semanalmente',
                 monthly: 'mensualmente',
               };
@@ -288,12 +304,16 @@ export class CloudApiProvider implements IWhatsappProvider {
             else if (buttonId.startsWith('exp_')) {
               text = buttonId.replace('exp_', ''); // "exp_junior" -> "junior"
             }
-            // Para otros casos, usar el título del botón
+            // Para IDs conocidos, usar token canÃ³nico estable
+            else if (buttonTextById[buttonId]) {
+              text = buttonTextById[buttonId];
+            }
+            // Para otros casos, usar ID y fallback al tÃ­tulo
             else {
-              text = buttonTitle;
+              text = buttonId || buttonTitle;
             }
 
-            this.logger.debug(`🔘 Botón presionado - ID: ${buttonId}, Texto extraído: ${text}`);
+            this.logger.debug(`ðŸ”˜ BotÃ³n presionado - ID: ${buttonId}, Texto extraÃ­do: ${text}`);
           } else if (interactiveType === 'list_reply') {
             // Respuesta de lista
             const listReplyId = message.interactive.list_reply.id;
@@ -303,7 +323,7 @@ export class CloudApiProvider implements IWhatsappProvider {
             if (listReplyId.startsWith('cmd_')) {
               text = listReplyId.replace('cmd_', ''); // "cmd_buscar" -> "buscar"
             }
-            // Si el ID es un campo de edición (ej: edit_rol), extraer el campo
+            // Si el ID es un campo de ediciÃ³n (ej: edit_rol), extraer el campo
             else if (listReplyId.startsWith('edit_')) {
               text = listReplyId.replace('edit_', ''); // "edit_rol" -> "rol"
             }
@@ -311,16 +331,22 @@ export class CloudApiProvider implements IWhatsappProvider {
             else if (listReplyId.startsWith('time_')) {
               text = listReplyId.replace('time_', ''); // "time_09:00" -> "09:00"
             }
-            // Para otros casos (ej: full_time, part_time), usar el ID directamente
+            else if (listReplyId.startsWith('reason_')) {
+              text = listReplyId;
+            }
+            else if (listReplyId.startsWith('exp_')) {
+              text = listReplyId.replace('exp_', '');
+            }
+            // Para otros casos, preferir ID estable
             else {
-              text = listReplyTitle;
+              text = listReplyId || listReplyTitle;
             }
 
             this.logger.debug(
-              `📋 Opción de lista seleccionada - ID: ${listReplyId}, Comando/Campo extraído: ${text}`,
+              `ðŸ“‹ OpciÃ³n de lista seleccionada - ID: ${listReplyId}, Comando/Campo extraÃ­do: ${text}`,
             );
           } else {
-            this.logger.warn(`Tipo de interacción no soportado: ${interactiveType}`);
+            this.logger.warn(`Tipo de interacciÃ³n no soportado: ${interactiveType}`);
             return null;
           }
           break;
@@ -334,7 +360,7 @@ export class CloudApiProvider implements IWhatsappProvider {
           break;
 
         case 'button':
-          // Respuesta de botón Quick Reply de un template
+          // Respuesta de botÃ³n Quick Reply de un template
           // Estructura: { "button": { "payload": "SEARCH_NOW", "text": "Ver ofertas ahora" } }
           const buttonPayload = message.button?.payload;
           const buttonText = message.button?.text;
@@ -345,10 +371,10 @@ export class CloudApiProvider implements IWhatsappProvider {
           } else if (buttonPayload) {
             text = buttonPayload; // Usar el payload directamente
           } else {
-            text = buttonText; // Fallback al texto del botón
+            text = buttonText; // Fallback al texto del botÃ³n
           }
 
-          this.logger.debug(`🔘 Quick Reply de template - Payload: ${buttonPayload}, Texto: ${buttonText}, Extraído: ${text}`);
+          this.logger.debug(`ðŸ”˜ Quick Reply de template - Payload: ${buttonPayload}, Texto: ${buttonText}, ExtraÃ­do: ${text}`);
           break;
 
         default:
@@ -375,21 +401,45 @@ export class CloudApiProvider implements IWhatsappProvider {
     }
   }
 
+  private sanitizeOutgoingReply(reply: BotReply): BotReply {
+    const sanitize = (value: string | undefined): string =>
+      value ? repairMojibakeText(value).trim() : '';
+
+    return {
+      ...reply,
+      text: sanitize(reply.text),
+      listTitle: reply.listTitle ? sanitize(reply.listTitle) : undefined,
+      buttons: reply.buttons?.map((button) => ({
+        ...button,
+        title: sanitize(button.title),
+      })),
+      listSections: reply.listSections?.map((section) => ({
+        ...section,
+        title: sanitize(section.title),
+        rows: section.rows.map((row) => ({
+          ...row,
+          title: sanitize(row.title),
+          description: row.description ? sanitize(row.description) : undefined,
+        })),
+      })),
+    };
+  }
+
   /**
    * Verifica el webhook de Cloud API
    */
   verifyWebhook(mode: string, token: string, challenge: string): string | null {
     this.logger.debug(
-      `🔍 Verificando webhook - mode: ${mode}, token recibido: ${token}, token esperado: ${this.verifyToken}, challenge: ${challenge}`,
+      `ðŸ” Verificando webhook - mode: ${mode}, token recibido: ${token}, token esperado: ${this.verifyToken}, challenge: ${challenge}`,
     );
 
     if (mode === 'subscribe' && token === this.verifyToken) {
-      this.logger.log('✅ Webhook verificado correctamente');
+      this.logger.log('âœ… Webhook verificado correctamente');
       return challenge;
     }
 
     this.logger.error(
-      `❌ Fallo en verificación de webhook - mode: ${mode}, token match: ${token === this.verifyToken}`,
+      `âŒ Fallo en verificaciÃ³n de webhook - mode: ${mode}, token match: ${token === this.verifyToken}`,
     );
     return null;
   }

@@ -1,9 +1,60 @@
-const SUSPICIOUS_PATTERN = /[ÃƒÃ‚Ã¢Ã…Ã°\uFFFD]/g;
+import * as iconv from 'iconv-lite';
+
 const CONTROL_CHARS_PATTERN = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
+const CLASSIC_MOJIBAKE_CODEPOINTS = new Set<number>([
+  0x00c2, 0x00c3, 0x00e2, 0x00c5, 0x00f0, 0xfffd,
+]);
+const DEEP_MOJIBAKE_CODEPOINTS = new Set<number>([
+  0x00c2, 0x00c3, 0x00e2, 0x00f0, 0x0192, 0x00c6,
+  0x2018, 0x2019, 0x201a, 0x201c, 0x201d, 0x201e,
+  0x2020, 0x2021, 0x2022, 0x2026, 0x2013, 0x2014,
+  0x20ac, 0x2122, 0x0160, 0x0161, 0x017d, 0x017e,
+  0x0152, 0x0153, 0x02c6, 0x02dc, 0x2030, 0x2039,
+  0x203a, 0x00a0, 0x00a1, 0x00a2, 0x00ac, 0x00b3,
+]);
 
 function countSuspiciousChars(value: string): number {
-  const matches = value.match(SUSPICIOUS_PATTERN);
-  return matches ? matches.length : 0;
+  let count = 0;
+  for (const char of value) {
+    if (CLASSIC_MOJIBAKE_CODEPOINTS.has(char.codePointAt(0) || 0)) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function countDeepMojibakeTokens(value: string): number {
+  let count = 0;
+  for (const char of value) {
+    if (DEEP_MOJIBAKE_CODEPOINTS.has(char.codePointAt(0) || 0)) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function safeDecodeAsUtf8(value: string, sourceEncoding: 'latin1' | 'win1252'): string {
+  try {
+    const bytes = iconv.encode(value, sourceEncoding);
+    return bytes.toString('utf8');
+  } catch {
+    return value;
+  }
+}
+
+function scoreCandidate(value: string): number {
+  const replacementChars = (value.match(/\uFFFD/g) || []).length;
+  const controlChars = (value.match(CONTROL_CHARS_PATTERN) || []).length;
+  const classicSuspicious = countSuspiciousChars(value);
+  const deepSuspicious = countDeepMojibakeTokens(value);
+  const longQuestionMarks = (value.match(/\?{2,}/g) || [])
+    .reduce((total, segment) => total + segment.length, 0);
+
+  return (replacementChars * 1000)
+    + (controlChars * 250)
+    + (classicSuspicious * 30)
+    + (deepSuspicious * 10)
+    + (longQuestionMarks * 120);
 }
 
 function applyKnownMojibakeReplacements(value: string): string {
@@ -119,33 +170,38 @@ function applyKnownMojibakeReplacements(value: string): string {
 export function repairMojibakeText(text: string): string {
   if (!text) return text;
 
-  const hasSuspiciousChars = /[\u00C2\u00C3\u00E2\u00F0]/.test(text) || text.includes('\uFFFD');
-  if (!hasSuspiciousChars) return text.replace(CONTROL_CHARS_PATTERN, '');
+  let best = text;
+  let bestScore = scoreCandidate(text);
+  const seen = new Set<string>([text]);
+  let frontier = [text];
 
-  let candidate = text;
-  for (let i = 0; i < 6; i += 1) {
-    try {
-      const repaired = Buffer.from(candidate, 'latin1').toString('utf8');
-      if (!repaired || repaired === candidate) break;
-      candidate = repaired;
-    } catch {
-      break;
+  for (let i = 0; i < 8; i += 1) {
+    const nextFrontier: string[] = [];
+
+    for (const candidate of frontier) {
+      const options = [
+        safeDecodeAsUtf8(candidate, 'latin1'),
+        safeDecodeAsUtf8(candidate, 'win1252'),
+      ];
+
+      for (const option of options) {
+        if (!option || seen.has(option)) continue;
+        seen.add(option);
+        nextFrontier.push(option);
+
+        const optionScore = scoreCandidate(option);
+        if (optionScore < bestScore) {
+          best = option;
+          bestScore = optionScore;
+        }
+      }
     }
+
+    if (nextFrontier.length === 0) break;
+    frontier = nextFrontier;
   }
 
-  const normalizedCandidate = applyKnownMojibakeReplacements(candidate);
-  const normalizedOriginal = applyKnownMojibakeReplacements(text);
-
-  const fixed =
-    countSuspiciousChars(normalizedCandidate) <= countSuspiciousChars(normalizedOriginal)
-      ? normalizedCandidate
-      : normalizedOriginal;
-
-  if (fixed.includes('\uFFFD') && !normalizedOriginal.includes('\uFFFD')) {
-    return normalizedOriginal.replace(CONTROL_CHARS_PATTERN, '');
-  }
-
-  return fixed.replace(CONTROL_CHARS_PATTERN, '');
+  return applyKnownMojibakeReplacements(best).replace(CONTROL_CHARS_PATTERN, '');
 }
 
 export function sanitizeUnknownForLogs(input: unknown): unknown {

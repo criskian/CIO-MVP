@@ -135,7 +135,7 @@ export class LlmService {
           { role: 'user', content: userMessage },
         ],
         temperature: 0.7, // Más alta para variedad conversacional
-        max_tokens: 300,
+        max_tokens: 500,
         // SIN response_format: json_object — queremos texto natural
       });
 
