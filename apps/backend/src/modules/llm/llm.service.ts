@@ -59,7 +59,7 @@ export interface InitialProfileExtractionResult {
 }
 
 export interface RejectionReasonClassificationResult {
-  reason: 'role' | 'location' | 'company' | 'salary' | 'remote' | 'other';
+  reason: 'role' | 'location' | 'company' | 'salary' | 'remote' | 'experience' | 'other';
   confidence: number;
   rationale: string;
 }
@@ -366,7 +366,7 @@ export class LlmService {
    * Retorna null si el LLM no esta disponible.
    */
   async scoreVacancyReuse(input: {
-    rejectionReason: 'role' | 'location' | 'company' | 'salary' | 'remote' | 'other';
+    rejectionReason: 'role' | 'location' | 'company' | 'salary' | 'remote' | 'experience' | 'other';
     userProfile: {
       role?: string | null;
       location?: string | null;
@@ -430,7 +430,7 @@ export class LlmService {
       rationale: 'No fue posible clasificar con alta confianza.',
     });
 
-    const allowedReasons = new Set(['role', 'location', 'company', 'salary', 'remote', 'other']);
+    const allowedReasons = new Set(['role', 'location', 'company', 'salary', 'remote', 'experience', 'other']);
     const reason = allowedReasons.has(result.reason) ? result.reason : 'other';
     const confidence = Number.isFinite(result.confidence)
       ? Math.min(1, Math.max(0, result.confidence))

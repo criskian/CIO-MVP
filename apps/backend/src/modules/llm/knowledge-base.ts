@@ -151,7 +151,7 @@ Campos a extraer:
 2) location: ciudad o pais objetivo (string o null)
 3) modality: "remote" | "hybrid" | "onsite" | null
 4) experienceLevel: "none" | "junior" | "mid" | "senior" | "lead" | null
-5) experienceYears: numero de anos si aparece (0, 1, 2, 3...) o null
+5) experienceYears: numero de años si aparece (0, 1, 2, 3...) o null
 6) seniority: texto corto de seniority si aparece (ej: "junior", "senior", "lead") o null
 7) sector: sector/industria si aparece (ej: "fintech", "salud", "retail") o null
 8) confidence: numero entre 0 y 1
@@ -170,10 +170,10 @@ REGLAS ESTRICTAS:
 - role debe quedar limpio y breve (max 4 palabras idealmente).
 - experienceYears:
   - "sin experiencia" => 0
-  - "1-2 anos" => 1
-  - "3-5 anos" => 3
+  - "1-2 años" => 1
+  - "3-5 años" => 3
   - "mas de 5" => 6
-  - "7+ anos" => 7
+  - "7+ años" => 7
 - experienceLevel por defecto desde years:
   - 0 => none
   - 1-2 => junior
@@ -194,7 +194,7 @@ RESPONDE SIEMPRE JSON VALIDO con esta estructura exacta:
 }
 
 Ejemplos:
-Input: "Busco analista de datos en Bogota, tengo 3 anos y prefiero remoto"
+Input: "Busco analista de datos en Bogota, tengo 3 años y prefiero remoto"
 Output: {"role":"Analista de Datos","location":"Bogotá","modality":"remote","experienceLevel":"mid","experienceYears":3,"seniority":"mid","sector":null,"confidence":0.95}
 
 Input: "Quiero trabajar en marketing"
@@ -209,7 +209,7 @@ Output: {"role":null,"location":null,"modality":"remote","experienceLevel":"none
 Input: "Asesor comercial / call center en Barranquilla"
 Output: {"role":null,"location":"Barranquilla","modality":null,"experienceLevel":null,"experienceYears":null,"seniority":null,"sector":null,"confidence":0.88}
 
-Input: "Gerente de operaciones en Lima o Arequipa, 10 anos"
+Input: "Gerente de operaciones en Lima o Arequipa, 10 años"
 Output: {"role":"Gerente de Operaciones","location":null,"modality":null,"experienceLevel":"lead","experienceYears":10,"seniority":"lead","sector":null,"confidence":0.9}`,
 
    /**
@@ -341,6 +341,7 @@ Tu tarea:
   - company
   - salary
   - remote
+  - experience
   - other
 - Devolver confidence entre 0 y 1.
 - Incluir rationale breve (1 línea).
@@ -351,16 +352,20 @@ Guía:
 - company: no le gusta la empresa o su tipo.
 - salary: pago, sueldo, compensación.
 - remote: quiere remoto/home office/desde casa.
+- experience: dice que no tiene experiencia o que su seniority no encaja.
 - other: cuando no encaja claramente en las anteriores.
 
 Responde SIEMPRE en JSON:
 {
-  "reason": "role" | "location" | "company" | "salary" | "remote" | "other",
+  "reason": "role" | "location" | "company" | "salary" | "remote" | "experience" | "other",
   "confidence": number,
   "rationale": string
 }
 
 Ejemplo:
+Input: "Me equivoque, yo no tengo experiencia"
+→ {"reason":"experience","confidence":0.95,"rationale":"El rechazo se centra en nivel de experiencia."}
+
 Input: "No me sirve porque queda muy lejos y yo estoy en otra ciudad"
 → {"reason":"location","confidence":0.92,"rationale":"El rechazo se centra en distancia/ciudad."}`,
 

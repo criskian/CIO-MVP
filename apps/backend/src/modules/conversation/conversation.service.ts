@@ -44,7 +44,7 @@ import {
 } from './helpers/date-utils';
 
 type FlowVariant = 'legacy' | 'freemium_v2';
-type LeadRejectionReason = 'role' | 'location' | 'company' | 'salary' | 'remote' | 'other';
+type LeadRejectionReason = 'role' | 'location' | 'company' | 'salary' | 'remote' | 'experience' | 'other';
 type LeadVacancySearchMode = 'default' | 'reuse_cache' | 'force_fresh';
 type LeadRejectionReasonSource = 'button' | 'free_text' | 'llm';
 
@@ -479,7 +479,7 @@ export class ConversationService {
         `Gracias. Elige el motivo principal para ajustar la siguiente oferta.`,
       ],
       [ConversationState.LEAD_WAIT_REJECTION_OTHER_TEXT]: [
-        `Te leo. Cuentame en una frase por que no te intereso y ajusto la siguiente oferta.`,
+        `Te leo. Cuéntame en una frase por qué no te interesó y ajusto la siguiente oferta.`,
       ],
       [ConversationState.LEAD_REGISTER_NAME]: [
         `Para continuar con tu registro, escribeme tu *nombre completo*.`,
@@ -569,26 +569,26 @@ export class ConversationService {
           {
             id: 'exp_none',
             title: 'Sin experiencia',
-            description: 'Recien graduado o sin experiencia laboral',
+            description: 'Reci\u00E9n graduado o sin experiencia laboral',
           },
           {
             id: 'exp_junior',
-            title: 'Junior (1-2 anos)',
+            title: 'Junior (1-2 a\u00F1os)',
             description: 'Experiencia inicial en el campo',
           },
           {
             id: 'exp_mid',
-            title: 'Intermedio (3-5 anos)',
-            description: 'Experiencia solida',
+            title: 'Intermedio (3-5 a\u00F1os)',
+            description: 'Experiencia s\u00F3lida',
           },
           {
             id: 'exp_senior',
-            title: 'Senior (5+ anos)',
-            description: 'Experto en el area',
+            title: 'Senior (5+ a\u00F1os)',
+            description: 'Experto en el \u00E1rea',
           },
           {
             id: 'exp_lead',
-            title: 'Lead/Expert (7+ anos)',
+            title: 'Lead/Expert (7+ a\u00F1os)',
             description: 'Liderazgo y expertise avanzado',
           },
         ],
@@ -659,6 +659,83 @@ export class ConversationService {
     return `Veo que escribiste varias ubicaciones. Para continuar, elige solo una:\n\n${options}\n\nEscr\u00edbela de nuevo exactamente como la prefieres.`;
   }
 
+  private toRoleTitleCase(value: string): string {
+    return value
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  }
+
+  private extractRoleChoicesFromText(text: string): string[] {
+    const hasExplicitRoleSeparators = /\/|,|;|\||\s-\s|\sy\/o\s/i.test(text);
+    if (!hasExplicitRoleSeparators) return [];
+
+    const rawParts = text
+      .replace(/\n+/g, ' ')
+      .split(/\/|,|;|\||\s-\s|\sy\/o\s/gi)
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    const ignoredPatterns = [
+      /\b(remoto|remote|home office|teletrabajo)\b/i,
+      /\b(ciudad|pais|pa[ií]s|ubicaci[oó]n|location)\b/i,
+      /\b(bogot|medell|cali|lima|miami|madrid|oporto|mexico|m[eé]xico|colombia|argentina|peru|per[uú]|chile|espa[nñ]a|portugal|estados unidos|usa|canada|canad[aá])\b/i,
+    ];
+
+    const cleaned = rawParts
+      .map((part) => part
+        .replace(/^(\s)*(quiero|busco|me interesa|trabajar como|trabajo como|cargo|rol|puesto|profesi[oó]n|profesion)\s+/i, '')
+        .replace(/\b(en|desde|para)\b.*$/i, '')
+        .replace(/[()"'`]/g, '')
+        .trim())
+      .filter((part) => part.length >= 3)
+      .filter((part) => !/^\d+$/.test(part))
+      .filter((part) => !ignoredPatterns.some((pattern) => pattern.test(part)))
+      .map((part) => this.toRoleTitleCase(part));
+
+    const unique: string[] = [];
+    const seen = new Set<string>();
+    for (const item of cleaned) {
+      const key = this.normalizeLeadSignalToken(item);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      unique.push(item);
+    }
+
+    return unique.slice(0, 5);
+  }
+
+  private buildSingleRoleChoiceMessage(choices: string[]): string {
+    if (!choices.length) {
+      return `Para continuar, escribe solo un cargo principal (por ejemplo: *Analista de Datos*).`;
+    }
+    const bulletList = choices.map((choice) => `• ${choice}`).join('\n');
+    return `Veo que mencionaste varios cargos. Para obtener mejores resultados, elige solo uno:\n\n${bulletList}\n\nEscr\u00edbeme el cargo que quieres priorizar.`;
+  }
+
+  private isGenericSingleWordRole(role: string): boolean {
+    const normalized = this.normalizeLeadSignalToken(role);
+    if (!normalized || normalized.includes(' ')) return false;
+
+    const genericRoles = new Set([
+      'auxiliar',
+      'analista',
+      'ingeniero',
+      'director',
+      'gerente',
+      'administrador',
+      'asesor',
+      'coordinador',
+      'operario',
+      'tecnico',
+      'profesional',
+    ]);
+
+    return genericRoles.has(normalized);
+  }
+
   private async inferLeadSignals(text: string): Promise<{
     role: string | null;
     location: string | null;
@@ -677,8 +754,11 @@ export class ConversationService {
       };
     }
 
+    const roleChoices = this.extractRoleChoicesFromText(text);
+    const inferredRole = roleChoices.length > 1 ? null : extracted.role?.trim() || null;
+
     return {
-      role: extracted.role?.trim() || null,
+      role: inferredRole,
       location: extracted.location?.trim() || null,
       modality: extracted.modality,
       experienceLevel:
@@ -694,6 +774,7 @@ export class ConversationService {
 
     const inferred = await this.inferLeadSignals(text);
     const multipleLocationChoices = this.extractMultipleLocationChoices(text);
+    const roleChoicesFromText = this.extractRoleChoicesFromText(text);
     const normalizedText = text.toLowerCase().trim();
     const remotePatterns = ['remoto', 'remote', 'trabajo remoto', 'home office', 'teletrabajo'];
     const isRemoteIntent = remotePatterns.some((pattern) => normalizedText.includes(pattern));
@@ -756,6 +837,16 @@ export class ConversationService {
       }
     }
 
+    if (roleChoicesFromText.length > 1) {
+      roleWarning = this.buildSingleRoleChoiceMessage(roleChoicesFromText);
+      roleCandidate = null;
+    }
+
+    if (roleCandidate && this.isGenericSingleWordRole(roleCandidate)) {
+      roleWarning = `Tu cargo es muy general. Para que la b\u00FAsqueda sea precisa, escribe una especialidad.\n\nEjemplo: *Auxiliar Administrativo*, *Analista de Datos* o *Ingeniero Industrial*.`;
+      roleCandidate = null;
+    }
+
     if (roleCandidate && remoteRequested && !/\b(remoto|remote)\b/i.test(roleCandidate)) {
       roleCandidate = `${roleCandidate} remoto`;
     }
@@ -769,6 +860,10 @@ export class ConversationService {
     }
 
     if (!roleCandidate) {
+      if (roleWarning) {
+        return { text: roleWarning };
+      }
+
       const profile = await this.prisma.userProfile.findUnique({
         where: { userId },
         select: { location: true, experienceLevel: true },
@@ -783,7 +878,7 @@ export class ConversationService {
 
       if (hasHints) {
         return {
-          text: `Perfecto, ya tome parte de tu info. Ahora dime *solo el cargo o rol* que estas buscando.`,
+          text: `Perfecto, ya tom\u00E9 parte de tu info. Ahora dime *solo el cargo o rol* que est\u00E1s buscando.`,
         };
       }
 
@@ -793,8 +888,7 @@ export class ConversationService {
       );
       return {
         text:
-          roleWarning
-          || this.normalizeConversationalMessage(conversational)
+          this.normalizeConversationalMessage(conversational)
           || BotMessages.ERROR_ROLE_INVALID,
       };
     }
@@ -1265,6 +1359,16 @@ export class ConversationService {
   private resolveLeadRejectionReason(text: string): LeadRejectionReason {
     const normalized = this.normalizeLeadSignalToken(text);
 
+    if (
+      normalized.includes('experiencia')
+      || normalized.includes('sin experiencia')
+      || normalized.includes('junior')
+      || normalized.includes('intermedio')
+      || normalized.includes('senior')
+      || normalized.includes('lead')
+      || normalized.includes('expert')
+      || /\b\d+\s*(ano|anos|a\u00f1o|a\u00f1os)\b/i.test(normalized)
+    ) return 'experience';
     if (normalized.includes('cargo') || normalized.includes('rol') || normalized.includes('puesto')) return 'role';
     if (normalized.includes('ciudad') || normalized.includes('ubicacion') || normalized.includes('pais')) return 'location';
     if (normalized.includes('empresa')) return 'company';
@@ -1276,8 +1380,21 @@ export class ConversationService {
 
   private normalizeLeadSignalToken(value: string | null | undefined): string {
     if (!value) return '';
-    return value
-      .toLowerCase()
+    let text = value.toLowerCase();
+
+    // Repara mojibake típico (ej: "SÃ­, me interesÃ³")
+    if (/[ÃÂâ]/.test(text)) {
+      try {
+        const repaired = Buffer.from(text, 'latin1').toString('utf8');
+        if (repaired && !repaired.includes('\uFFFD')) {
+          text = repaired;
+        }
+      } catch {
+        // noop
+      }
+    }
+
+    return text
       .normalize('NFD')
       .replace(/\p{Diacritic}/gu, '')
       .trim();
@@ -1424,7 +1541,16 @@ export class ConversationService {
 
     if (reason === 'role') {
       await this.updateSessionState(userId, ConversationState.LEAD_COLLECT_PROFILE);
-      return { text: `Entendido. Dime el rol que quieres priorizar y ajusto la busqueda.` };
+      return { text: `Entendido. Dime el rol que quieres priorizar y ajusto la búsqueda.` };
+    }
+
+    if (reason === 'experience') {
+      await this.updateSessionState(userId, ConversationState.LEAD_ASK_EXPERIENCE);
+      return {
+        text: `Entendido. Ajustemos tu nivel de experiencia para mejorar la siguiente oferta.`,
+        listTitle: 'Seleccionar nivel',
+        listSections: this.getLeadExperienceListSections(),
+      };
     }
 
     if (reason === 'location') {
@@ -1441,7 +1567,7 @@ export class ConversationService {
       );
       return {
         ...nextVacancyReply,
-        text: `Gracias, sigo ajustando la busqueda segun tu perfil.\n\n${nextVacancyReply.text}`,
+        text: `Gracias, sigo ajustando la búsqueda según tu perfil.\n\n${nextVacancyReply.text}`,
       };
     }
 
@@ -1465,7 +1591,7 @@ export class ConversationService {
 
       return {
         ...nextVacancyReply,
-        text: `Gracias, sigo ajustando la busqueda segun tu perfil.\n\n${nextVacancyReply.text}`,
+        text: `Gracias, sigo ajustando la búsqueda según tu perfil.\n\n${nextVacancyReply.text}`,
       };
     }
 
@@ -1473,7 +1599,7 @@ export class ConversationService {
     const nextVacancyReply = await this.handleLeadShowFirstVacancyState(userId);
     return {
       ...nextVacancyReply,
-      text: `Gracias, sigo ajustando la busqueda segun tu perfil.\n\n${nextVacancyReply.text}`,
+      text: `Gracias, sigo ajustando la búsqueda según tu perfil.\n\n${nextVacancyReply.text}`,
     };
   }
 
@@ -1482,7 +1608,21 @@ export class ConversationService {
     text: string,
     _intent: UserIntent,
   ): Promise<BotReply> {
-    if (isAcceptance(text)) {
+    const normalizedText = this.normalizeLeadSignalToken(text);
+    const isPositiveInterest =
+      isAcceptance(text)
+      || normalizedText === 'lead_interest_yes'
+      || normalizedText.startsWith('si')
+      || normalizedText.includes('me intereso')
+      || normalizedText.includes('si me intereso')
+      || normalizedText.includes('si, me intereso');
+    const isNegativeInterest =
+      isRejection(text)
+      || normalizedText === 'lead_interest_no'
+      || normalizedText.includes('no me intereso')
+      || normalizedText.includes('no, me intereso') === false && normalizedText.startsWith('no');
+
+    if (isPositiveInterest) {
       await this.persistLeadFeedback(userId, {
         interested: true,
         reasonSource: 'button',
@@ -1525,7 +1665,7 @@ export class ConversationService {
       return this.buildLeadTermsConsentReply();
     }
 
-    if (isRejection(text)) {
+    if (isNegativeInterest) {
       await this.updateSessionState(userId, ConversationState.LEAD_WAIT_REJECTION_REASON);
       return {
         text: BotMessages.V2_REJECTION_REASON,
@@ -1534,12 +1674,12 @@ export class ConversationService {
           {
             title: 'Motivo principal',
             rows: [
-              { id: 'reason_role', title: 'cargo' },
-              { id: 'reason_location', title: 'ciudad' },
-              { id: 'reason_company', title: 'empresa' },
-              { id: 'reason_salary', title: 'salario' },
-              { id: 'reason_remote', title: 'remoto' },
-              { id: 'reason_other', title: 'otro motivo' },
+              { id: 'reason_role', title: 'Cargo' },
+              { id: 'reason_location', title: 'Ciudad' },
+              { id: 'reason_company', title: 'Empresa' },
+              { id: 'reason_salary', title: 'Salario' },
+              { id: 'reason_remote', title: 'Remoto' },
+              { id: 'reason_other', title: 'Otro motivo' },
             ],
           },
         ],
@@ -1547,7 +1687,7 @@ export class ConversationService {
     }
 
     return {
-      text: `Para seguir, elige una opcion:`,
+      text: `Para seguir, elige una opción:`,
       buttons: [
         { id: 'lead_interest_yes', title: 'S\u00ED, me interes\u00F3' },
         { id: 'lead_interest_no', title: 'No me interes\u00F3' },
@@ -1565,7 +1705,7 @@ export class ConversationService {
       await this.updateSessionData(userId, { leadPendingRejectionReason: 'other' });
       await this.updateSessionState(userId, ConversationState.LEAD_WAIT_REJECTION_OTHER_TEXT);
       return {
-        text: `Entiendo. Cuentame en una frase por que no te interes\u00F3 esta vacante y ajusto la siguiente.`,
+        text: `Entiendo. Cu\u00E9ntame en una frase por qu\u00E9 no te interes\u00F3 esta vacante y ajusto la siguiente.`,
       };
     }
 
@@ -1591,7 +1731,16 @@ export class ConversationService {
 
     const classified = await this.llmService.classifyRejectionReason(text);
     const fallbackReason = this.resolveLeadRejectionReason(text);
-    const reason = classified?.reason || fallbackReason;
+    const shouldPreferFallback =
+      fallbackReason !== 'other'
+      && (
+        !classified
+        || (classified.confidence ?? 0) < 0.82
+        || (fallbackReason === 'experience' && classified.reason !== 'experience')
+      );
+    const reason = shouldPreferFallback
+      ? fallbackReason
+      : (classified?.reason || fallbackReason);
 
     return await this.continueLeadAfterRejection(userId, reason, {
       reasonText: text,
@@ -2363,13 +2512,12 @@ export class ConversationService {
 
   /**
    * Estado ASK_ALERT_TIME: Esperando hora de alertas
-   * ACTUALIZADO: Siempre muestra lista interactiva para el menÃº
+   * ACTUALIZADO: Siempre muestra lista interactiva para el menú
    */
   private async handleAskAlertTimeState(userId: string, text: string): Promise<BotReply> {
     const alertTime = normalizeTime(text);
 
     if (!alertTime) {
-      // Mostrar lista de horas cuando no entiende
       const timeOptions = generateTimeOptions();
       return {
         text: BotMessages.ERROR_TIME_INVALID,
@@ -2383,26 +2531,22 @@ export class ConversationService {
       };
     }
 
-    // Guardar en AlertPreference (frecuencia siempre diaria)
     await this.upsertAlertPreference(userId, alertTime, 'daily');
-
-    // TransiciÃ³n: ASK_ALERT_TIME â†’ READY
     await this.updateSessionState(userId, ConversationState.READY);
 
-    const confirmationMessage = `Â¡Listo! âœ…
-Alertas activadas ðŸ”” a las ${alertTime}
+    const confirmationMessage = `¡Listo! ✅
+Alertas activadas 🔔 a las ${alertTime}
 
-Cuando te llegue la notificaciÃ³n, toca *â€œBuscar empleosâ€* para ver las ofertas.
+Cuando te llegue la notificación, toca *"Buscar empleos"* para ver las ofertas.
 
-â„¹ï¸ Ten en cuenta:
+ℹ️ Ten en cuenta:
 
-ðŸ“Œ Cada vez que le des clic en â€œBuscar empleosâ€ consumes 1 BÃºsqueda.
+📌 Cada vez que le des clic en "Buscar empleos" consumes 1 búsqueda.
 
-Actualmente tienes el Plan Free: 5 bÃºsquedas por una semana.
+Actualmente tienes el Plan Free: 5 búsquedas por una semana.
 
-Â¿QuÃ© quieres hacer ahora?`;
+¿Qué quieres hacer ahora?`;
 
-    // Siempre mostrar lista interactiva con comandos
     return {
       text: confirmationMessage,
       listTitle: 'Ver opciones',
@@ -2437,7 +2581,7 @@ Actualmente tienes el Plan Free: 5 bÃºsquedas por una semana.
   }
 
   /**
-   * Estado READY: Usuario completÃ³ onboarding
+   * Estado READY: Usuario completó onboarding
    * ACTUALIZADO: Siempre usa botones/listas interactivas
    */
   private async handleReadyState(
@@ -2588,96 +2732,84 @@ Actualmente tienes el Plan Free: 5 bÃºsquedas por una semana.
   }
 
   /**
-   * Ejecuta bÃºsqueda de empleos y devuelve resultados formateados
+   * Ejecuta búsqueda de empleos y devuelve resultados formateados
    */
   private async performJobSearch(userId: string, usesLeftAfterDeduction?: number): Promise<BotReply> {
     try {
-      this.logger.log(`ðŸ” Usuario ${userId} solicitÃ³ bÃºsqueda de empleos`);
+      this.logger.log(`🔍 Usuario ${userId} solicitó búsqueda de empleos`);
 
-      // Determinar maxResults segun plan y variante de flujo.
-      // V2 freemium: 1 vacante por interaccion.
+      // Determinar maxResults según plan y variante de flujo.
+      // V2 freemium: 1 vacante por interacción.
       const subscription = await this.prisma.subscription.findUnique({ where: { userId } });
       const onboardingFlags = await this.getOnboardingFlags(userId);
       const isPaidPlan = subscription?.plan === 'PREMIUM' || subscription?.plan === 'PRO';
       const isFreemiumV2 = subscription?.plan === 'FREEMIUM' && onboardingFlags.flowVariant === this.v2FlowVariant;
       const maxResults = isPaidPlan ? 5 : (isFreemiumV2 ? 1 : 3);
 
-      // Ejecutar bÃºsqueda
+      // Ejecutar búsqueda
       const result = await this.jobSearchService.searchJobsForUser(userId, maxResults);
 
-      // Si no hay ofertas â€” sugerir roles alternativos con IA
+      // Si no hay ofertas, sugerir roles alternativos con IA
       if (result.jobs.length === 0) {
-        // Obtener perfil para el rol actual
         const profile = await this.prisma.userProfile.findUnique({ where: { userId } });
         const currentRole = profile?.role || 'tu perfil';
 
-        // Pedir sugerencias al LLM
         const suggestions = await this.llmService.suggestRelatedRoles(currentRole);
         const suggestionsText = suggestions.length > 0
-          ? `\n\nðŸ’¡ *Roles relacionados que podrÃ­as probar:*\n${suggestions.map(s => `â€¢ ${s}`).join('\n')}\n\nPuedes escribir *"editar"* para cambiar tu cargo.`
-          : `\n\nIntenta de nuevo mÃ¡s tarde o escribe *"editar"* para ajustar tus preferencias.`;
+          ? `\n\n💡 *Roles relacionados que podrías probar:*\n${suggestions.map((s) => `• ${s}`).join('\n')}\n\nPuedes escribir *"editar"* para cambiar tu cargo.`
+          : `\n\nIntenta de nuevo más tarde o escribe *"editar"* para ajustar tus preferencias.`;
 
         return {
-          text: `No encontrÃ© ofertas que coincidan con *"${currentRole}"* en este momento. ðŸ˜”${suggestionsText}`,
+          text: `No encontré ofertas que coincidan con *"${currentRole}"* en este momento. 😔${suggestionsText}`,
         };
       }
 
-      // Formatear ofertas para WhatsApp
       const formattedJobs = this.jobSearchService.formatJobsForWhatsApp(result.jobs);
       const primarySearchMessage =
         result.jobs.length === 1
           ? this.buildReadySearchSingleVacancyMessage(result.jobs[0])
           : formattedJobs;
 
-      // Marcar ofertas como enviadas
       await this.jobSearchService.markJobsAsSent(userId, result.jobs);
 
-      // Mensaje de advertencia si se agotaron las ofertas disponibles
       let exhaustedMessage = '';
       if (result.offersExhausted) {
         exhaustedMessage = `
 
-âš ï¸ *Â¡AtenciÃ³n!* Has visto todas las ofertas disponibles para tu perfil actual. Para tu prÃ³xima bÃºsqueda puedes:
-â€¢ Esperar un tiempo mientras se publican nuevas ofertas
-â€¢ Escribir *"editar"* para ajustar tus preferencias y encontrar mÃ¡s opciones`;
+⚠️ *¡Atención!* Has visto todas las ofertas disponibles para tu perfil actual. Para tu próxima búsqueda puedes:
+• Esperar un tiempo mientras se publican nuevas ofertas
+• Escribir *"editar"* para ajustar tus preferencias y encontrar más opciones`;
       }
 
-      // Tiempo de espera para mensaje retrasado: 10 segundos
       const DELAY_MS = 10000;
-
-      // Usar usesLeft pasado como parÃ¡metro (ya descontado) o consultar DB
       const usesLeft = usesLeftAfterDeduction ?? subscription?.freemiumUsesLeft ?? 0;
       const isPremium = subscription?.plan === 'PREMIUM' || subscription?.plan === 'PRO';
-
-      // Construir mensaje retrasado con info de bÃºsquedas
       const planLabel = isPremium ? (subscription?.plan === 'PRO' ? 'Plan Pro' : 'Plan Premium') : 'Plan Free';
 
       let menuText: string;
-
       if (usesLeft === 0 && !isPremium) {
-        // Mensaje especial cuando se agotan las busquedas del Plan Free
         const profile = await this.prisma.userProfile.findUnique({ where: { userId } });
         const userRole = profile?.role || 'tu perfil';
         const checkoutLink = process.env.WOMPI_CHECKOUT_LINK || 'https://checkout.wompi.co/l/xTJSuZ';
 
-        menuText = `*B\u00FAsquedas restantes esta semana:* 0 (Plan Free)
+        menuText = `*Búsquedas restantes esta semana:* 0 (Plan Free)
 
 Hay muchas ofertas que podemos cazar por ti en internet para tu rol (*${userRole}*).
-Si quieres seguir recibi\u00E9ndolas de forma autom\u00E1tica y filtradas seg\u00FAn tu perfil, activa CIO por solo *$20.000 COP al mes* y contin\u00FAa tu b\u00FAsqueda sin l\u00EDmites.
-Act\u00EDvalo aqu\u00ED:
+Si quieres seguir recibiéndolas de forma automática y filtradas según tu perfil, activa CIO por solo *$20.000 COP al mes* y continúa tu búsqueda sin límites.
+Actívalo aquí:
 
 ${checkoutLink}
 
-Estoy lista para ayudarte a cazar tu pr\u00F3xima oportunidad.`;
+Estoy lista para ayudarte a cazar tu próxima oportunidad.`;
       } else {
-        const searchWord = usesLeft === 1 ? 'b\u00FAsqueda' : 'b\u00FAsquedas';
-        menuText = `\uD83D\uDCCC Te quedan *${usesLeft} ${searchWord} esta semana* (${planLabel}).
+        const searchWord = usesLeft === 1 ? 'búsqueda' : 'búsquedas';
+        menuText = `📌 Te quedan *${usesLeft} ${searchWord} esta semana* (${planLabel}).
 
-\u26A0\uFE0F \u00BFLas ofertas no encajan del todo?
+⚠️ ¿Las ofertas no encajan del todo?
 
 Puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
 
-\u00BFQu\u00E9 quieres hacer ahora?`;
+¿Qué quieres hacer ahora?`;
       }
 
       return {
@@ -2690,30 +2822,28 @@ Puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
             {
               title: 'Acciones disponibles',
               rows: [
-                { id: 'cmd_buscar', title: 'Buscar empleos', description: 'Encontrar m\u00E1s ofertas' },
+                { id: 'cmd_buscar', title: 'Buscar empleos', description: 'Encontrar más ofertas' },
                 { id: 'cmd_editar', title: 'Editar perfil', description: 'Cambiar tus preferencias' },
                 { id: 'cmd_reiniciar', title: 'Reiniciar', description: 'Reconfigurar tu perfil' },
                 { id: 'cmd_cancelar', title: 'Cancelar servicio', description: 'Dejar de usar el CIO' },
               ],
             },
           ],
-        }
+        },
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Error en bÃºsqueda de empleos: ${errorMessage}`);
+      this.logger.error(`Error en búsqueda de empleos: ${errorMessage}`);
 
       const profile = await this.prisma.userProfile.findUnique({
         where: { userId },
       });
 
-      // Fallback heurÃ­stico rÃ¡pido para problemas obvios de parÃ¡metros.
       const heuristicDiagnosis = this.detectSearchProfileIssue(profile);
       if (heuristicDiagnosis) {
         return { text: heuristicDiagnosis };
       }
 
-      // DiagnÃ³stico con IA para explicar causa probable y siguiente acciÃ³n.
       const diagnosis = await this.llmService.diagnoseSearchFailure({
         errorMessage,
         role: profile?.role,
@@ -2728,7 +2858,7 @@ Puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
       }
 
       return {
-        text: `Lo siento, no pude buscar ofertas en este momento. ðŸ˜”
+        text: `Lo siento, no pude buscar ofertas en este momento. 😔
 
 Por favor intenta de nuevo en unos minutos.`,
       };
@@ -2740,14 +2870,10 @@ Por favor intenta de nuevo en unos minutos.`,
    * ACTUALIZADO: Si acepta, va directamente a ASK_ALERT_TIME (frecuencia siempre diaria)
    */
   private async handleOfferAlertsState(userId: string, text: string): Promise<BotReply> {
-    // Verificar si acepta alertas
     if (isAcceptance(text) || text.toLowerCase().includes('activar')) {
-      // Usuario quiere activar alertas â†’ Preguntar hora directamente (frecuencia siempre diaria)
       await this.updateSessionState(userId, ConversationState.ASK_ALERT_TIME);
 
-      // Mostrar lista desplegable con horas comunes
       const timeOptions = generateTimeOptions();
-
       return {
         text: BotMessages.ASK_ALERT_TIME_MOBILE,
         listTitle: 'Seleccionar hora',
@@ -2760,30 +2886,25 @@ Por favor intenta de nuevo en unos minutos.`,
       };
     }
 
-    // Verificar si rechaza alertas
     if (isRejection(text) || text.toLowerCase().includes('sin alertas') || text.toLowerCase().includes('no quiero')) {
-      // Usuario NO quiere alertas â†’ Crear AlertPreference con enabled=false
       await this.prisma.alertPreference.create({
         data: {
           userId,
-          alertFrequency: 'daily', // Siempre diaria
-          alertTimeLocal: '09:00', // Valor por defecto (no se usarÃ¡)
+          alertFrequency: 'daily',
+          alertTimeLocal: '09:00',
           timezone: 'America/Bogota',
-          enabled: false, // âš ï¸ DESACTIVADO
+          enabled: false,
         },
       });
 
-      // Volver a READY
       await this.updateSessionState(userId, ConversationState.READY);
-
       return await this.returnToMainMenu(userId, BotMessages.ALERTS_DISABLED);
     }
 
-    // No entendiÃ³ la respuesta, mostrar botones (sin emojis)
     return {
-      text: `${BotMessages.OFFER_ALERTS}\n\n_Por favor, selecciona una opciÃ³n:_`,
+      text: `${BotMessages.OFFER_ALERTS}\n\n_Por favor, selecciona una opción:_`,
       buttons: [
-        { id: 'accept_alerts', title: 'SÃ­, activar' },
+        { id: 'accept_alerts', title: 'Sí, activar' },
         { id: 'reject_alerts', title: 'No, gracias' },
       ],
     };
@@ -2791,7 +2912,7 @@ Por favor intenta de nuevo en unos minutos.`,
 
   /**
    * Estado CONFIRM_RESTART: Confirmando reinicio de perfil
-   * ACTUALIZADO: Va directamente a ASK_ROLE (sin tÃ©rminos)
+   * ACTUALIZADO: Va directamente a ASK_ROLE (sin términos)
    */
   private async handleConfirmRestartState(userId: string, text: string): Promise<BotReply> {
     if (isAcceptance(text)) {
