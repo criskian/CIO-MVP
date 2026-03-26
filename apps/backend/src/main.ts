@@ -2,9 +2,12 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
+import { SanitizedConsoleLogger } from './common/logging/sanitized-console.logger';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: new SanitizedConsoleLogger(),
+  });
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT', 3001);
@@ -41,8 +44,8 @@ async function bootstrap() {
   );
 
   await app.listen(port);
-  console.log(`🚀 CIO Backend corriendo en puerto ${port}`);
-  console.log(`📡 CORS habilitado para: ${corsOrigins.join(', ')}`);
+  console.log(`\u{1F680} CIO Backend corriendo en puerto ${port}`);
+  console.log(`\u{1F4E1} CORS habilitado para: ${corsOrigins.join(', ')}`);
 }
 
 bootstrap();

@@ -2062,7 +2062,7 @@ export class ConversationService {
         text: BotMessages.FREEMIUM_EXPIRED_RETURNING_USER(getFirstName(user?.name)),
         buttons: [
           { id: 'cmd_pagar', title: 'Quiero pagar' },
-          { id: 'cmd_ofertas', title: 'Ver ofertas gratis' },
+          { id: 'cmd_ofertas', title: 'Ver ofertas ahora' },
         ],
       };
     }
@@ -2620,6 +2620,23 @@ Actualmente tienes el Plan Free: 5 bÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬
 
     // Detectar intenciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n de buscar empleos
     if (intent === UserIntent.SEARCH_NOW) {
+      // Freemium V2: al abrir alerta pendiente, mostrar 1 vacante con el texto nuevo.
+      const v2PendingAlert = await this.getLatestNonStalePendingAlert(userId);
+      if (v2PendingAlert) {
+        const onboardingFlags = await this.getOnboardingFlags(userId);
+        const isFreemiumV2 = onboardingFlags.flowVariant === this.v2FlowVariant;
+        const pendingJobs = v2PendingAlert.jobs as any[];
+
+        if (isFreemiumV2 && pendingJobs.length > 0) {
+          await this.prisma.pendingJobAlert.update({
+            where: { id: v2PendingAlert.id },
+            data: { viewedAt: new Date() },
+          });
+          await this.jobSearchService.markJobsAsSent(userId, [pendingJobs[0]]);
+          return { text: this.buildReadySearchSingleVacancyMessage(pendingJobs[0] as JobPosting) };
+        }
+      }
+
       // PRIMERO: Verificar si hay alertas pendientes de un template notification
       const pendingAlert = await this.getLatestNonStalePendingAlert(userId);
 
