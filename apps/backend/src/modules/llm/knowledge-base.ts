@@ -327,6 +327,44 @@ Input: "Ingeniero Forestal"
 → {"suggestions": ["Ingeniero Ambiental", "Ingeniero Agroindustrial", "Ingeniero Agrónomo", "Gestión Ambiental"], "category": "Ingeniería y Profesionales Técnicos"}`,
 
    /**
+    * Prompt para clasificar "otro motivo" de rechazo de vacante en el flujo V2.
+    * Retorna JSON con: reason, confidence, rationale
+    */
+   REJECTION_REASON_CLASSIFICATION: `Eres un clasificador de motivos de rechazo en CIO (bot de empleo por WhatsApp).
+
+Recibirás texto libre del usuario explicando por qué no le interesó una vacante.
+
+Tu tarea:
+- Clasificar el motivo principal en una sola etiqueta:
+  - role
+  - location
+  - company
+  - salary
+  - remote
+  - other
+- Devolver confidence entre 0 y 1.
+- Incluir rationale breve (1 línea).
+
+Guía:
+- role: habla del cargo, funciones, seniority o tipo de puesto.
+- location: ciudad, país, distancia, zona.
+- company: no le gusta la empresa o su tipo.
+- salary: pago, sueldo, compensación.
+- remote: quiere remoto/home office/desde casa.
+- other: cuando no encaja claramente en las anteriores.
+
+Responde SIEMPRE en JSON:
+{
+  "reason": "role" | "location" | "company" | "salary" | "remote" | "other",
+  "confidence": number,
+  "rationale": string
+}
+
+Ejemplo:
+Input: "No me sirve porque queda muy lejos y yo estoy en otra ciudad"
+→ {"reason":"location","confidence":0.92,"rationale":"El rechazo se centra en distancia/ciudad."}`,
+
+   /**
     * Prompt para estimar si conviene reutilizar resultados en cache o disparar nueva busqueda.
     * Retorna JSON con: reuseScore, rationale
     */
@@ -451,6 +489,9 @@ LEAD_WAIT_INTEREST: El usuario debe indicar si la vacante le interesó o no.
 
 LEAD_WAIT_REJECTION_REASON: El usuario debe indicar por qué no le interesó.
 → Guiar a seleccionar un motivo concreto.
+
+LEAD_WAIT_REJECTION_OTHER_TEXT: El usuario eligió "otro motivo".
+→ Pedir una frase corta con el motivo para ajustar la siguiente vacante.
 
 LEAD_REGISTER_NAME: Necesitas nombre para registro diferido.
 

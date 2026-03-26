@@ -17,6 +17,7 @@ export enum ConversationState {
   LEAD_SHOW_FIRST_VACANCY = 'LEAD_SHOW_FIRST_VACANCY', // Muestra primera vacante (1 resultado)
   LEAD_WAIT_INTEREST = 'LEAD_WAIT_INTEREST', // Espera interés/no interés
   LEAD_WAIT_REJECTION_REASON = 'LEAD_WAIT_REJECTION_REASON', // Motivo de rechazo para ajustar
+  LEAD_WAIT_REJECTION_OTHER_TEXT = 'LEAD_WAIT_REJECTION_OTHER_TEXT', // Texto libre para "otro motivo"
   LEAD_REGISTER_NAME = 'LEAD_REGISTER_NAME', // Registro diferido: nombre
   LEAD_REGISTER_EMAIL = 'LEAD_REGISTER_EMAIL', // Registro diferido: email
   LEAD_TERMS_CONSENT = 'LEAD_TERMS_CONSENT', // Consentimiento posterior al correo

@@ -58,6 +58,12 @@ export interface InitialProfileExtractionResult {
   confidence: number;
 }
 
+export interface RejectionReasonClassificationResult {
+  reason: 'role' | 'location' | 'company' | 'salary' | 'remote' | 'other';
+  confidence: number;
+  rationale: string;
+}
+
 @Injectable()
 export class LlmService {
   private readonly logger = new Logger(LlmService.name);
@@ -401,6 +407,42 @@ export class LlmService {
 
     return {
       reuseScore: boundedScore,
+      rationale: result.rationale || '',
+    };
+  }
+
+  /**
+   * Clasifica texto libre de "otro motivo" de rechazo en una razon accionable.
+   * Retorna null si el LLM no esta disponible.
+   */
+  async classifyRejectionReason(
+    text: string,
+  ): Promise<RejectionReasonClassificationResult | null> {
+    const raw = await this.callOpenAI(
+      SYSTEM_PROMPTS.REJECTION_REASON_CLASSIFICATION,
+      text,
+    );
+    if (!raw) return null;
+
+    const result = this.parseJSON<RejectionReasonClassificationResult>(raw, {
+      reason: 'other',
+      confidence: 0.5,
+      rationale: 'No fue posible clasificar con alta confianza.',
+    });
+
+    const allowedReasons = new Set(['role', 'location', 'company', 'salary', 'remote', 'other']);
+    const reason = allowedReasons.has(result.reason) ? result.reason : 'other';
+    const confidence = Number.isFinite(result.confidence)
+      ? Math.min(1, Math.max(0, result.confidence))
+      : 0.5;
+
+    this.logger.log(
+      `🧠 Clasificacion IA de rechazo: reason=${reason}, confidence=${confidence.toFixed(2)}`,
+    );
+
+    return {
+      reason: reason as RejectionReasonClassificationResult['reason'],
+      confidence,
       rationale: result.rationale || '',
     };
   }

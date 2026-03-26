@@ -440,7 +440,7 @@ export class SchedulerService implements OnModuleInit {
       const dayOfWeek = now.day(); // 0=domingo, 1=lunes, ..., 6=sÃ¡bado
       if (dayOfWeek === 0 || dayOfWeek === 6) {
         this.logger.debug(
-          `ðŸ“… Usuario ${userId}: Hoy es ${dayOfWeek === 0 ? 'domingo' : 'sÃ¡bado'} â†’ NO ENVIAR (solo dÃ­as hÃ¡biles)`,
+          `Usuario ${userId}: Hoy es ${dayOfWeek === 0 ? 'domingo' : 'sabado'} -> NO ENVIAR (solo dias habiles)`,
         );
         return false;
       }
@@ -462,13 +462,13 @@ export class SchedulerService implements OnModuleInit {
 
       if (!isWithinTimeWindow) {
         this.logger.debug(
-          `â° Usuario ${userId}: Fuera de ventana horaria (actual: ${currentHour}:${String(currentMinute).padStart(2, '0')}, objetivo: ${targetHour}:${String(targetMinute).padStart(2, '0')}, diff: ${minutesDiff} min) â†’ NO ENVIAR`,
+          `Usuario ${userId}: Fuera de ventana horaria (actual: ${currentHour}:${String(currentMinute).padStart(2, '0')}, objetivo: ${targetHour}:${String(targetMinute).padStart(2, '0')}, diff: ${minutesDiff} min) -> NO ENVIAR`,
         );
         return false;
       }
 
       this.logger.debug(
-        `âœ… Usuario ${userId}: Dentro de ventana horaria (diff: ${minutesDiff} min desde objetivo)`,
+        `Usuario ${userId}: Dentro de ventana horaria (diff: ${minutesDiff} min desde objetivo)`,
       );
 
       // Si no hay Ãºltima notificaciÃ³n, es la primera vez â†’ enviar
@@ -488,14 +488,14 @@ export class SchedulerService implements OnModuleInit {
       const minutesSinceLastAlert = now.diff(lastNotif, 'minute');
 
       this.logger.debug(
-        `â° Usuario ${userId}: Ãšltima alerta hace ${daysSinceLastAlert.toFixed(2)} dÃ­as (${hoursSinceLastAlert}h ${minutesSinceLastAlert % 60}m)`,
+        `Usuario ${userId}: Ultima alerta hace ${daysSinceLastAlert.toFixed(2)} dias (${hoursSinceLastAlert}h ${minutesSinceLastAlert % 60}m)`,
       );
 
       // [FIX CRÃTICO] Evitar enviar mÃºltiples veces en la misma ventana horaria
       // Si la Ãºltima alerta fue hace menos de 15 minutos, NO enviar (incluso si cumple frecuencia)
       if (minutesSinceLastAlert < 15) {
         this.logger.debug(
-          `â­ï¸ Usuario ${userId}: Ya recibiÃ³ alerta hace ${minutesSinceLastAlert} minutos (muy reciente) â†’ NO ENVIAR`,
+          `Usuario ${userId}: Ya recibio alerta hace ${minutesSinceLastAlert} minutos (muy reciente) -> NO ENVIAR`,
         );
         return false;
       }
@@ -534,11 +534,11 @@ export class SchedulerService implements OnModuleInit {
       // Loguear decisiÃ³n para debug
       if (shouldSend) {
         this.logger.log(
-          `âœ… Usuario ${userId}: Frecuencia=${alertPref.alertFrequency}, Ãºltima alerta hace ${daysSinceLastAlert.toFixed(1)} dÃ­as (${hoursSinceLastAlert}h) â†’ ENVIAR`,
+          `Usuario ${userId}: Frecuencia=${alertPref.alertFrequency}, ultima alerta hace ${daysSinceLastAlert.toFixed(1)} dias (${hoursSinceLastAlert}h) -> ENVIAR`,
         );
       } else {
         this.logger.debug(
-          `â³ Usuario ${userId}: Frecuencia=${alertPref.alertFrequency}, Ãºltima alerta hace ${daysSinceLastAlert.toFixed(1)} dÃ­as (${hoursSinceLastAlert}h) â†’ NO ENVIAR AÃšN`,
+          `Usuario ${userId}: Frecuencia=${alertPref.alertFrequency}, ultima alerta hace ${daysSinceLastAlert.toFixed(1)} dias (${hoursSinceLastAlert}h) -> NO ENVIAR AUN`,
         );
       }
 

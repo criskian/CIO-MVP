@@ -45,6 +45,7 @@ import {
 type FlowVariant = 'legacy' | 'freemium_v2';
 type LeadRejectionReason = 'role' | 'location' | 'company' | 'salary' | 'remote' | 'other';
 type LeadVacancySearchMode = 'default' | 'reuse_cache' | 'force_fresh';
+type LeadRejectionReasonSource = 'button' | 'free_text' | 'llm';
 
 /**
  * Servicio de conversaciÃ³n (Orquestador)
@@ -239,6 +240,9 @@ export class ConversationService {
       case ConversationState.LEAD_WAIT_REJECTION_REASON:
         return await this.handleLeadWaitRejectionReasonState(userId, text);
 
+      case ConversationState.LEAD_WAIT_REJECTION_OTHER_TEXT:
+        return await this.handleLeadWaitRejectionOtherTextState(userId, text);
+
       case ConversationState.LEAD_REGISTER_NAME:
         return await this.handleLeadRegisterNameState(userId, text);
 
@@ -382,6 +386,7 @@ export class ConversationService {
       ConversationState.LEAD_ASK_EXPERIENCE,
       ConversationState.LEAD_WAIT_INTEREST,
       ConversationState.LEAD_WAIT_REJECTION_REASON,
+      ConversationState.LEAD_WAIT_REJECTION_OTHER_TEXT,
       ConversationState.LEAD_REGISTER_NAME,
       ConversationState.LEAD_REGISTER_EMAIL,
       ConversationState.LEAD_TERMS_CONSENT,
@@ -465,10 +470,13 @@ export class ConversationService {
         `Gracias. Para continuar, selecciona *tu nivel de experiencia* en el rol.`,
       ],
       [ConversationState.LEAD_WAIT_INTEREST]: [
-        `Solo necesito que elijas una opcion para seguir: *Si, me intereso* o *No me intereso*.`,
+        `Solo necesito que elijas una opcion para seguir: *S\u00ED, me interes\u00F3* o *No me interes\u00F3*.`,
       ],
       [ConversationState.LEAD_WAIT_REJECTION_REASON]: [
         `Gracias. Elige el motivo principal para ajustar la siguiente oferta.`,
+      ],
+      [ConversationState.LEAD_WAIT_REJECTION_OTHER_TEXT]: [
+        `Te leo. Cuentame en una frase por que no te intereso y ajusto la siguiente oferta.`,
       ],
       [ConversationState.LEAD_REGISTER_NAME]: [
         `Para continuar con tu registro, escribeme tu *nombre completo*.`,
@@ -538,6 +546,7 @@ export class ConversationService {
       ConversationState.LEAD_SHOW_FIRST_VACANCY,
       ConversationState.LEAD_WAIT_INTEREST,
       ConversationState.LEAD_WAIT_REJECTION_REASON,
+      ConversationState.LEAD_WAIT_REJECTION_OTHER_TEXT,
       ConversationState.LEAD_REGISTER_NAME,
       ConversationState.LEAD_REGISTER_EMAIL,
       ConversationState.LEAD_TERMS_CONSENT,
@@ -1103,14 +1112,30 @@ export class ConversationService {
     userId: string,
     searchMode: LeadVacancySearchMode,
   ): Promise<JobPosting | null> {
+    const sessionData = await this.getLatestSessionData(userId);
+    const excludedCompanies = Array.isArray(sessionData?.leadExcludedCompanies)
+      ? sessionData.leadExcludedCompanies
+        .filter((value: any) => typeof value === 'string')
+        .map((value: string) => this.normalizeLeadSignalToken(value))
+      : [];
+    const shouldFetchBatch = excludedCompanies.length > 0;
+    const maxResults = shouldFetchBatch ? Math.max(this.leadReuseCandidateLimit, 5) : 1;
+
     const result =
       searchMode === 'reuse_cache'
-        ? await this.jobSearchService.searchJobsForUser(userId, 1, { cacheOnlyIfAvailable: true })
+        ? await this.jobSearchService.searchJobsForUser(userId, maxResults, { cacheOnlyIfAvailable: true })
         : searchMode === 'force_fresh'
-          ? await this.jobSearchService.searchJobsForUser(userId, 1, { forceFreshSearch: true })
-          : await this.jobSearchService.searchJobsForUser(userId, 1);
+          ? await this.jobSearchService.searchJobsForUser(userId, maxResults, { forceFreshSearch: true })
+          : await this.jobSearchService.searchJobsForUser(userId, maxResults);
 
-    return result.jobs[0] || null;
+    if (!result.jobs.length) return null;
+    if (!excludedCompanies.length) return result.jobs[0] || null;
+
+    const excludedSet = new Set(excludedCompanies);
+    const filtered = result.jobs.find(
+      (job) => !excludedSet.has(this.normalizeLeadSignalToken(job.company || '')),
+    );
+    return filtered || result.jobs[0] || null;
   }
 
   private async buildLeadNoVacancyFoundReply(userId: string): Promise<BotReply> {
@@ -1151,8 +1176,8 @@ export class ConversationService {
     return {
       text: this.buildLeadVacancyMessage(job),
       buttons: [
-        { id: 'lead_interest_yes', title: 'Si, me intereso' },
-        { id: 'lead_interest_no', title: 'No me intereso' },
+        { id: 'lead_interest_yes', title: 'S\u00ED, me interes\u00F3' },
+        { id: 'lead_interest_no', title: 'No me interes\u00F3' },
       ],
     };
   }
@@ -1218,10 +1243,10 @@ export class ConversationService {
   }
 
   private resolveLeadRejectionReason(text: string): LeadRejectionReason {
-    const normalized = text.toLowerCase();
+    const normalized = this.normalizeLeadSignalToken(text);
 
     if (normalized.includes('cargo') || normalized.includes('rol') || normalized.includes('puesto')) return 'role';
-    if (normalized.includes('ciudad') || normalized.includes('ubicacion') || normalized.includes('ubicaciÃ³n')) return 'location';
+    if (normalized.includes('ciudad') || normalized.includes('ubicacion') || normalized.includes('pais')) return 'location';
     if (normalized.includes('empresa')) return 'company';
     if (normalized.includes('salario') || normalized.includes('sueldo')) return 'salary';
     if (normalized.includes('remoto') || normalized.includes('remote') || normalized.includes('casa')) return 'remote';
@@ -1229,65 +1254,153 @@ export class ConversationService {
     return 'other';
   }
 
-  private async handleLeadWaitInterestState(
-    userId: string,
-    text: string,
-    _intent: UserIntent,
-  ): Promise<BotReply> {
-    if (isAcceptance(text)) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { name: true, email: true },
-      });
-
-      if (user?.name && user?.email) {
-        const onboardingFlags = await this.getOnboardingFlags(userId);
-        await this.activateFreemiumTrialFromLead(userId, onboardingFlags.defaultOnboardingAlertTime);
-        await this.updateSessionState(userId, ConversationState.READY);
-
-        return await this.returnToMainMenu(
-          userId,
-          `Perfecto, seguimos con tu busqueda y ya puedes explorar mas ofertas.`,
-        );
-      }
-
-      await this.updateSessionState(userId, ConversationState.LEAD_REGISTER_NAME);
-      return { text: BotMessages.V2_REGISTER_NAME };
-    }
-
-    if (isRejection(text)) {
-      await this.updateSessionState(userId, ConversationState.LEAD_WAIT_REJECTION_REASON);
-      return {
-        text: BotMessages.V2_REJECTION_REASON,
-        listTitle: 'Elegir motivo',
-        listSections: [
-          {
-            title: 'Motivo principal',
-            rows: [
-              { id: 'reason_role', title: 'No me gusto el cargo' },
-              { id: 'reason_location', title: 'No me gusto la ciudad' },
-              { id: 'reason_company', title: 'No me gusto la empresa' },
-              { id: 'reason_salary', title: 'No me gusto el salario' },
-              { id: 'reason_remote', title: 'Busco algo remoto' },
-              { id: 'reason_other', title: 'Otro motivo' },
-            ],
-          },
-        ],
-      };
-    }
-
-    return {
-      text: `Para seguir, elige una opcion:`,
-      buttons: [
-        { id: 'lead_interest_yes', title: 'Si, me intereso' },
-        { id: 'lead_interest_no', title: 'No me intereso' },
-      ],
-    };
+  private normalizeLeadSignalToken(value: string | null | undefined): string {
+    if (!value) return '';
+    return value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .trim();
   }
 
-  private async handleLeadWaitRejectionReasonState(userId: string, text: string): Promise<BotReply> {
-    const reason = this.resolveLeadRejectionReason(text);
-    await this.updateSessionData(userId, { leadLastRejectionReason: reason });
+  private async persistLeadFeedback(
+    userId: string,
+    params: {
+      interested: boolean;
+      reason?: LeadRejectionReason | null;
+      reasonText?: string | null;
+      reasonSource?: LeadRejectionReasonSource;
+      confidence?: number | null;
+      metadata?: Record<string, any>;
+    },
+  ): Promise<void> {
+    try {
+      const sessionData = await this.getLatestSessionData(userId);
+      const vacancy = sessionData?.leadCurrentVacancy || null;
+      const decision = sessionData?.leadVacancyDecision || null;
+
+      await (this.prisma as any).leadVacancyFeedback.create({
+        data: {
+          userId,
+          interested: params.interested,
+          reason: params.reason || null,
+          reasonText: params.reasonText || null,
+          reasonSource: params.reasonSource || null,
+          confidence: params.confidence ?? null,
+          vacancy,
+          metadata: {
+            decision,
+            ...(params.metadata || {}),
+          },
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`No se pudo guardar lead feedback para ${userId}: ${message}`);
+    }
+  }
+
+  private async persistLeadSignalInSession(
+    userId: string,
+    params: {
+      interested: boolean;
+      reason?: LeadRejectionReason | null;
+      reasonText?: string | null;
+      reasonSource?: LeadRejectionReasonSource;
+      confidence?: number | null;
+      metadata?: Record<string, any>;
+    },
+  ): Promise<void> {
+    const sessionData = await this.getLatestSessionData(userId);
+    const currentSignals = Array.isArray(sessionData.leadSignals) ? sessionData.leadSignals : [];
+    const signal = {
+      at: new Date().toISOString(),
+      interested: params.interested,
+      reason: params.reason || null,
+      reasonText: params.reasonText || null,
+      reasonSource: params.reasonSource || null,
+      confidence: params.confidence ?? null,
+      vacancy: sessionData?.leadCurrentVacancy || null,
+      metadata: params.metadata || {},
+    };
+
+    const nextSignals = [...currentSignals.slice(-19), signal];
+    await this.updateSessionData(userId, {
+      leadSignals: nextSignals,
+      leadLastSignal: signal,
+      leadLastRejectionReason: params.interested ? null : (params.reason || null),
+    });
+  }
+
+  private async applyLeadAdjustmentByReason(
+    userId: string,
+    reason: LeadRejectionReason,
+    reasonText?: string | null,
+  ): Promise<void> {
+    if (reason === 'remote') {
+      await this.updateUserProfile(userId, { location: 'Remoto' });
+      return;
+    }
+
+    if (reason === 'company') {
+      const sessionData = await this.getLatestSessionData(userId);
+      const currentCompany = typeof sessionData?.leadCurrentVacancy?.company === 'string'
+        ? sessionData.leadCurrentVacancy.company.trim()
+        : '';
+      if (!currentCompany) return;
+
+      const existing = Array.isArray(sessionData?.leadExcludedCompanies)
+        ? sessionData.leadExcludedCompanies.filter((value: any) => typeof value === 'string')
+        : [];
+
+      const normalizedCurrent = this.normalizeLeadSignalToken(currentCompany);
+      const alreadyExists = existing.some(
+        (value: string) => this.normalizeLeadSignalToken(value) === normalizedCurrent,
+      );
+      if (alreadyExists) return;
+
+      await this.updateSessionData(userId, {
+        leadExcludedCompanies: [...existing, currentCompany],
+      });
+      return;
+    }
+
+    if (reason === 'salary') {
+      await this.updateSessionData(userId, {
+        leadSalaryPreference: 'higher',
+        leadSalaryFeedbackText: reasonText || null,
+      });
+    }
+  }
+
+  private async continueLeadAfterRejection(
+    userId: string,
+    reason: LeadRejectionReason,
+    options?: {
+      reasonText?: string;
+      reasonSource?: LeadRejectionReasonSource;
+      confidence?: number | null;
+      metadata?: Record<string, any>;
+    },
+  ): Promise<BotReply> {
+    await this.persistLeadFeedback(userId, {
+      interested: false,
+      reason,
+      reasonText: options?.reasonText || null,
+      reasonSource: options?.reasonSource || 'button',
+      confidence: options?.confidence ?? null,
+      metadata: options?.metadata,
+    });
+    await this.persistLeadSignalInSession(userId, {
+      interested: false,
+      reason,
+      reasonText: options?.reasonText || null,
+      reasonSource: options?.reasonSource || 'button',
+      confidence: options?.confidence ?? null,
+      metadata: options?.metadata,
+    });
+
+    await this.applyLeadAdjustmentByReason(userId, reason, options?.reasonText || null);
 
     if (reason === 'role') {
       await this.updateSessionState(userId, ConversationState.LEAD_COLLECT_PROFILE);
@@ -1300,7 +1413,6 @@ export class ConversationService {
     }
 
     if (reason === 'remote') {
-      await this.updateUserProfile(userId, { location: 'Remoto' });
       await this.updateSessionState(userId, ConversationState.LEAD_SHOW_FIRST_VACANCY);
       const nextVacancyReply = await this.handleLeadShowFirstVacancyState(
         userId,
@@ -1343,6 +1455,119 @@ export class ConversationService {
       ...nextVacancyReply,
       text: `Gracias, sigo ajustando la busqueda segun tu perfil.\n\n${nextVacancyReply.text}`,
     };
+  }
+
+  private async handleLeadWaitInterestState(
+    userId: string,
+    text: string,
+    _intent: UserIntent,
+  ): Promise<BotReply> {
+    if (isAcceptance(text)) {
+      await this.persistLeadFeedback(userId, {
+        interested: true,
+        reasonSource: 'button',
+      });
+      await this.persistLeadSignalInSession(userId, {
+        interested: true,
+        reasonSource: 'button',
+      });
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true, email: true },
+      });
+
+      if (user?.name && user?.email) {
+        const onboardingFlags = await this.getOnboardingFlags(userId);
+        await this.activateFreemiumTrialFromLead(userId, onboardingFlags.defaultOnboardingAlertTime);
+        await this.updateSessionState(userId, ConversationState.READY);
+
+        return await this.returnToMainMenu(
+          userId,
+          `Perfecto, seguimos con tu busqueda y ya puedes explorar mas ofertas.`,
+        );
+      }
+
+      await this.updateSessionState(userId, ConversationState.LEAD_REGISTER_NAME);
+      return { text: BotMessages.V2_REGISTER_NAME };
+    }
+
+    if (isRejection(text)) {
+      await this.updateSessionState(userId, ConversationState.LEAD_WAIT_REJECTION_REASON);
+      return {
+        text: BotMessages.V2_REJECTION_REASON,
+        listTitle: 'Elegir motivo',
+        listSections: [
+          {
+            title: 'Motivo principal',
+            rows: [
+              { id: 'reason_role', title: 'cargo' },
+              { id: 'reason_location', title: 'ciudad' },
+              { id: 'reason_company', title: 'empresa' },
+              { id: 'reason_salary', title: 'salario' },
+              { id: 'reason_remote', title: 'remoto' },
+              { id: 'reason_other', title: 'otro motivo' },
+            ],
+          },
+        ],
+      };
+    }
+
+    return {
+      text: `Para seguir, elige una opcion:`,
+      buttons: [
+        { id: 'lead_interest_yes', title: 'S\u00ED, me interes\u00F3' },
+        { id: 'lead_interest_no', title: 'No me interes\u00F3' },
+      ],
+    };
+  }
+
+  private async handleLeadWaitRejectionReasonState(userId: string, text: string): Promise<BotReply> {
+    const reason = this.resolveLeadRejectionReason(text);
+    const normalizedText = this.normalizeLeadSignalToken(text);
+    const explicitOtherSelection =
+      normalizedText === 'otro motivo' || normalizedText === 'otro' || normalizedText === 'other';
+
+    if (reason === 'other' && explicitOtherSelection) {
+      await this.updateSessionData(userId, { leadPendingRejectionReason: 'other' });
+      await this.updateSessionState(userId, ConversationState.LEAD_WAIT_REJECTION_OTHER_TEXT);
+      return {
+        text: `Entiendo. Cuentame en una frase por que no te interes\u00F3 esta vacante y ajusto la siguiente.`,
+      };
+    }
+
+    const source: LeadRejectionReasonSource =
+      ['cargo', 'ciudad', 'empresa', 'salario', 'remoto'].includes(normalizedText)
+        ? 'button'
+        : 'free_text';
+    return await this.continueLeadAfterRejection(userId, reason, {
+      reasonText: text,
+      reasonSource: source,
+    });
+  }
+
+  private async handleLeadWaitRejectionOtherTextState(
+    userId: string,
+    text: string,
+  ): Promise<BotReply> {
+    if (text.trim().length < 3) {
+      return {
+        text: `Cu\u00E9ntame un poco m\u00E1s del motivo para poder ajustar mejor la siguiente oferta.`,
+      };
+    }
+
+    const classified = await this.llmService.classifyRejectionReason(text);
+    const fallbackReason = this.resolveLeadRejectionReason(text);
+    const reason = classified?.reason || fallbackReason;
+
+    return await this.continueLeadAfterRejection(userId, reason, {
+      reasonText: text,
+      reasonSource: classified ? 'llm' : 'free_text',
+      confidence: classified?.confidence ?? null,
+      metadata: classified
+        ? { classificationRationale: classified.rationale }
+        : { classificationRationale: null },
+    });
   }
 
   private async handleLeadRegisterNameState(userId: string, text: string): Promise<BotReply> {

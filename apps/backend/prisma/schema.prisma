@@ -72,6 +72,7 @@ model User {
   chatMessages    ChatMessage[]
   pendingAlerts   PendingJobAlert[]
   emailDispatches EmailDispatch[]
+  leadVacancyFeedbacks LeadVacancyFeedback[]
   
   // Nuevas relaciones para sistema de planes
   subscription  Subscription?
@@ -219,6 +220,25 @@ model JobSearchLog {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("job_search_logs")
+}
+
+model LeadVacancyFeedback {
+  id           String   @id @default(cuid())
+  userId       String
+  interested   Boolean
+  reason       String?
+  reasonText   String?  @db.Text
+  reasonSource String?
+  confidence   Float?
+  vacancy      Json?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, interested, createdAt])
+  @@map("lead_vacancy_feedback")
 }
 
 model SentJob {
