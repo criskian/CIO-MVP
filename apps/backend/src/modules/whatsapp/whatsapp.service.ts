@@ -8,26 +8,26 @@ import { repairMojibakeText as repairMojibakeUtil } from '../../common/text/moji
 
 /**
  * Servicio principal de WhatsApp
- * ActÃºa como adapter agnÃ³stico entre el proveedor y el resto de la aplicaciÃ³n
- * NO contiene lÃ³gica de negocio, solo adapta mensajes
+ * Actúa como adapter agnóstico entre el proveedor y el resto de la aplicación
+ * NO contiene lógica de negocio, solo adapta mensajes
  */
 @Injectable()
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
   private readonly provider: IWhatsappProvider;
   private readonly canonicalButtonTitles: Record<string, string> = {
-    confirm_restart: 'SÃ­, reiniciar',
+    confirm_restart: 'Sí, reiniciar',
     cancel_restart: 'No, cancelar',
-    confirm_cancel: 'SÃ­, confirmar',
+    confirm_cancel: 'Sí, confirmar',
     abort_cancel: 'No, continuar',
-    accept_alerts: 'SÃ­, activar',
+    accept_alerts: 'Sí, activar',
     reject_alerts: 'No, gracias',
-    alerts_yes: 'SÃ­, activar',
+    alerts_yes: 'Sí, activar',
     alerts_no: 'No, gracias',
-    remote_yes: 'SÃ­',
+    remote_yes: 'Sí',
     remote_no: 'No',
-    lead_interest_yes: 'SÃ­, me interesÃ³',
-    lead_interest_no: 'No me interesÃ³',
+    lead_interest_yes: 'Sí, me interesó',
+    lead_interest_no: 'No me interesó',
     lead_terms_accept: 'Acepto',
     lead_terms_reject: 'No acepto',
     continue: 'A buscar empleo',
@@ -53,12 +53,12 @@ export class WhatsappService {
     reason_remote: 'Remoto',
     reason_other: 'Otro motivo',
     exp_none: 'Sin experiencia',
-    exp_junior: 'Junior (1-2 aÃ±os)',
-    exp_mid: 'Intermedio (3-5 aÃ±os)',
-    exp_senior: 'Senior (5+ aÃ±os)',
-    exp_lead: 'Lead/Expert (7+ aÃ±os)',
+    exp_junior: 'Junior (1-2 años)',
+    exp_mid: 'Intermedio (3-5 años)',
+    exp_senior: 'Senior (5+ años)',
+    exp_lead: 'Lead/Expert (7+ años)',
     freq_daily: 'Diariamente',
-    freq_every_3_days: 'Cada 3 dÃ­as',
+    freq_every_3_days: 'Cada 3 días',
     freq_weekly: 'Semanalmente',
     freq_monthly: 'Mensualmente',
   };
@@ -74,17 +74,17 @@ export class WhatsappService {
     reason_salary: 'El salario no se ajusta',
     reason_remote: 'Busco una modalidad diferente',
     reason_other: 'Te explico el motivo',
-    exp_none: 'ReciÃ©n graduado o sin experiencia laboral',
+    exp_none: 'Recién graduado o sin experiencia laboral',
     exp_junior: 'Experiencia inicial en el campo',
-    exp_mid: 'Experiencia sÃ³lida',
-    exp_senior: 'Experto en el Ã¡rea',
+    exp_mid: 'Experiencia sólida',
+    exp_senior: 'Experto en el área',
     exp_lead: 'Liderazgo y expertise avanzado',
   };
 
-  // Cache para deduplicaciÃ³n de mensajes (messageId -> timestamp)
+  // Cache para deduplicación de mensajes (messageId -> timestamp)
   private readonly processedMessages = new Map<string, number>();
 
-  // Tiempo mÃ¡ximo para aceptar un mensaje (2 minutos)
+  // Tiempo máximo para aceptar un mensaje (2 minutos)
   private readonly MAX_MESSAGE_AGE_MS = 2 * 60 * 1000;
 
   // Tiempo para mantener IDs en cache (10 minutos)
@@ -95,7 +95,7 @@ export class WhatsappService {
     private readonly cloudApiProvider: CloudApiProvider,
     private readonly prisma: PrismaService,
   ) {
-    // Usar Cloud API como provider Ãºnico
+    // Usar Cloud API como provider único
     this.provider = this.cloudApiProvider;
     this.logger.log('ðŸ“± Usando WhatsApp Cloud API como proveedor');
 
@@ -267,7 +267,7 @@ export class WhatsappService {
       });
       this.logger.debug(`ðŸ’¾ Mensaje outbound guardado para usuario ${userId.substring(0, 8)}...`);
     } catch (error) {
-      // No bloquear el envÃ­o si falla el guardado
+      // No bloquear el envío si falla el guardado
       this.logger.error(`âŒ Error guardando mensaje outbound en historial: ${error}`);
     }
   }
@@ -298,7 +298,7 @@ export class WhatsappService {
   }
 
   /**
-   * Busca el userId basado en el nÃºmero de telÃ©fono
+   * Busca el userId basado en el número de teléfono
    */
   private async findUserIdByPhone(phone: string): Promise<string | undefined> {
     try {
@@ -321,8 +321,8 @@ export class WhatsappService {
       return result || { error: 'Verification failed' };
     }
 
-    // Twilio no requiere verificaciÃ³n GET
-    this.logger.warn('Provider no soporta verificaciÃ³n de webhook');
+    // Twilio no requiere verificación GET
+    this.logger.warn('Provider no soporta verificación de webhook');
     return { error: 'Not supported' };
   }
 
@@ -353,7 +353,7 @@ export class WhatsappService {
         return { status: 'duplicate' };
       }
 
-      // 2. VALIDAR ANTIGÃœEDAD: Rechazar mensajes muy antiguos (>2 min)
+      // 2. VALIDAR ANTIGÜEDAD: Rechazar mensajes muy antiguos (>2 min)
       if (normalizedMessage.timestamp) {
         const messageAge = Date.now() - normalizedMessage.timestamp.getTime();
         if (messageAge > this.MAX_MESSAGE_AGE_MS) {
@@ -390,7 +390,7 @@ export class WhatsappService {
           source: 'conversation'
         });
       } catch (sendError) {
-        // Si falla el envÃ­o del mensaje principal, intentar reenviar el mismo mensaje
+        // Si falla el envío del mensaje principal, intentar reenviar el mismo mensaje
         // con un texto de error adicional
         const errorMessage = sendError instanceof Error ? sendError.message : 'Unknown error';
         this.logger.error(`âŒ Error enviando respuesta: ${errorMessage}`);
@@ -412,7 +412,7 @@ export class WhatsappService {
         } catch (retryError) {
           const retryErrorMessage = retryError instanceof Error ? retryError.message : 'Unknown error';
           this.logger.error(`Error en retry: ${retryErrorMessage}`);
-          throw sendError; // Lanzar el error original si el retry tambiÃ©n falla
+          throw sendError; // Lanzar el error original si el retry también falla
         }
       }
 
@@ -427,9 +427,9 @@ export class WhatsappService {
   }
 
   /**
-   * EnvÃ­a una respuesta del bot (BotReply)
+   * Envía una respuesta del bot (BotReply)
    * Soporta mensajes de texto simple, botones, listas y mensajes retrasados
-   * @param to - NÃºmero de telÃ©fono destino
+   * @param to - Número de teléfono destino
    * @param reply - Respuesta del bot
    * @param options - Opciones adicionales (userId y source para guardar en historial)
    */
@@ -464,7 +464,7 @@ export class WhatsappService {
         await this.saveOutboundMessage(userId, sanitizedReply.text || '', metadata);
       }
 
-      // Si hay mensaje retrasado, programar su envÃ­o
+      // Si hay mensaje retrasado, programar su envío
       if (delayedMessage) {
         const delayMs = delayedMessage.delayMs || 60000; // Default 1 minuto
         this.logger.log(`â° Programando mensaje retrasado para ${to} en ${delayMs / 1000} segundos`);
@@ -507,12 +507,12 @@ export class WhatsappService {
   }
 
   /**
-   * EnvÃ­a un mensaje de template de WhatsApp
+   * Envía un mensaje de template de WhatsApp
    * Usado para notificaciones de alerta fuera de la ventana de 24 horas
-   * @param to - NÃºmero de telÃ©fono destino
+   * @param to - Número de teléfono destino
    * @param templateName - Nombre del template
-   * @param languageCode - CÃ³digo de idioma
-   * @param bodyParams - ParÃ¡metros del template
+   * @param languageCode - Código de idioma
+   * @param bodyParams - Parámetros del template
    * @param options - Opciones adicionales (userId para guardar en historial)
    */
   async sendTemplateMessage(
