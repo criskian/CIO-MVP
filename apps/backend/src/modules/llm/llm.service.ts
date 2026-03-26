@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { SYSTEM_PROMPTS } from './knowledge-base';
@@ -447,29 +447,29 @@ export class LlmService {
     };
   }
 
-  // ===== MÃ©todo conversacional =====
+  // ===== Método conversacional =====
 
   /**
-   * Genera una respuesta conversacional natural y Ãºnica para el usuario.
-   * NO retorna JSON â€” retorna texto directo listo para WhatsApp.
+   * Genera una respuesta conversacional natural y única para el usuario.
+   * NO retorna JSON — retorna texto directo listo para WhatsApp.
    * Usado cuando el input del usuario no es lo esperado en el paso actual.
    * 
-   * @param text - Lo que escribiÃ³ el usuario
+   * @param text - Lo que escribió el usuario
    * @param currentState - El estado actual del onboarding (ASK_ROLE, ASK_LOCATION, etc.)
    * @returns Texto natural para responder al usuario, o null si LLM no estÃ¡ disponible
-   */
+   * @returns Texto natural para responder al usuario, o null si LLM no está disponible
   async generateConversationalResponse(text: string, currentState: string): Promise<string | null> {
     const userMessage = `ESTADO_ACTUAL: ${currentState}\nMENSAJE_DEL_USUARIO: ${text}`;
     const response = await this.callOpenAIText(SYSTEM_PROMPTS.CONVERSATIONAL_REDIRECT, userMessage);
 
     if (response) {
-      this.logger.log(`ðŸ—£ï¸ Respuesta conversacional para "${text}" en ${currentState}`);
+      this.logger.log(`🗣️ Respuesta conversacional para "${text}" en ${currentState}`);
     }
 
     return response;
   }
 
-  // ===== MÃ©todos legacy (mantenidos por compatibilidad) =====
+  // ===== Métodos legacy (mantenidos por compatibilidad) =====
 
   /**
    * Parsea un texto libre de salario a un nÃºmero

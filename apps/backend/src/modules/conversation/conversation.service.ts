@@ -1099,6 +1099,17 @@ export class ConversationService {
     }
 
     if (!roleCandidate) {
+      // Siempre intentar respuesta conversacional primero — maneja confusión, preguntas, hesitación
+      const conversational = await this.llmService.generateConversationalResponse(
+        text,
+        ConversationState.LEAD_COLLECT_PROFILE,
+      );
+      const conversationalText = this.normalizeConversationalMessage(conversational);
+      if (conversationalText) {
+        return { text: conversationalText };
+      }
+
+      // Fallback: si el LLM no está disponible, usar warning de validación o hints de perfil
       if (roleWarning) {
         return { text: roleWarning };
       }
@@ -1121,15 +1132,7 @@ export class ConversationService {
         };
       }
 
-      const conversational = await this.llmService.generateConversationalResponse(
-        text,
-        ConversationState.LEAD_COLLECT_PROFILE,
-      );
-      return {
-        text:
-          this.normalizeConversationalMessage(conversational)
-          || BotMessages.ERROR_ROLE_INVALID,
-      };
+      return { text: BotMessages.ERROR_ROLE_INVALID };
     }
 
     if (multipleLocationChoices.length > 1) {
@@ -1183,7 +1186,14 @@ export class ConversationService {
       if (validation.errorType === 'too_vague') {
         return { text: this.getTooVagueLocationMessage(text) };
       }
-      return { text: BotMessages.ERROR_LOCATION_INVALID };
+      // Intentar respuesta conversacional antes del error estático
+      const conversational = await this.llmService.generateConversationalResponse(
+        text,
+        ConversationState.LEAD_ASK_LOCATION,
+      );
+      return {
+        text: this.normalizeConversationalMessage(conversational) || BotMessages.ERROR_LOCATION_INVALID,
+      };
     }
 
     const profileUpdates: Record<string, string> = { location: finalLocation };
@@ -2392,36 +2402,38 @@ export class ConversationService {
     let role = normalizeRole(text);
 
     // Paso 2: Si regex falla, pedir ayuda al LLM
+    let roleWarningFromAi: string | null = null;
     if (!role) {
       const aiResult = await this.llmService.validateAndCorrectRole(text);
       if (aiResult) {
-        // Si la IA detectó un problema específico (genérico, múltiples roles, etc.), mostrar su mensaje
-        if (!aiResult.isValid) {
-          return { text: aiResult.warning || aiResult.suggestion || BotMessages.ERROR_ROLE_INVALID };
+        if (aiResult.isValid && aiResult.role) {
+          role = aiResult.role;
+        } else {
+          roleWarningFromAi = aiResult.warning || aiResult.suggestion || null;
         }
-        role = aiResult.role;
       }
     } else {
       // Regex dio resultado → validar con IA para posibles mejoras (typos, genérico)
       const aiResult = await this.llmService.validateAndCorrectRole(text);
       if (aiResult) {
-        if (!aiResult.isValid && aiResult.warning) {
-          return { text: aiResult.warning };
-        }
-        if (!aiResult.isValid && aiResult.suggestion) {
-          return { text: aiResult.suggestion };
-        }
-        // Si la IA corrigió/mejoró el rol, usar la versión de la IA
-        if (aiResult.isValid && aiResult.role) {
+        if (!aiResult.isValid) {
+          roleWarningFromAi = aiResult.warning || aiResult.suggestion || null;
+          role = null;
+        } else if (aiResult.isValid && aiResult.role) {
           role = aiResult.role;
         }
       }
     }
 
     if (!role) {
-      // Intentar respuesta conversacional única
+      // Siempre intentar respuesta conversacional primero — maneja confusión, preguntas, hesitación
       const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.ASK_ROLE);
-      return { text: this.normalizeConversationalMessage(conversational) || BotMessages.ERROR_ROLE_INVALID };
+      const conversationalText = this.normalizeConversationalMessage(conversational);
+      if (conversationalText) {
+        return { text: conversationalText };
+      }
+      // Fallback: warning de validación o mensaje genérico
+      return { text: roleWarningFromAi || BotMessages.ERROR_ROLE_INVALID };
     }
 
     // Guardar en UserProfile
@@ -2610,17 +2622,22 @@ export class ConversationService {
     // Siempre pasar por IA primero para ubicación.
     const aiResult = await this.llmService.validateAndCorrectLocation(text);
     if (aiResult) {
-      if (!aiResult.isValid) {
-        return {
-          text: aiResult.suggestion
-            || (isRemoteIntent ? BotMessages.ERROR_LOCATION_REMOTE_INVALID : BotMessages.ERROR_LOCATION_INVALID),
-        };
+      if (aiResult.isValid && aiResult.location) {
+        finalLocation = aiResult.location;
       }
-      finalLocation = aiResult.location;
     } else if (validation.isValid && validation.location) {
       // LLM no disponible: fallback local.
       finalLocation = validation.location;
-    } else {
+    }
+
+    if (!finalLocation) {
+      // Siempre intentar respuesta conversacional primero — maneja confusión, preguntas, hesitación
+      const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.ASK_LOCATION);
+      const conversationalText = this.normalizeConversationalMessage(conversational);
+      if (conversationalText) {
+        return { text: conversationalText };
+      }
+      // Fallback estático según el tipo de error
       if (isRemoteIntent) {
         return { text: BotMessages.ERROR_LOCATION_REMOTE_INVALID };
       }
@@ -2628,12 +2645,6 @@ export class ConversationService {
         return { text: this.getTooVagueLocationMessage(text) };
       }
       return { text: BotMessages.ERROR_LOCATION_INVALID };
-    }
-
-    if (!finalLocation) {
-      // Intentar respuesta conversacional única
-      const conversational = await this.llmService.generateConversationalResponse(text, ConversationState.ASK_LOCATION);
-      return { text: this.normalizeConversationalMessage(conversational) || BotMessages.ERROR_LOCATION_INVALID };
     }
 
     await this.updateUserProfile(userId, { location: finalLocation });
