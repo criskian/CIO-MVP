@@ -14,6 +14,28 @@ import { PrismaService } from '../database/prisma.service';
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
   private readonly provider: IWhatsappProvider;
+  private readonly canonicalButtonTitles: Record<string, string> = {
+    confirm_restart: 'Sí, reiniciar',
+    cancel_restart: 'No, cancelar',
+    confirm_cancel: 'Sí, confirmar',
+    abort_cancel: 'No, continuar',
+    accept_alerts: 'Sí, activar',
+    reject_alerts: 'No, gracias',
+    alerts_yes: 'Sí, activar',
+    alerts_no: 'No, gracias',
+    remote_yes: 'Sí',
+    remote_no: 'No',
+  };
+  private readonly canonicalRowTitles: Record<string, string> = {
+    cmd_buscar: 'Buscar empleos',
+    cmd_editar: 'Editar perfil',
+    cmd_reiniciar: 'Reiniciar',
+    cmd_cancelar: 'Cancelar servicio',
+    edit_rol: '🔹 Rol',
+    edit_experiencia: '💡 Experiencia',
+    edit_ubicacion: '📍 Ubicación',
+    edit_horario: '⏰ Horario alertas',
+  };
 
   // Cache para deduplicación de mensajes (messageId -> timestamp)
   private readonly processedMessages = new Map<string, number>();
@@ -57,15 +79,84 @@ export class WhatsappService {
       }
     }
 
-    if (candidate.includes('\uFFFD')) {
-      return text;
+    const normalizedCandidate = this.applyKnownMojibakeReplacements(candidate);
+    const normalizedOriginal = this.applyKnownMojibakeReplacements(text);
+
+    const fixed =
+      this.countSuspiciousChars(normalizedCandidate) <= this.countSuspiciousChars(normalizedOriginal)
+        ? normalizedCandidate
+        : normalizedOriginal;
+
+    if (fixed.includes('\uFFFD') && !normalizedOriginal.includes('\uFFFD')) {
+      return normalizedOriginal;
     }
 
-    return candidate;
+    return fixed;
+  }
+
+  private countSuspiciousChars(value: string): number {
+    const matches = value.match(/[ÃÂâÅð\uFFFD]/g);
+    return matches ? matches.length : 0;
+  }
+
+  private applyKnownMojibakeReplacements(value: string): string {
+    let result = value;
+
+    const replacements: Array<[string, string]> = [
+      ['Ã°Å¸â€œÂ', '📝'],
+      ['Ã°Å¸â€Â¹', '🔹'],
+      ['Ã°Å¸â€™Â¡', '💡'],
+      ['Ã°Å¸â€œÂ', '📍'],
+      ['Ã¢ÂÂ°', '⏰'],
+      ['Ã¢ÂÅ’', '❌'],
+      ['ðŸ“', '📝'],
+      ['ðŸ”¹', '🔹'],
+      ['ðŸ’¡', '💡'],
+      ['ðŸ“', '📍'],
+      ['ðŸ”', '🔍'],
+      ['â°', '⏰'],
+      ['âŒ', '❌'],
+      ['âœ…', '✅'],
+      ['âš ï¸', '⚠️'],
+      ['âœ¨', '✨'],
+      ['â€¢', '•'],
+      ['â€¦', '...'],
+      ['â€œ', '"'],
+      ['â€', '"'],
+      ['â€™', "'"],
+      ['Ã¡', 'á'],
+      ['Ã©', 'é'],
+      ['Ã­', 'í'],
+      ['Ã³', 'ó'],
+      ['Ãº', 'ú'],
+      ['Ã', 'Á'],
+      ['Ã‰', 'É'],
+      ['Ã', 'Í'],
+      ['Ã“', 'Ó'],
+      ['Ãš', 'Ú'],
+      ['Ã±', 'ñ'],
+      ['Ã‘', 'Ñ'],
+      ['Ã¼', 'ü'],
+      ['Ãœ', 'Ü'],
+      ['Â¿', '¿'],
+      ['Â¡', '¡'],
+      ['Â°', '°'],
+      ['Â', ''],
+    ];
+
+    for (const [broken, fixed] of replacements) {
+      result = result.split(broken).join(fixed);
+    }
+
+    return result;
   }
 
   private sanitizeBotReply(reply: BotReply): BotReply {
     const sanitizeText = (value?: string) => (value ? this.repairMojibakeText(value) : value);
+    const sanitizeButtonTitle = (id: string, title: string) =>
+      this.canonicalButtonTitles[id] ?? sanitizeText(title) ?? title;
+    const sanitizeRowTitle = (id: string, title: string) =>
+      this.canonicalRowTitles[id] ?? sanitizeText(title) ?? title;
 
     return {
       ...reply,
@@ -73,14 +164,14 @@ export class WhatsappService {
       listTitle: sanitizeText(reply.listTitle),
       buttons: reply.buttons?.map((btn) => ({
         ...btn,
-        title: sanitizeText(btn.title) || btn.title,
+        title: sanitizeButtonTitle(btn.id, btn.title),
       })),
       listSections: reply.listSections?.map((section) => ({
         ...section,
         title: sanitizeText(section.title),
         rows: section.rows.map((row) => ({
           ...row,
-          title: sanitizeText(row.title) || row.title,
+          title: sanitizeRowTitle(row.id, row.title),
           description: sanitizeText(row.description),
         })),
       })),
@@ -94,7 +185,7 @@ export class WhatsappService {
             title: sanitizeText(section.title),
             rows: section.rows.map((row) => ({
               ...row,
-              title: sanitizeText(row.title) || row.title,
+              title: sanitizeRowTitle(row.id, row.title),
               description: sanitizeText(row.description),
             })),
           })),
@@ -342,16 +433,17 @@ export class WhatsappService {
               listTitle: delayedMessage.listTitle,
               listSections: delayedMessage.listSections,
             };
-            await this.provider.sendMessage(to, this.sanitizeBotReply(delayedReply));
+            const sanitizedDelayedReply = this.sanitizeBotReply(delayedReply);
+            await this.provider.sendMessage(to, sanitizedDelayedReply);
             this.logger.log(`✅ Mensaje retrasado enviado a ${to}`);
 
             // Guardar mensaje retrasado en historial (siempre, ya que no viene de ConversationService)
             if (delayedUserId) {
-              await this.saveOutboundMessage(delayedUserId, this.repairMojibakeText(delayedMessage.text || ''), {
+              await this.saveOutboundMessage(delayedUserId, sanitizedDelayedReply.text || '', {
                 type: 'delayed',
                 source: options?.source || 'scheduler',
-                listTitle: delayedMessage.listTitle ? this.repairMojibakeText(delayedMessage.listTitle) : delayedMessage.listTitle,
-                listSections: delayedMessage.listSections,
+                listTitle: sanitizedDelayedReply.listTitle,
+                listSections: sanitizedDelayedReply.listSections,
               });
             }
           } catch (delayedError) {
