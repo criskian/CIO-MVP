@@ -1344,6 +1344,24 @@ export function normalizeRole(text: string): string | null {
 export function normalizeExperienceLevel(text: string): ExperienceLevel | null {
   const normalizedText = text.toLowerCase().trim();
 
+  // Tokens que envía CloudApiProvider al elegir fila de lista (exp_* → sin prefijo)
+  const listRowTokens: Record<string, ExperienceLevel> = {
+    none: ExperienceLevel.NONE,
+    junior: ExperienceLevel.JUNIOR,
+    mid: ExperienceLevel.MID,
+    senior: ExperienceLevel.SENIOR,
+    lead: ExperienceLevel.LEAD,
+  };
+  if (listRowTokens[normalizedText]) {
+    return listRowTokens[normalizedText];
+  }
+  if (normalizedText.startsWith('exp_')) {
+    const suffix = normalizedText.slice(4);
+    if (listRowTokens[suffix]) {
+      return listRowTokens[suffix];
+    }
+  }
+
   // Sin experiencia
   const nonePatterns = [
     'sin experiencia',

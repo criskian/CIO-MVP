@@ -524,8 +524,11 @@ export class ConversationService {
     }
 
     if (currentState === ConversationState.LEAD_WAIT_INTEREST) {
+      // normalized elimina diacríticos, entonces "interesó" → "intereso"
       return normalized === 'lead_interest_yes'
         || normalized === 'lead_interest_no'
+        || isAcceptance(text)
+        || isRejection(text)
         || normalized.includes('me intereso');
     }
 
@@ -1221,7 +1224,12 @@ export class ConversationService {
 
     if (!experienceLevel) {
       return {
-        text: this.normalizeConversationalMessage(await this.llmService.generateConversationalResponse(text, 'ASK_EXPERIENCE')) || 'Selecciona tu nivel de experiencia:',
+        text: this.normalizeConversationalMessage(
+          await this.llmService.generateConversationalResponse(
+            text,
+            ConversationState.LEAD_ASK_EXPERIENCE,
+          ),
+        ) || 'Selecciona tu nivel de experiencia:',
         listTitle: 'Seleccionar nivel',
         listSections: this.getLeadExperienceListSections(),
       };
@@ -1630,6 +1638,14 @@ export class ConversationService {
   private resolveLeadRejectionReason(text: string): LeadRejectionReason {
     const normalized = this.normalizeLeadSignalToken(text);
 
+    // Reconocer IDs de botón de lista directamente
+    if (normalized === 'reason_role') return 'role';
+    if (normalized === 'reason_location') return 'location';
+    if (normalized === 'reason_company') return 'company';
+    if (normalized === 'reason_salary') return 'salary';
+    if (normalized === 'reason_remote') return 'remote';
+    if (normalized === 'reason_other') return 'other';
+
     if (
       normalized.includes('experiencia')
       || normalized.includes('sin experiencia')
@@ -1880,18 +1896,24 @@ export class ConversationService {
     _intent: UserIntent,
   ): Promise<BotReply> {
     const normalizedText = this.normalizeLeadSignalToken(text);
-    const isPositiveInterest =
-      isAcceptance(text)
-      || normalizedText === 'lead_interest_yes'
-      || normalizedText.startsWith('si')
-      || normalizedText.includes('me intereso')
-      || normalizedText.includes('si me intereso')
-      || normalizedText.includes('si, me intereso');
+
+    // Verificar rechazo PRIMERO para evitar falsos positivos
+    // normalizeLeadSignalToken elimina diacríticos, por eso "no me interesó" → "no me intereso"
     const isNegativeInterest =
-      isRejection(text)
-      || normalizedText === 'lead_interest_no'
-      || normalizedText.includes('no me intereso')
-      || normalizedText.includes('no, me intereso') === false && normalizedText.startsWith('no');
+      normalizedText === 'lead_interest_no'
+      || isRejection(text)
+      || normalizedText.includes('no me intereso');
+
+    // Solo evaluar positivo si no es negativo
+    const isPositiveInterest =
+      !isNegativeInterest
+      && (
+        normalizedText === 'lead_interest_yes'
+        || isAcceptance(text)
+        || normalizedText === 'si me intereso'
+        || normalizedText === 'si, me intereso'
+        || (normalizedText.startsWith('si') && !normalizedText.startsWith('sin') && normalizedText.length < 25)
+      );
 
     if (isPositiveInterest) {
       await this.persistLeadFeedback(userId, {
@@ -1970,7 +1992,10 @@ export class ConversationService {
     const reason = this.resolveLeadRejectionReason(text);
     const normalizedText = this.normalizeLeadSignalToken(text);
     const explicitOtherSelection =
-      normalizedText === 'otro motivo' || normalizedText === 'otro' || normalizedText === 'other';
+      normalizedText === 'reason_other'
+      || normalizedText === 'otro motivo'
+      || normalizedText === 'otro'
+      || normalizedText === 'other';
 
     if (reason === 'other' && explicitOtherSelection) {
       await this.updateSessionData(userId, { leadPendingRejectionReason: 'other' });
@@ -1980,10 +2005,11 @@ export class ConversationService {
       };
     }
 
-    const source: LeadRejectionReasonSource =
-      ['cargo', 'ciudad', 'empresa', 'salario', 'remoto'].includes(normalizedText)
-        ? 'button'
-        : 'free_text';
+    const buttonIds = new Set([
+      'reason_role', 'reason_location', 'reason_company', 'reason_salary', 'reason_remote',
+      'cargo', 'ciudad', 'empresa', 'salario', 'remoto',
+    ]);
+    const source: LeadRejectionReasonSource = buttonIds.has(normalizedText) ? 'button' : 'free_text';
     return await this.continueLeadAfterRejection(userId, reason, {
       reasonText: text,
       reasonSource: source,
