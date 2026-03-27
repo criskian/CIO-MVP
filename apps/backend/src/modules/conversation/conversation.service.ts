@@ -1240,21 +1240,21 @@ export class ConversationService {
     return await this.handleLeadShowFirstVacancyState(userId);
   }
 
-  private buildLeadVacancyMessage(job: any): string {
+  private buildLeadVacancyMessage(job: JobPosting): string {
+    return this.buildFreemiumV2SingleVacancyMessage(job);
+  }
+
+  private buildFreemiumV2SingleVacancyLeadInMessage(): string {
+    return 'Listo, mira la siguiente oferta y dime si te interesa para enviarte similares:';
+  }
+
+  private buildFreemiumV2SingleVacancyMessage(job: Partial<JobPosting>): string {
     const company = job?.company || 'una empresa';
     const title = job?.title || 'un cargo';
     const location = job?.locationRaw || 'una ubicación sin especificar';
-    const source = job?.source || 'un portal de empleo';
     const cleanUrl = this.jobSearchService.cleanJobUrl(job?.url || '');
 
-    let snippet = (job?.snippet || '').trim();
-    if (snippet.length > 220) {
-      snippet = `${snippet.slice(0, 217)}...`;
-    }
-
-    const summary = snippet || 'Esta vacante puede encajar con tu perfil.';
-
-    return `Hola, te cuento que ${company} está buscando *${title}* en ${location}.\n\nPosteada por ${source}\n\n${summary}\n\n${cleanUrl}`;
+    return `${company} está buscando *${title}* en ${location}.\n\nPosteado en:\n${cleanUrl}`;
   }
 
   private buildReadySearchSingleVacancyMessage(job: JobPosting): string {
@@ -1545,6 +1545,9 @@ export class ConversationService {
     await this.updateSessionState(userId, ConversationState.LEAD_WAIT_INTEREST);
 
     return {
+      preMessage: {
+        text: this.buildFreemiumV2SingleVacancyLeadInMessage(),
+      },
       text: this.buildLeadVacancyMessage(job),
       buttons: [
         { id: 'lead_interest_yes', title: 'Sí, me interesó' },
@@ -2931,7 +2934,12 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
             data: { viewedAt: new Date() },
           });
           await this.jobSearchService.markJobsAsSent(userId, [pendingJobs[0]]);
-          return { text: this.buildReadySearchSingleVacancyMessage(pendingJobs[0] as JobPosting) };
+          return {
+            preMessage: {
+              text: this.buildFreemiumV2SingleVacancyLeadInMessage(),
+            },
+            text: this.buildFreemiumV2SingleVacancyMessage(pendingJobs[0] as JobPosting),
+          };
         }
       }
 
@@ -3082,8 +3090,13 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
       const formattedJobs = this.jobSearchService.formatJobsForWhatsApp(result.jobs);
       const primarySearchMessage =
         result.jobs.length === 1
-          ? this.buildReadySearchSingleVacancyMessage(result.jobs[0])
+          ? (
+            isFreemiumV2
+              ? this.buildFreemiumV2SingleVacancyMessage(result.jobs[0])
+              : this.buildReadySearchSingleVacancyMessage(result.jobs[0])
+          )
           : formattedJobs;
+      const shouldSendV2LeadInMessage = isFreemiumV2 && result.jobs.length === 1;
 
       await this.jobSearchService.markJobsAsSent(userId, result.jobs);
 
@@ -3128,6 +3141,11 @@ Puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
       }
 
       return {
+        preMessage: shouldSendV2LeadInMessage
+          ? {
+            text: this.buildFreemiumV2SingleVacancyLeadInMessage(),
+          }
+          : undefined,
         text: primarySearchMessage + exhaustedMessage,
         delayedMessage: {
           text: menuText,
@@ -4977,6 +4995,3 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
     this.logger.log(`🗑️ Preferencias eliminadas para usuario ${userId} (usuario NO eliminado)`);
   }
 }
-
-
-

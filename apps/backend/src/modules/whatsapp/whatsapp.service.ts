@@ -206,6 +206,12 @@ export class WhatsappService {
 
     return {
       ...reply,
+      preMessage: reply.preMessage
+        ? {
+          ...reply.preMessage,
+          text: sanitizeText(reply.preMessage.text) || '',
+        }
+        : undefined,
       text: sanitizeText(reply.text) || '',
       listTitle: sanitizeText(reply.listTitle),
       buttons: reply.buttons?.map((btn) => ({
@@ -441,13 +447,27 @@ export class WhatsappService {
     try {
       const sanitizedReply = this.sanitizeBotReply(reply);
 
-      // Enviar mensaje principal (sin el delayedMessage)
-      const { delayedMessage, ...mainReply } = sanitizedReply;
-      await this.provider.sendMessage(to, mainReply);
-      this.logger.log(`âœ… Mensaje enviado a ${to}`);
-
-      // ðŸ’¾ GUARDAR en historial (centralizado aquÃ­)
       const userId = options?.userId || await this.findUserIdByPhone(to);
+
+      // Enviar mensaje previo (si existe)
+      const { preMessage, delayedMessage, ...mainReply } = sanitizedReply;
+      if (preMessage?.text) {
+        await this.provider.sendMessage(to, { text: preMessage.text });
+        this.logger.log(`Mensaje previo enviado a ${to}`);
+
+        if (userId) {
+          await this.saveOutboundMessage(userId, preMessage.text, {
+            type: 'text',
+            source: options?.source || 'scheduler',
+          });
+        }
+      }
+
+      // Enviar mensaje principal (sin preMessage ni delayedMessage)
+      await this.provider.sendMessage(to, mainReply);
+      this.logger.log(`Mensaje enviado a ${to}`);
+
+      // Guardar en historial (centralizado aquí)
       if (userId) {
         const metadata: any = {
           type: sanitizedReply.buttons ? 'interactive' : 'text',
@@ -463,7 +483,6 @@ export class WhatsappService {
         }
         await this.saveOutboundMessage(userId, sanitizedReply.text || '', metadata);
       }
-
       // Si hay mensaje retrasado, programar su envío
       if (delayedMessage) {
         const delayMs = delayedMessage.delayMs || 60000; // Default 1 minuto

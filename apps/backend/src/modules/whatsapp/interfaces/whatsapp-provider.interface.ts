@@ -42,6 +42,10 @@ export interface ListSection {
  * Respuesta del bot que puede incluir mensajes interactivos
  */
 export interface BotReply {
+  // Mensaje previo opcional (se envía inmediatamente antes del mensaje principal)
+  preMessage?: {
+    text: string;
+  };
   text: string;
   // Botones de respuesta rápida (máximo 3)
   buttons?: ReplyButton[];
