@@ -38,7 +38,7 @@ export function isMobileDevice(text: string): boolean {
   return mobilePatterns.some((pattern) => normalizedText.includes(pattern));
 }
 
-//Detecta si el usuario está en PC/desktop
+// Detecta si el usuario está en PC/desktop
 export function isDesktopDevice(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
   const desktopPatterns = [
@@ -56,7 +56,7 @@ export function isDesktopDevice(text: string): boolean {
   return desktopPatterns.some((pattern) => normalizedText.includes(pattern));
 }
 
-//Detecta si el usuario está aceptando (sí, acepto, ok, dale, etc.)
+// Detecta si el usuario está aceptando (sí, acepto, ok, dale, etc.)
 export function isAcceptance(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
 
@@ -64,6 +64,8 @@ export function isAcceptance(text: string): boolean {
   const exactPatterns = [
     'si', 'sí', 'ok', 'okay', 'dale', 'claro', 's', 'y', 'yes',
     'alerts_yes', 'accept_alerts',
+    'lead_interest_yes', 'lead_terms_accept',
+    'confirm_restart', 'confirm_cancel',
   ];
 
   // Patrones que permiten startsWith (frases largas e inequívocas)
@@ -76,7 +78,7 @@ export function isAcceptance(text: string): boolean {
   return startsWithPatterns.some((pattern) => normalizedText.startsWith(pattern));
 }
 
-//Detecta si el usuario está rechazando (no, rechazo, etc.)
+// Detecta si el usuario está rechazando (no, rechazo, etc.)
 export function isRejection(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
 
@@ -84,6 +86,8 @@ export function isRejection(text: string): boolean {
   const exactPatterns = [
     'no', 'nop', 'nope', 'n',
     'alerts_no', 'reject_alerts',
+    'lead_interest_no', 'lead_terms_reject',
+    'cancel_restart', 'abort_cancel',
   ];
 
   // Patrones que permiten startsWith (frases largas e inequívocas)
@@ -96,7 +100,7 @@ export function isRejection(text: string): boolean {
   return startsWithPatterns.some((pattern) => normalizedText.startsWith(pattern));
 }
 
-//Detecta intención de buscar ahora
+// Detecta intención de buscar ahora
 export function isSearchIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
 
@@ -116,7 +120,7 @@ export function isSearchIntent(text: string): boolean {
   return searchPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
-//Detecta intención de subir CV
+// Detecta intención de subir CV
 export function isUploadCVIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
 
@@ -136,7 +140,7 @@ export function isUploadCVIntent(text: string): boolean {
   return cvPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
-//Detecta intención de ayuda
+// Detecta intención de ayuda
 export function isHelpIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
 
@@ -154,7 +158,7 @@ export function isHelpIntent(text: string): boolean {
   return helpPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
-//Detecta intención de reiniciar perfil
+// Detecta intención de reiniciar perfil
 export function isRestartIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
 
@@ -171,7 +175,7 @@ export function isRestartIntent(text: string): boolean {
   return restartPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
-//Detecta intención de cancelar servicio
+// Detecta intención de cancelar servicio
 export function isCancelServiceIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
 
@@ -189,7 +193,7 @@ export function isCancelServiceIntent(text: string): boolean {
   return cancelPatterns.some((pattern) => pattern.test(normalizedText));
 }
 
-//Detecta intención de editar perfil
+// Detecta intención de editar perfil
 export function isEditIntent(text: string): boolean {
   const normalizedText = text.toLowerCase().trim();
 
@@ -390,7 +394,7 @@ export function detectEditField(
   return null;
 }
 
-//Detecta la intención general del usuario
+// Detecta la intención general del usuario
 export function detectIntent(text: string): UserIntent {
   if (isAcceptance(text)) return UserIntent.ACCEPT;
   if (isRejection(text)) return UserIntent.REJECT;
@@ -400,7 +404,7 @@ export function detectIntent(text: string): UserIntent {
   return UserIntent.UNKNOWN;
 }
 
-//Normaliza texto de tipo de trabajo
+// Normaliza texto de tipo de trabajo
 export function normalizeJobType(text: string): JobType | null {
   const normalizedText = text.toLowerCase().trim();
 
@@ -438,7 +442,7 @@ export function normalizeJobType(text: string): JobType | null {
   return null;
 }
 
-//Valida y normaliza una hora desde múltiples formatos
+// Valida y normaliza una hora desde múltiples formatos
 export function normalizeTime(text: string): string | null {
   const normalizedText = text.toLowerCase().trim();
 
@@ -456,7 +460,7 @@ export function normalizeTime(text: string): string | null {
     return '20:00';
   }
 
-  // Detectar patrones de "X de la mañana/tarde/noche"
+  // Detectar patrones de "X de la maÃ±ana/tarde/noche"
   const deLaMatch = normalizedText.match(/^(\d{1,2})\s*(?:de la\s*)?(mañana|manana|tarde|noche)$/);
   if (deLaMatch) {
     let hours = parseInt(deLaMatch[1]);
@@ -527,7 +531,7 @@ export function normalizeTime(text: string): string | null {
   return null;
 }
 
-//Valida y normaliza un salario desde múltiples formatos
+// Valida y normaliza un salario desde múltiples formatos
 export function normalizeSalary(text: string): number | null {
   const normalizedText = text.toLowerCase().trim();
 
@@ -661,10 +665,10 @@ export function normalizeSalary(text: string): number | null {
   return null;
 }
 
-// ===== VALIDACIÓN DE UBICACIÓN =====
+// ===== VALIDACIÃ“N DE UBICACIÃ“N =====
 
 /**
- * Diccionario de ubicaciones válidas en LATAM
+ * Diccionario de ubicaciones vÃ¡lidas en LATAM
  * Mapea variantes (incluyendo typos comunes) a la forma correcta
  */
 const KNOWN_LOCATIONS: Record<string, string> = {
@@ -715,7 +719,7 @@ const KNOWN_LOCATIONS: Record<string, string> = {
   'barranqilla': 'Barranquilla',
   'baranquilla': 'Barranquilla',
 
-  // Países LATAM
+  // PaÃ­ses LATAM
   'colombia': 'Colombia',
   'mexico': 'México',
   'méxico': 'México',
@@ -772,10 +776,10 @@ const KNOWN_LOCATIONS: Record<string, string> = {
   'londres': 'Londres',
   'dublin': 'Dublín',
   'dublín': 'Dublín',
-  'amsterdam': 'Ámsterdam',
-  'ámsterdam': 'Ámsterdam',
+  'amsterdam': 'Ãmsterdam',
+  'Ã¡msterdam': 'Ãmsterdam',
 
-  // México - Ciudades principales
+  // MÃ©xico - Ciudades principales
   'cdmx': 'Ciudad de México',
   'ciudad de mexico': 'Ciudad de México',
   'ciudad de méxico': 'Ciudad de México',
@@ -805,7 +809,7 @@ const KNOWN_LOCATIONS: Record<string, string> = {
   'la plata': 'La Plata',
   'mar del plata': 'Mar del Plata',
 
-  // Perú - Ciudades principales
+  // PerÃº - Ciudades principales
   'lima': 'Lima',
   'arequipa': 'Arequipa',
   'trujillo': 'Trujillo',
@@ -821,7 +825,7 @@ const KNOWN_LOCATIONS: Record<string, string> = {
   'concepción': 'Concepción',
   'viña del mar': 'Viña del Mar',
 
-  // Otros países - Capitales
+  // Otros paÃ­ses - Capitales
   'quito': 'Quito',
   'guayaquil': 'Guayaquil',
   'caracas': 'Caracas',
@@ -852,7 +856,7 @@ const KNOWN_LOCATIONS: Record<string, string> = {
  */
 const INVALID_LOCATIONS = [
   'latinoamerica', 'latinoamérica', 'latam', 'latin america',
-  'sudamerica', 'sudamérica', 'suramerica', 'surámerica', 'south america',
+  'sudamerica', 'sudamérica', 'suramerica', 'suramérica', 'south america',
   'centroamerica', 'centroamérica', 'central america',
   'norteamerica', 'norteamérica', 'north america',
   'europa', 'europe', 'union europea', 'unión europea', 'european union',
@@ -932,19 +936,21 @@ export function correctLocationTypo(text: string): string {
 
   // Búsqueda exacta en diccionario
   if (KNOWN_LOCATIONS[normalized]) {
-    return KNOWN_LOCATIONS[normalized];
+    return repairMojibakeText(KNOWN_LOCATIONS[normalized]);
   }
 
   // Fuzzy matching - buscar la ubicación más parecida
   let bestMatch: string | null = null;
   let bestDistance = Infinity;
-  const maxDistance = Math.max(2, Math.floor(normalized.length * 0.3)); // Max 30% de diferencia
+  const maxDistance = normalized.length <= 5
+    ? 1
+    : Math.max(1, Math.floor(normalized.length * 0.2)); // Max 20% de diferencia en textos largos
 
   for (const [key, value] of Object.entries(KNOWN_LOCATIONS)) {
     const distance = levenshteinDistance(normalized, key);
     if (distance < bestDistance && distance <= maxDistance) {
       bestDistance = distance;
-      bestMatch = value;
+      bestMatch = repairMojibakeText(value);
     }
   }
 
@@ -952,8 +958,8 @@ export function correctLocationTypo(text: string): string {
     return bestMatch;
   }
 
-  // Si no hay match, capitalizar la primera letra
-  return text.trim().charAt(0).toUpperCase() + text.trim().slice(1).toLowerCase();
+  // Si no hay match, normalizar a Title Case.
+  return toTitleCaseLocation(text);
 }
 
 /**
@@ -962,10 +968,177 @@ export function correctLocationTypo(text: string): string {
 export interface LocationValidationResult {
   isValid: boolean;
   location: string | null;
-  errorType?: 'too_short' | 'too_vague' | 'multiple_extracted';
+  errorType?: 'too_short' | 'too_vague' | 'multiple' | 'multiple_extracted';
   originalInput?: string;
   wasMultiple?: boolean;
   wasCorrected?: boolean;
+  options?: string[];
+}
+
+function normalizeForMatching(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
+}
+
+function repairMojibakeText(text: string): string {
+  if (!text) return text;
+  if (!/[ÃÂâ]/.test(text)) return text;
+
+  try {
+    const repaired = Buffer.from(text, 'latin1').toString('utf8');
+    if (!repaired || repaired.includes('\uFFFD')) {
+      return text;
+    }
+    return repaired;
+  } catch {
+    return text;
+  }
+}
+
+function toTitleCaseLocation(text: string): string {
+  return repairMojibakeText(text)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function normalizeLocationToken(text: string): string {
+  const key = normalizeForMatching(text.trim());
+  for (const [rawKey, normalizedValue] of Object.entries(KNOWN_LOCATIONS)) {
+    if (normalizeForMatching(rawKey) === key) {
+      return repairMojibakeText(normalizedValue);
+    }
+  }
+  return toTitleCaseLocation(text);
+}
+
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function collectKnownLocationsFromText(text: string): string[] {
+  const normalizedText = normalizeForMatching(text);
+  const matches: Array<{ start: number; end: number; length: number; value: string }> = [];
+
+  for (const [rawKey, normalizedValue] of Object.entries(KNOWN_LOCATIONS)) {
+    const key = normalizeForMatching(rawKey);
+    const pattern = new RegExp(`(^|[^a-z0-9])(${escapeRegex(key)})(?=$|[^a-z0-9])`, 'g');
+    let match: RegExpExecArray | null;
+
+    while ((match = pattern.exec(normalizedText)) !== null) {
+      const boundaryLength = match[1]?.length ?? 0;
+      const keyLength = match[2]?.length ?? key.length;
+      const start = match.index + boundaryLength;
+      const end = start + keyLength;
+      matches.push({ start, end, length: keyLength, value: repairMojibakeText(normalizedValue) });
+
+      // Evita loop infinito con patrones que puedan consumir 0 caracteres.
+      if (pattern.lastIndex === match.index) {
+        pattern.lastIndex += 1;
+      }
+    }
+  }
+
+  matches.sort((a, b) => {
+    if (a.start !== b.start) return a.start - b.start;
+    return b.length - a.length;
+  });
+
+  const selected: Array<{ start: number; end: number; value: string }> = [];
+  const seenValues = new Set<string>();
+
+  for (const candidate of matches) {
+    const overlaps = selected.some((picked) => candidate.start < picked.end && picked.start < candidate.end);
+    if (overlaps) continue;
+
+    const dedupeKey = candidate.value.toLowerCase();
+    if (seenValues.has(dedupeKey)) continue;
+
+    seenValues.add(dedupeKey);
+    selected.push({ start: candidate.start, end: candidate.end, value: candidate.value });
+  }
+
+  return selected.map((entry) => entry.value);
+}
+
+/**
+ * Extrae ubicaciones detectadas en texto libre y las normaliza (tildes/capitalizacion).
+ * Detecta listas como:
+ * - "medellin o buga"
+ * - "ciudad de mexico cali y bogota"
+ * - "miami / toronto"
+ */
+export function extractNormalizedLocations(text: string): string[] {
+  const original = text.trim();
+  if (!original) return [];
+
+  const found: string[] = [];
+  const seen = new Set<string>();
+  const addUnique = (value: string) => {
+    const dedupeKey = value.toLowerCase();
+    if (seen.has(dedupeKey)) return;
+    seen.add(dedupeKey);
+    found.push(value);
+  };
+
+  // 1) Detectar por diccionario en el texto completo.
+  for (const location of collectKnownLocationsFromText(original)) {
+    addUnique(location);
+  }
+
+  // 2) Fallback por separadores para lugares no contemplados en diccionario.
+  const hasSeparators = /[,/;]|\s+\b(?:o|y|u|or|and)\b\s+/i.test(original);
+  if (hasSeparators) {
+    const parts = original
+      .split(/[,\-\/;]|\s+\b(?:o|y|u|or|and)\b\s+/i)
+      .map((part) => part.trim())
+      .map((part) =>
+        part
+          .replace(/^(?:(quiero|busco|prefiero|trabajo|empleo|ofertas|en|de|para|ciudad|pais|país)\s+)+/i, '')
+          .replace(/\s+/g, ' ')
+          .trim(),
+      )
+      .filter((part) => part.length >= 2)
+      .filter((part) => !isInvalidLocation(part));
+
+    for (const part of parts) {
+      const knownInPart = collectKnownLocationsFromText(part);
+      if (knownInPart.length > 0) {
+        knownInPart.forEach(addUnique);
+        continue;
+      }
+
+      // Si sigue siendo una frase larga, probablemente no es una ubicación limpia.
+      if (part.split(/\s+/).length > 3) {
+        continue;
+      }
+
+      const normalized = normalizeLocationToken(part);
+      if (isInvalidLocation(normalized)) {
+        continue;
+      }
+      addUnique(normalized);
+    }
+  }
+
+  const countryInsideCity = new Set(
+    found
+      .map((location) => {
+        const match = /^Ciudad de\s+(.+)$/i.exec(location.trim());
+        return match?.[1]?.trim().toLowerCase() || null;
+      })
+      .filter((value): value is string => Boolean(value)),
+  );
+
+  if (countryInsideCity.size > 0) {
+    return found.filter((location) => !countryInsideCity.has(location.trim().toLowerCase()));
+  }
+
+  return found;
 }
 
 /**
@@ -979,19 +1152,24 @@ export function validateAndNormalizeLocation(text: string): LocationValidationRe
     return { isValid: false, location: null, errorType: 'too_short' };
   }
 
+  const extractedLocations = extractNormalizedLocations(originalInput);
+
+  if (extractedLocations.length > 1) {
+    return {
+      isValid: false,
+      location: null,
+      errorType: 'multiple',
+      originalInput,
+      options: extractedLocations.slice(0, 5),
+    };
+  }
+
   // Detectar ubicaciones vagas
   if (isInvalidLocation(originalInput)) {
     return { isValid: false, location: null, errorType: 'too_vague', originalInput };
   }
 
-  // Extraer primera ubicación si hay múltiples
-  const extracted = extractFirstLocation(originalInput);
-  const wasMultiple = extracted !== originalInput;
-
-  // Si hay múltiples ubicaciones, NO auto-seleccionar — dejar que el LLM pregunte al usuario
-  if (wasMultiple) {
-    return { isValid: false, location: null, errorType: 'multiple' as any, originalInput };
-  }
+  const extracted = extractedLocations.length === 1 ? extractedLocations[0] : extractFirstLocation(originalInput);
 
   // Corregir typos
   const corrected = correctLocationTypo(extracted);
@@ -1039,10 +1217,10 @@ export function normalizeLocation(text: string): string | null {
 //     return 'sin_preferencia';
 //   }
 //
-//   // Detectar "híbrido"
+//   // Detectar "hÃ­brido"
 //   const hybridPatterns = [
 //     'hibrido',
-//     'híbrido',
+//     'hÃ­brido',
 //     'hybrid',
 //     'mixto',
 //     'mix',
@@ -1091,7 +1269,7 @@ export function normalizeLocation(text: string): string | null {
 //   return null;
 // }
 
-//Valida que un texto sea un rol o área válida (acepta roles específicos o áreas generales, mínimo 2 caracteres)
+// Valida que un texto sea un rol o área válida (acepta roles específicos o áreas generales, mínimo 2 caracteres)
 /**
  * Detecta si un texto es claramente NO un rol profesional.
  * Atrapa saludos, preguntas, frases conversacionales, etc.
@@ -1112,7 +1290,7 @@ export function isNonRoleInput(text: string): boolean {
     return true;
   }
 
-  // Tiene signo de interrogación → es una pregunta, no un rol
+  // Tiene signo de interrogaciÃ³n â†’ es una pregunta, no un rol
   if (normalizedText.includes('?') || normalizedText.includes('¿')) {
     return true;
   }
@@ -1120,7 +1298,7 @@ export function isNonRoleInput(text: string): boolean {
   // Frases conversacionales comunes (NO roles)
   const conversational = [
     'gracias', 'muchas gracias', 'ok', 'vale', 'entendido',
-    'no entiendo', 'no entendí', 'no sé', 'no se', 'no lo sé', 'no lo se', 'ni idea', 'quien sabe', 'quién sabe', 'nose', 'espera',
+    'no entiendo',     'no entendí', 'no sé', 'no se', 'no lo sé', 'no lo se', 'ni idea', 'quien sabe', 'quién sabe', 'nose', 'espera',
     'un momento', 'ya voy', 'ahí voy', 'dame un segundo',
     'qué es esto', 'que es esto', 'para qué sirve', 'para que sirve',
     'quién eres', 'quien eres', 'qué haces', 'que haces',
@@ -1162,9 +1340,27 @@ export function normalizeRole(text: string): string | null {
   return null;
 }
 
-//Normaliza el nivel de experiencia del usuario
+// Normaliza el nivel de experiencia del usuario
 export function normalizeExperienceLevel(text: string): ExperienceLevel | null {
   const normalizedText = text.toLowerCase().trim();
+
+  // Tokens que envía CloudApiProvider al elegir fila de lista (exp_* → sin prefijo)
+  const listRowTokens: Record<string, ExperienceLevel> = {
+    none: ExperienceLevel.NONE,
+    junior: ExperienceLevel.JUNIOR,
+    mid: ExperienceLevel.MID,
+    senior: ExperienceLevel.SENIOR,
+    lead: ExperienceLevel.LEAD,
+  };
+  if (listRowTokens[normalizedText]) {
+    return listRowTokens[normalizedText];
+  }
+  if (normalizedText.startsWith('exp_')) {
+    const suffix = normalizedText.slice(4);
+    if (listRowTokens[suffix]) {
+      return listRowTokens[suffix];
+    }
+  }
 
   // Sin experiencia
   const nonePatterns = [
@@ -1241,7 +1437,7 @@ export function normalizeExperienceLevel(text: string): ExperienceLevel | null {
   return null;
 }
 
-//Obtiene las palabras clave de búsqueda para cada nivel de experiencia
+//Obtiene las palabras clave de bÃºsqueda para cada nivel de experiencia
 export function getExperienceKeywords(level: ExperienceLevel): string[] {
   switch (level) {
     case ExperienceLevel.NONE:
@@ -1269,7 +1465,7 @@ export function normalizeAlertFrequency(text: string): AlertFrequency | null {
     return AlertFrequency.DAILY;
   }
 
-  // Cada 3 días
+  // Cada 3 dÃ­as
   const every3DaysPatterns = ['cada 3', '3 dias', 'tres dias', '2'];
   if (every3DaysPatterns.some((pattern) => normalizedText.includes(pattern))) {
     return AlertFrequency.EVERY_3_DAYS;
@@ -1290,7 +1486,7 @@ export function normalizeAlertFrequency(text: string): AlertFrequency | null {
   return null;
 }
 
-//Convierte AlertFrequency enum a texto legible en español
+//Convierte AlertFrequency enum a texto legible en espaÃ±ol
 export function alertFrequencyToText(frequency: AlertFrequency): string {
   switch (frequency) {
     case AlertFrequency.DAILY:
@@ -1310,15 +1506,15 @@ export function alertFrequencyToText(frequency: AlertFrequency): string {
 export function generateTimeOptions(): Array<{ id: string; title: string }> {
   const options: Array<{ id: string; title: string }> = [];
 
-  // Horas más comunes: 6:00 AM a 4:00 PM (10 opciones)
+  // Horas mÃ¡s comunes: 6:00 AM a 4:00 PM (10 opciones)
   for (let hour = 6; hour <= 16; hour++) {
     const time = `${hour.toString().padStart(2, '0')}:00`;
     let label = time;
 
     // Agregar etiquetas especiales
-    if (hour === 6) label = '🌅 06:00 (Mañana)';
-    else if (hour === 12) label = '☀️ 12:00 (Mediodía)';
-    else if (hour === 16) label = '🌆 16:00 (Tarde)';
+    if (hour === 6) label = 'ðŸŒ… 06:00 (MaÃ±ana)';
+    else if (hour === 12) label = 'â˜€ï¸ 12:00 (MediodÃ­a)';
+    else if (hour === 16) label = 'ðŸŒ† 16:00 (Tarde)';
 
     options.push({
       id: `time_${time}`,
@@ -1328,3 +1524,4 @@ export function generateTimeOptions(): Array<{ id: string; title: string }> {
 
   return options;
 }
+

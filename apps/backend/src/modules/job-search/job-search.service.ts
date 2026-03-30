@@ -6,6 +6,11 @@ import { JobPosting, JobSearchQuery, JobSearchResult } from './types/job-posting
 import { getExperienceKeywords } from '../conversation/helpers/input-validators';
 import { ExperienceLevel } from '../conversation/types/conversation-states';
 
+interface SearchJobsOptions {
+  forceFreshSearch?: boolean;
+  cacheOnlyIfAvailable?: boolean;
+}
+
 /**
  * Servicio de búsqueda de empleos
  * Utiliza SerpApi Google Jobs API para acceder al panel de Google Jobs
@@ -75,7 +80,11 @@ export class JobSearchService {
    * - Siguientes: usa cache + API si necesario
    * @param maxResults - Máximo de ofertas a enviar (5 para PREMIUM, 3 para FREE)
    */
-  async searchJobsForUser(userId: string, maxResults: number = 5): Promise<JobSearchResult> {
+  async searchJobsForUser(
+    userId: string,
+    maxResults: number = 5,
+    options: SearchJobsOptions = {},
+  ): Promise<JobSearchResult> {
     try {
       this.logger.log(`🔍 Iniciando búsqueda de empleos para usuario ${userId}`);
 
@@ -120,42 +129,54 @@ export class JobSearchService {
       // 5. Lógica de caché diferenciada por plan:
       // - FREE: priorizar caché sin llamar API (ahorrar costos)
       // - PREMIUM: combinar caché + API para mejores resultados
-      const isCacheValid = cache && cache.profileHash === profileHash;
+      const isCacheValid = Boolean(cache && cache.profileHash === profileHash);
       const isPremium = maxResults >= 5; // PREMIUM usa 5 resultados, FREE usa 3
+      const forceFreshSearch = options.forceFreshSearch === true;
+      const cacheOnlyIfAvailable = options.cacheOnlyIfAvailable === true;
 
-      if (isPremium) {
-        // === LÓGICA PREMIUM: combinar cache + API para más ofertas ===
-        if (isCacheValid && cache.nextPageToken) {
-          // Hay cache válido con token - combinar cache + nueva página
-          const cachedJobs = cache.cachedJobs || [];
-          this.logger.log(`📦 [PREMIUM] Combinando ${cachedJobs.length} ofertas del caché con nueva página API...`);
-          const nextPageResult = await this.searchJobsSinglePage(searchQuery, cache.nextPageToken);
-          allJobs = [...cachedJobs, ...nextPageResult.jobs];
-          newNextPageToken = nextPageResult.nextPageToken;
-          this.logger.log(`📊 Pool combinado: ${allJobs.length} ofertas`);
-        } else if (isCacheValid && cache.cachedJobs && cache.cachedJobs.length > 0) {
-          // Cache válido sin token - usar solo cache
-          this.logger.log(`📦 [PREMIUM] Usando ${cache.cachedJobs.length} ofertas del caché`);
-          allJobs = cache.cachedJobs;
+      if (forceFreshSearch) {
+        this.logger.log(`🆕 [FORCE_FRESH] Ignorando caché para ${userId}`);
+      }
+
+      if (cacheOnlyIfAvailable && isCacheValid && cache?.cachedJobs?.length > 0 && !forceFreshSearch) {
+        this.logger.log(`♻️ [CACHE_ONLY] Reutilizando ${cache.cachedJobs.length} ofertas en caché`);
+        allJobs = cache.cachedJobs;
+        newNextPageToken = cache.nextPageToken;
+      } else if (isPremium) {
+        // === LOGICA PREMIUM: siempre hacer busqueda nueva y combinar con cache ===
+        const cachedJobs =
+          !forceFreshSearch && isCacheValid && Array.isArray(cache?.cachedJobs)
+            ? cache.cachedJobs
+            : [];
+
+        let apiResult: { jobs: JobPosting[]; nextPageToken?: string };
+        if (!forceFreshSearch && isCacheValid && cache?.nextPageToken) {
+          this.logger.log(
+            `🆕 [PREMIUM] Ejecutando nueva busqueda con next_page_token y combinando con cache (${cachedJobs.length})`,
+          );
+          apiResult = await this.searchJobsSinglePage(searchQuery, cache.nextPageToken);
         } else {
-          // Sin cache válido - búsqueda nueva
           if (cache && cache.profileHash !== profileHash) {
-            this.logger.log(`🔄 [PREMIUM] Perfil cambió, iniciando búsqueda nueva...`);
+            this.logger.log(`🔄 [PREMIUM] Perfil cambio, ejecutando busqueda nueva desde pagina inicial`);
           } else {
-            this.logger.log(`🆕 [PREMIUM] Primera búsqueda para este perfil`);
+            this.logger.log(`🆕 [PREMIUM] Ejecutando busqueda nueva desde pagina inicial`);
           }
-          const result = await this.searchJobsSinglePage(searchQuery);
-          allJobs = result.jobs;
-          newNextPageToken = result.nextPageToken;
+          apiResult = await this.searchJobsSinglePage(searchQuery);
         }
+
+        allJobs = this.removeDuplicateJobs([...cachedJobs, ...apiResult.jobs]);
+        newNextPageToken = apiResult.nextPageToken;
+        this.logger.log(
+          `📊 [PREMIUM] Pool final combinado: cache=${cachedJobs.length}, api=${apiResult.jobs.length}, total_unico=${allJobs.length}`,
+        );
       } else {
         // === LÓGICA FREE: priorizar cache, pero buscar más si quedan < 3 ofertas ===
-        if (isCacheValid && cache.cachedJobs && cache.cachedJobs.length >= 3) {
+        if (!forceFreshSearch && isCacheValid && cache.cachedJobs && cache.cachedJobs.length >= 3) {
           // Suficientes ofertas en cache (3+) - usar cache sin API
           this.logger.log(`📦 [FREE] Usando ${cache.cachedJobs.length} ofertas del caché (sin API call)`);
           allJobs = cache.cachedJobs;
           newNextPageToken = cache.nextPageToken; // Mantener token para cuando se agote
-        } else if (isCacheValid && cache.cachedJobs && cache.cachedJobs.length > 0 && cache.cachedJobs.length < 3 && cache.nextPageToken) {
+        } else if (!forceFreshSearch && isCacheValid && cache.cachedJobs && cache.cachedJobs.length > 0 && cache.cachedJobs.length < 3 && cache.nextPageToken) {
           // Pocas ofertas en cache (1-2) y hay más páginas - combinar cache + nueva búsqueda
           const cachedJobs = cache.cachedJobs;
           this.logger.log(`📦 [FREE] Solo ${cachedJobs.length} ofertas en caché, complementando con API...`);
@@ -163,21 +184,23 @@ export class JobSearchService {
           allJobs = [...cachedJobs, ...nextPageResult.jobs];
           newNextPageToken = nextPageResult.nextPageToken;
           this.logger.log(`📦 [FREE] Resultado: ${cachedJobs.length} del caché + ${nextPageResult.jobs.length} de API = ${allJobs.length} ofertas`);
-        } else if (isCacheValid && cache.cachedJobs && cache.cachedJobs.length > 0) {
+        } else if (!forceFreshSearch && isCacheValid && cache.cachedJobs && cache.cachedJobs.length > 0) {
           // Pocas ofertas en cache pero sin más páginas disponibles - usar lo que hay
           this.logger.log(`📦 [FREE] Solo ${cache.cachedJobs.length} ofertas disponibles (sin más páginas)`);
           allJobs = cache.cachedJobs;
           newNextPageToken = undefined;
-        } else if (isCacheValid && cache.nextPageToken && (!cache.cachedJobs || cache.cachedJobs.length === 0)) {
+        } else if (!forceFreshSearch && isCacheValid && cache.nextPageToken && (!cache.cachedJobs || cache.cachedJobs.length === 0)) {
           // Cache vacío pero hay más páginas - cargar siguiente página
           this.logger.log(`📄 [FREE] Cache vacío, cargando siguiente página...`);
           const nextPageResult = await this.searchJobsSinglePage(searchQuery, cache.nextPageToken);
           allJobs = nextPageResult.jobs;
           newNextPageToken = nextPageResult.nextPageToken;
-        } else if (!isCacheValid || !cache) {
+        } else if (forceFreshSearch || !isCacheValid || !cache) {
           // Sin cache válido o perfil cambió - búsqueda nueva
           if (cache && cache.profileHash !== profileHash) {
             this.logger.log(`🔄 [FREE] Perfil cambió, iniciando búsqueda nueva...`);
+          } else if (forceFreshSearch) {
+            this.logger.log(`🆕 [FREE] Forzando búsqueda nueva por estrategia de conversación`);
           } else {
             this.logger.log(`🆕 [FREE] Primera búsqueda para este perfil`);
           }
@@ -859,8 +882,20 @@ export class JobSearchService {
       score: this.calculateJobScore(job, query),
     }));
 
-    // Ordenar por score descendente
-    jobsWithScore.sort((a, b) => (b.score || 0) - (a.score || 0));
+    // Ordenar por score descendente y usar ubicacion como desempate fuerte.
+    jobsWithScore.sort((a, b) => {
+      const scoreDiff = (b.score || 0) - (a.score || 0);
+      if (scoreDiff !== 0) return scoreDiff;
+
+      if (query.location) {
+        const locationDiff =
+          this.getLocationPriorityScore(b, query.location)
+          - this.getLocationPriorityScore(a, query.location);
+        if (locationDiff !== 0) return locationDiff;
+      }
+
+      return 0;
+    });
 
     // Priorizar que la primera oferta coincida con la ubicación del usuario (si existe al menos una).
     this.prioritizeFirstJobByLocation(jobsWithScore, query);
@@ -886,15 +921,39 @@ export class JobSearchService {
    * Determina si la ubicación de una oferta coincide con la ubicación solicitada.
    */
   private isLocationMatch(job: JobPosting, targetLocation: string): boolean {
-    if (!job.locationRaw) return false;
+    return this.getLocationPriorityScore(job, targetLocation) > 0;
+  }
+
+  private extractPrimaryLocationSegment(location: string): string {
+    if (!location) return '';
+    const firstSegment = location.split(',')[0] || location;
+    return this.normalizeTextForComparison(firstSegment);
+  }
+
+  private getLocationPriorityScore(job: JobPosting, targetLocation: string): number {
+    if (!job.locationRaw || !targetLocation) return 0;
 
     const normalizedJobLocation = this.normalizeTextForComparison(job.locationRaw);
     const normalizedTargetLocation = this.normalizeTextForComparison(targetLocation);
+    if (!normalizedJobLocation || !normalizedTargetLocation) return 0;
 
-    if (!normalizedJobLocation || !normalizedTargetLocation) return false;
+    const jobPrimary = this.extractPrimaryLocationSegment(job.locationRaw);
+    const targetPrimary = this.extractPrimaryLocationSegment(targetLocation);
 
-    return normalizedJobLocation.includes(normalizedTargetLocation)
-      || normalizedTargetLocation.includes(normalizedJobLocation);
+    if (jobPrimary && targetPrimary && jobPrimary === targetPrimary) {
+      return 60;
+    }
+
+    if (normalizedJobLocation === normalizedTargetLocation) return 55;
+    if (normalizedJobLocation.includes(normalizedTargetLocation)) return 45;
+    if (normalizedTargetLocation.includes(normalizedJobLocation)) return 35;
+
+    const targetWords = targetPrimary.split(' ').filter((word) => word.length > 2);
+    if (targetWords.length > 0 && targetWords.every((word) => normalizedJobLocation.includes(word))) {
+      return 28;
+    }
+
+    return 0;
   }
 
   /**
@@ -941,10 +1000,15 @@ export class JobSearchService {
       }
     }
 
-    // +8 puntos si la ubicación coincide
-    if (query.location && job.locationRaw) {
-      if (job.locationRaw.toLowerCase().includes(query.location.toLowerCase())) {
-        score += 8;
+    // Prioridad fuerte por ciudad objetivo
+    if (query.location) {
+      const locationPriorityScore = job.locationRaw
+        ? this.getLocationPriorityScore(job, query.location)
+        : 0;
+      score += locationPriorityScore;
+
+      if (locationPriorityScore === 0) {
+        score -= job.locationRaw ? 20 : 25;
       }
     }
 

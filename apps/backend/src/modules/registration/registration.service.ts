@@ -9,6 +9,10 @@ import { PrismaService } from '../database/prisma.service';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ConversationState } from '../conversation/types/conversation-states';
+import {
+  getBusinessDaysRemaining,
+  shouldExpireFreemiumByPolicy,
+} from '../conversation/helpers/date-utils';
 
 /**
  * Servicio de registro de usuarios
@@ -17,6 +21,8 @@ import { ConversationState } from '../conversation/types/conversation-states';
 @Injectable()
 export class RegistrationService {
   private readonly logger = new Logger(RegistrationService.name);
+  private readonly privacyPolicyVersion =
+    process.env.PRIVACY_POLICY_VERSION || '2026-03-25';
 
   constructor(
     private readonly prisma: PrismaService,
@@ -67,11 +73,14 @@ export class RegistrationService {
     }
 
     // Crear usuario con suscripción freemium
-    const user = await this.prisma.user.create({
+    const user = await (this.prisma.user as any).create({
       data: {
         phone: dto.phone,
         name: dto.name.trim(),
         email: dto.email.toLowerCase().trim(),
+        dataAuthorizationAccepted: true,
+        dataAuthorizationAcceptedAt: new Date(),
+        privacyPolicyVersion: this.privacyPolicyVersion,
         subscription: {
           create: {
             plan: 'FREEMIUM',
@@ -125,11 +134,14 @@ export class RegistrationService {
     }
 
     // Actualizar usuario
-    const user = await this.prisma.user.update({
+    const user = await (this.prisma.user as any).update({
       where: { id: userId },
       data: {
         name: dto.name.trim(),
         email: dto.email.toLowerCase().trim(),
+        dataAuthorizationAccepted: true,
+        dataAuthorizationAcceptedAt: new Date(),
+        privacyPolicyVersion: this.privacyPolicyVersion,
       },
       include: { subscription: true },
     });
@@ -221,11 +233,18 @@ export class RegistrationService {
     // Calcular días hábiles restantes de freemium
     let freemiumDaysLeft = 0;
     if (subscription && !subscription.freemiumExpired && subscription.plan === 'FREEMIUM') {
-      const businessDays = this.countBusinessDays(subscription.freemiumStartDate, new Date());
-      freemiumDaysLeft = Math.max(0, 5 - businessDays);
+      freemiumDaysLeft = getBusinessDaysRemaining(subscription.freemiumStartDate);
 
       // Si pasaron los 5 días hábiles, marcar como expirado
-      if (freemiumDaysLeft === 0 && !subscription.freemiumExpired) {
+      if (
+        shouldExpireFreemiumByPolicy({
+          startDate: subscription.freemiumStartDate,
+          usesLeft: subscription.freemiumUsesLeft,
+          freemiumPolicy: (subscription as any).freemiumPolicy,
+          freemiumExpiresAt: (subscription as any).freemiumExpiresAt,
+        })
+        && !subscription.freemiumExpired
+      ) {
         await this.prisma.subscription.update({
           where: { id: subscription.id },
           data: {
@@ -265,6 +284,7 @@ export class RegistrationService {
     const currentData = (latestSession?.data as Record<string, any>) || {};
     const mergedData = {
       ...currentData,
+      flowVariant: 'freemium_v2',
       skipAlertConfigOnboarding: true,
       defaultOnboardingAlertTime: '07:00',
     };
@@ -313,26 +333,5 @@ export class RegistrationService {
     }
   }
 
-  /**
-   * Cuenta los días hábiles (lunes a viernes) entre dos fechas
-   */
-  private countBusinessDays(startDate: Date, endDate: Date): number {
-    let count = 0;
-    const current = new Date(startDate);
-    current.setHours(0, 0, 0, 0);
-
-    const end = new Date(endDate);
-    end.setHours(0, 0, 0, 0);
-
-    while (current < end) {
-      const dayOfWeek = current.getDay();
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        count++;
-      }
-      current.setDate(current.getDate() + 1);
-    }
-
-    return count;
-  }
 }
 

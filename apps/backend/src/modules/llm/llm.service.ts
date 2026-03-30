@@ -42,6 +42,39 @@ export interface SearchFailureDiagnosisResult {
   userMessage: string;
 }
 
+export interface VacancyReuseScoreResult {
+  reuseScore: number;
+  rationale: string;
+}
+
+export interface PremiumSearchExpansionDecision {
+  shouldFetchMore: boolean;
+  confidence: number;
+  rationale: string;
+}
+
+export interface PremiumJobRerankResult {
+  orderedIndexes: number[];
+  rationale: string;
+}
+
+export interface InitialProfileExtractionResult {
+  role: string | null;
+  location: string | null;
+  modality: 'remote' | 'hybrid' | 'onsite' | null;
+  experienceLevel: 'none' | 'junior' | 'mid' | 'senior' | 'lead' | null;
+  experienceYears: number | null;
+  seniority: string | null;
+  sector: string | null;
+  confidence: number;
+}
+
+export interface RejectionReasonClassificationResult {
+  reason: 'role' | 'location' | 'company' | 'salary' | 'remote' | 'experience' | 'other';
+  confidence: number;
+  rationale: string;
+}
+
 @Injectable()
 export class LlmService {
   private readonly logger = new Logger(LlmService.name);
@@ -54,10 +87,10 @@ export class LlmService {
     if (apiKey) {
       this.openai = new OpenAI({ apiKey });
       this.isEnabled = true;
-      this.logger.log('✅ LlmService inicializado con OpenAI GPT-4o-mini');
+      this.logger.log('âœ… LlmService inicializado con OpenAI GPT-4o-mini');
     } else {
       this.isEnabled = false;
-      this.logger.warn('⚠️ OPENAI_API_KEY no configurada — LlmService desactivado, usando solo regex');
+      this.logger.warn('🚫 OPENAI_API_KEY no configurada — LlmService desactivado, usando solo regex');
     }
   }
 
@@ -86,7 +119,7 @@ export class LlmService {
         return null;
       }
 
-      this.logger.debug(`🤖 Tokens usados: input=${response.usage?.prompt_tokens}, output=${response.usage?.completion_tokens}`);
+      this.logger.debug(`🔍 Tokens usados: input=${response.usage?.prompt_tokens}, output=${response.usage?.completion_tokens}`);
       return content;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -98,7 +131,7 @@ export class LlmService {
   /**
    * Llama a OpenAI en modo TEXTO (no JSON).
    * Usado para respuestas conversacionales naturales.
-   * Temperature más alta para variedad en las respuestas.
+    * Temperature más alta para variedad en las respuestas.
    */
   private async callOpenAIText(systemPrompt: string, userMessage: string): Promise<string | null> {
     if (!this.openai || !this.isEnabled) {
@@ -113,7 +146,7 @@ export class LlmService {
           { role: 'user', content: userMessage },
         ],
         temperature: 0.7, // Más alta para variedad conversacional
-        max_tokens: 300,
+        max_tokens: 500,
         // SIN response_format: json_object — queremos texto natural
       });
 
@@ -123,7 +156,7 @@ export class LlmService {
         return null;
       }
 
-      this.logger.debug(`💬 Respuesta conversacional generada (${content.length} chars)`);
+      this.logger.debug(`🗣️ Respuesta conversacional generada (${content.length} chars)`);
       return content;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -161,9 +194,9 @@ export class LlmService {
     });
 
     if (result.isValid && result.role) {
-      this.logger.log(`✅ Rol validado por IA: "${text}" → "${result.role}"`);
+      this.logger.log(`👍 Rol validado por IA: "${text}" → "${result.role}"`);
     } else {
-      this.logger.log(`⚠️ Rol rechazado por IA: "${text}" — ${result.warning || result.suggestion}`);
+      this.logger.log(`🚫 Rol rechazado por IA: "${text}" — ${result.warning || result.suggestion}`);
     }
 
     return result;
@@ -186,9 +219,9 @@ export class LlmService {
     });
 
     if (result.isValid && result.location) {
-      this.logger.log(`✅ Ubicación validada por IA: "${text}" → "${result.location}"${result.wasCorrected ? ' (corregida)' : ''}`);
+      this.logger.log(`👍 Ubicación validada por IA: "${text}" → "${result.location}"${result.wasCorrected ? ' (corregida)' : ''}`);
     } else {
-      this.logger.log(`⚠️ Ubicación rechazada por IA: "${text}"`);
+      this.logger.log(`🚫 Ubicación rechazada por IA: "${text}"`);
     }
 
     return result;
@@ -213,7 +246,7 @@ export class LlmService {
 
     // Solo aceptar si la confianza es >= 0.7
     if (result.confidence >= 0.7 && result.intent !== UserIntent.UNKNOWN) {
-      this.logger.log(`🧠 Intent detectado por IA: "${text}" → ${result.intent} (confianza: ${result.confidence})`);
+      this.logger.log(`👍 Intent detectado por IA: "${text}" → ${result.intent} (confianza: ${result.confidence})`);
 
       // Mapear string a enum
       const intentMap: Record<string, UserIntent> = {
@@ -229,7 +262,7 @@ export class LlmService {
       return intentMap[result.intent] || UserIntent.UNKNOWN;
     }
 
-    this.logger.debug(`🤷 IA no pudo detectar intent con confianza suficiente: "${text}" → ${result.intent} (${result.confidence})`);
+    this.logger.debug(`🚫 IA no pudo detectar intent con confianza suficiente: "${text}" → ${result.intent} (${result.confidence})`);
     return null;
   }
 
@@ -252,9 +285,9 @@ export class LlmService {
     });
 
     if (result.isValidAnswer) {
-      this.logger.log(`🎯 IA extrajo respuesta válida de out-of-flow: "${text}" → "${result.extractedAnswer}"`);
+      this.logger.log(`👍 IA extrajo respuesta válida de out-of-flow: "${text}" → "${result.extractedAnswer}"`);
     } else {
-      this.logger.log(`💬 IA manejó out-of-flow: "${text}" en estado ${currentState}`);
+      this.logger.log(`🚫 IA manejó out-of-flow: "${text}" en estado ${currentState}`);
     }
 
     return result;
@@ -262,7 +295,7 @@ export class LlmService {
 
   /**
    * Sugiere roles alternativos cuando hay pocas vacantes.
-   * Retorna array vacío si el LLM no está disponible.
+    * Retorna array vacío si el LLM no está disponible.
    */
   async suggestRelatedRoles(role: string): Promise<string[]> {
     const raw = await this.callOpenAI(SYSTEM_PROMPTS.SUGGEST_RELATED_ROLES, role);
@@ -274,10 +307,38 @@ export class LlmService {
     });
 
     if (result.suggestions.length > 0) {
-      this.logger.log(`💡 Roles sugeridos para "${role}": ${result.suggestions.join(', ')} (categoría: ${result.category})`);
+      this.logger.log(`👍 Roles sugeridos para "${role}": ${result.suggestions.join(', ')} (categoría: ${result.category})`);
     }
 
     return result.suggestions;
+  }
+
+  /**
+   * Extrae variables de perfil inicial desde texto libre del usuario.
+   * Retorna null si el LLM no esta disponible.
+   */
+  async extractInitialProfileFromFreeText(
+    text: string,
+  ): Promise<InitialProfileExtractionResult | null> {
+    const raw = await this.callOpenAI(SYSTEM_PROMPTS.INITIAL_PROFILE_EXTRACTION, text);
+    if (!raw) return null;
+
+    const result = this.parseJSON<InitialProfileExtractionResult>(raw, {
+      role: null,
+      location: null,
+      modality: null,
+      experienceLevel: null,
+      experienceYears: null,
+      seniority: null,
+      sector: null,
+      confidence: 0,
+    });
+
+    this.logger.log(
+      `👍 Extraccion inicial perfil: role=${result.role || '-'}, location=${result.location || '-'}, modality=${result.modality || '-'}, exp=${result.experienceLevel || '-'} (conf=${result.confidence ?? 0})`,
+    );
+
+    return result;
   }
 
   /**
@@ -305,10 +366,225 @@ export class LlmService {
     });
 
     if (result.userMessage) {
-      this.logger.log(`🩺 Diagnóstico IA de fallo de búsqueda: ${result.reason}`);
+      this.logger.log(`👍 Diagnóstico IA de fallo de búsqueda: ${result.reason}`);
     }
 
     return result;
+  }
+
+  /**
+   * Calcula score de reutilizacion de vacantes tras rechazo del usuario.
+   * Retorna null si el LLM no está disponible.
+   */
+  async scoreVacancyReuse(input: {
+    rejectionReason: 'role' | 'location' | 'company' | 'salary' | 'remote' | 'experience' | 'other';
+    userProfile: {
+      role?: string | null;
+      location?: string | null;
+      experienceLevel?: string | null;
+    };
+    rejectedVacancy?: {
+      title?: string | null;
+      company?: string | null;
+      locationRaw?: string | null;
+      salaryRaw?: string | null;
+      source?: string | null;
+    } | null;
+    candidateVacancies: Array<{
+      title?: string | null;
+      company?: string | null;
+      locationRaw?: string | null;
+      salaryRaw?: string | null;
+      source?: string | null;
+      score?: number | null;
+    }>;
+  }): Promise<VacancyReuseScoreResult | null> {
+    const raw = await this.callOpenAI(
+      SYSTEM_PROMPTS.VACANCY_REUSE_SCORING,
+      JSON.stringify(input),
+    );
+    if (!raw) return null;
+
+    const result = this.parseJSON<VacancyReuseScoreResult>(raw, {
+      reuseScore: 0.5,
+      rationale: 'No hubo suficiente contexto para estimar con alta confianza.',
+    });
+
+    const boundedScore = Number.isFinite(result.reuseScore)
+      ? Math.min(1, Math.max(0, result.reuseScore))
+      : 0.5;
+
+    this.logger.log(`👍 Score IA de reutilizacion: ${boundedScore.toFixed(2)}`);
+
+    return {
+      reuseScore: boundedScore,
+      rationale: result.rationale || '',
+    };
+  }
+
+  /**
+   * Clasifica texto libre de "otro motivo" de rechazo en una razon accionable.
+   * Retorna null si el LLM no está disponible.
+   */
+  async classifyRejectionReason(
+    text: string,
+  ): Promise<RejectionReasonClassificationResult | null> {
+    const raw = await this.callOpenAI(
+      SYSTEM_PROMPTS.REJECTION_REASON_CLASSIFICATION,
+      text,
+    );
+    if (!raw) return null;
+
+    const result = this.parseJSON<RejectionReasonClassificationResult>(raw, {
+      reason: 'other',
+      confidence: 0.5,
+      rationale: 'No fue posible clasificar con alta confianza.',
+    });
+
+    const allowedReasons = new Set(['role', 'location', 'company', 'salary', 'remote', 'experience', 'other']);
+    const reason = allowedReasons.has(result.reason) ? result.reason : 'other';
+    const confidence = Number.isFinite(result.confidence)
+      ? Math.min(1, Math.max(0, result.confidence))
+      : 0.5;
+
+    this.logger.log(
+      `👍 Clasificación IA de rechazo: reason=${reason}, confidence=${confidence.toFixed(2)}`,
+    );
+
+    return {
+      reason: reason as RejectionReasonClassificationResult['reason'],
+      confidence,
+      rationale: result.rationale || '',
+    };
+  }
+
+  /**
+   * Decide si conviene ejecutar una busqueda adicional para premium.
+   * Si el LLM no esta disponible, usa una heuristica conservadora.
+   */
+  async shouldFetchMorePremiumJobs(input: {
+    role?: string | null;
+    location?: string | null;
+    experienceLevel?: string | null;
+    jobs: Array<{
+      title?: string | null;
+      company?: string | null;
+      locationRaw?: string | null;
+      source?: string | null;
+      score?: number | null;
+    }>;
+    targetResults: number;
+    offersExhausted?: boolean;
+  }): Promise<PremiumSearchExpansionDecision | null> {
+    if (input.offersExhausted) {
+      return {
+        shouldFetchMore: false,
+        confidence: 1,
+        rationale: 'No hay mas paginas disponibles segun el buscador.',
+      };
+    }
+
+    const fallbackDecision: PremiumSearchExpansionDecision = {
+      shouldFetchMore: input.jobs.length < input.targetResults,
+      confidence: 0.6,
+      rationale: 'Heuristica local por cantidad de resultados disponibles.',
+    };
+
+    const systemPrompt = [
+      'Eres un evaluador de calidad de resultados para un buscador de empleo premium.',
+      'Debes decidir si conviene ejecutar UNA busqueda adicional de pagina.',
+      'Responde SOLO JSON valido con: {"shouldFetchMore": boolean, "confidence": number, "rationale": string}.',
+      'Criterios:',
+      '- Si hay pocas ofertas para el objetivo del plan premium, prioriza shouldFetchMore=true.',
+      '- Si la relevancia promedio parece baja o repetitiva, prioriza shouldFetchMore=true.',
+      '- Si ya hay variedad y alta relevancia suficiente, puedes responder false.',
+      '- confidence debe estar entre 0 y 1.',
+    ].join('\n');
+
+    const raw = await this.callOpenAI(systemPrompt, JSON.stringify(input));
+    if (!raw) return fallbackDecision;
+
+    const parsed = this.parseJSON<PremiumSearchExpansionDecision>(raw, fallbackDecision);
+    const confidence = Number.isFinite(parsed.confidence)
+      ? Math.min(1, Math.max(0, parsed.confidence))
+      : fallbackDecision.confidence;
+
+    return {
+      shouldFetchMore: parsed.shouldFetchMore === true,
+      confidence,
+      rationale: parsed.rationale || fallbackDecision.rationale,
+    };
+  }
+
+  /**
+   * Reordena candidatas de oferta para premium segun calidad global.
+   * Si el LLM no esta disponible, usa el score local existente.
+   */
+  async rerankPremiumJobs(input: {
+    role?: string | null;
+    location?: string | null;
+    experienceLevel?: string | null;
+    jobs: Array<{
+      title?: string | null;
+      company?: string | null;
+      locationRaw?: string | null;
+      source?: string | null;
+      snippet?: string | null;
+      score?: number | null;
+    }>;
+  }): Promise<PremiumJobRerankResult | null> {
+    if (input.jobs.length <= 1) {
+      return {
+        orderedIndexes: input.jobs.map((_, index) => index),
+        rationale: 'No se requiere reordenamiento con una sola oferta.',
+      };
+    }
+
+    const fallbackIndexes = input.jobs
+      .map((job, index) => ({ index, score: typeof job.score === 'number' ? job.score : -1 }))
+      .sort((a, b) => b.score - a.score)
+      .map((item) => item.index);
+
+    const fallback: PremiumJobRerankResult = {
+      orderedIndexes: fallbackIndexes,
+      rationale: 'Orden por score local al no disponer de IA.',
+    };
+
+    const systemPrompt = [
+      'Eres un ranking engine para ofertas de empleo.',
+      'Debes ordenar las ofertas de mayor a menor calidad para el usuario.',
+      'Responde SOLO JSON valido con: {"orderedIndexes": number[], "rationale": string}.',
+      'orderedIndexes debe incluir todos los indices exactamente una vez.',
+      'Regla critica: prioriza con maxima fuerza la coincidencia de ciudad objetivo (location).',
+      'Si una oferta coincide exactamente en ciudad con location, debe quedar por encima de ofertas de otras ciudades, salvo incompatibilidad extrema de rol.',
+      'Luego prioriza relevancia del rol, seniority y calidad de fuente.',
+    ].join('\n');
+
+    const raw = await this.callOpenAI(systemPrompt, JSON.stringify(input));
+    if (!raw) return fallback;
+
+    const parsed = this.parseJSON<PremiumJobRerankResult>(raw, fallback);
+    const used = new Set<number>();
+    const validOrder: number[] = [];
+
+    for (const maybeIndex of parsed.orderedIndexes || []) {
+      if (!Number.isInteger(maybeIndex)) continue;
+      if (maybeIndex < 0 || maybeIndex >= input.jobs.length) continue;
+      if (used.has(maybeIndex)) continue;
+      used.add(maybeIndex);
+      validOrder.push(maybeIndex);
+    }
+
+    for (let index = 0; index < input.jobs.length; index += 1) {
+      if (!used.has(index)) {
+        validOrder.push(index);
+      }
+    }
+
+    return {
+      orderedIndexes: validOrder.length > 0 ? validOrder : fallback.orderedIndexes,
+      rationale: parsed.rationale || fallback.rationale,
+    };
   }
 
   // ===== Método conversacional =====

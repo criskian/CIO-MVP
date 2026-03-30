@@ -4,6 +4,7 @@ import { IWhatsappProvider, BotReply } from './interfaces/whatsapp-provider.inte
 import { CloudApiProvider } from './providers/cloud-api.provider';
 import { BotMessages } from '../conversation/helpers/bot-messages';
 import { PrismaService } from '../database/prisma.service';
+import { repairMojibakeText as repairMojibakeUtil } from '../../common/text/mojibake.util';
 
 /**
  * Servicio principal de WhatsApp
@@ -14,6 +15,74 @@ import { PrismaService } from '../database/prisma.service';
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
   private readonly provider: IWhatsappProvider;
+  private readonly canonicalButtonTitles: Record<string, string> = {
+    confirm_restart: 'Sí, reiniciar',
+    cancel_restart: 'No, cancelar',
+    confirm_cancel: 'Sí, confirmar',
+    abort_cancel: 'No, continuar',
+    accept_alerts: 'Sí, activar',
+    reject_alerts: 'No, gracias',
+    alerts_yes: 'Sí, activar',
+    alerts_no: 'No, gracias',
+    remote_yes: 'Sí',
+    remote_no: 'No',
+    lead_interest_yes: 'Sí, me interesó',
+    lead_interest_no: 'No me interesó',
+    lead_terms_accept: 'Acepto',
+    lead_terms_reject: 'No acepto',
+    continue: 'A buscar empleo',
+    cmd_ofertas: 'Ver ofertas ahora',
+    cmd_pagar: 'Activar premium',
+    cmd_verificar: 'Verificar pago',
+    premium_cv_back_menu: 'Volver al menu',
+  };
+  private readonly canonicalRowTitles: Record<string, string> = {
+    cmd_buscar: 'Buscar empleos',
+    cmd_editar: 'Editar perfil',
+    cmd_reiniciar: 'Reiniciar',
+    cmd_cancelar: 'Cancelar servicio',
+    cmd_adjuntar_hv: 'Adjuntar HV',
+    cmd_ofertas: 'Ver ofertas ahora',
+    cmd_pagar: 'Activar premium',
+    edit_rol: 'ðŸ”¹ Rol',
+    edit_experiencia: 'ðŸ’¡ Experiencia',
+    edit_ubicacion: 'ðŸ“ UbicaciÃ³n',
+    edit_horario: 'â° Horario alertas',
+    reason_role: 'Cargo',
+    reason_location: 'Ciudad',
+    reason_company: 'Empresa',
+    reason_salary: 'Salario',
+    reason_remote: 'Remoto',
+    reason_other: 'Otro motivo',
+    exp_none: 'Sin experiencia',
+    exp_junior: 'Junior (1-2 años)',
+    exp_mid: 'Intermedio (3-5 años)',
+    exp_senior: 'Senior (5+ años)',
+    exp_lead: 'Lead/Expert (7+ años)',
+    freq_daily: 'Diariamente',
+    freq_every_3_days: 'Cada 3 días',
+    freq_weekly: 'Semanalmente',
+    freq_monthly: 'Mensualmente',
+  };
+  private readonly canonicalRowDescriptions: Record<string, string> = {
+    cmd_buscar: 'Encontrar ofertas ahora',
+    cmd_editar: 'Cambiar tus preferencias',
+    cmd_reiniciar: 'Reconfigurar desde cero',
+    cmd_cancelar: 'Dejar de usar el servicio',
+    cmd_adjuntar_hv: 'Enviar hoja de vida',
+    cmd_ofertas: 'Revisar las ofertas disponibles',
+    reason_role: 'El cargo no encaja',
+    reason_location: 'La ciudad no me sirve',
+    reason_company: 'La empresa no me interesa',
+    reason_salary: 'El salario no se ajusta',
+    reason_remote: 'Busco una modalidad diferente',
+    reason_other: 'Te explico el motivo',
+    exp_none: 'Recién graduado o sin experiencia laboral',
+    exp_junior: 'Experiencia inicial en el campo',
+    exp_mid: 'Experiencia sólida',
+    exp_senior: 'Experto en el área',
+    exp_lead: 'Liderazgo y expertise avanzado',
+  };
 
   // Cache para deduplicación de mensajes (messageId -> timestamp)
   private readonly processedMessages = new Map<string, number>();
@@ -31,10 +100,153 @@ export class WhatsappService {
   ) {
     // Usar Cloud API como provider único
     this.provider = this.cloudApiProvider;
-    this.logger.log('📱 Usando WhatsApp Cloud API como proveedor');
+    this.logger.log('ðŸ“± Usando WhatsApp Cloud API como proveedor');
 
     // Limpiar cache cada 5 minutos
     setInterval(() => this.cleanupMessageCache(), 5 * 60 * 1000);
+  }
+
+  private repairMojibakeText(text: string): string {
+    if (!text) return text;
+
+    const hasSuspiciousChars =
+      /[\u00C2\u00C3\u00E2\u00F0]/.test(text) || text.includes('\uFFFD');
+    if (!hasSuspiciousChars) return text;
+
+    let candidate = text;
+    for (let i = 0; i < 3; i += 1) {
+      try {
+        const repaired = Buffer.from(candidate, 'latin1').toString('utf8');
+        if (!repaired || repaired === candidate) {
+          break;
+        }
+        candidate = repaired;
+      } catch {
+        break;
+      }
+    }
+
+    const normalizedCandidate = this.applyKnownMojibakeReplacements(candidate);
+    const normalizedOriginal = this.applyKnownMojibakeReplacements(text);
+
+    const fixed =
+      this.countSuspiciousChars(normalizedCandidate) <= this.countSuspiciousChars(normalizedOriginal)
+        ? normalizedCandidate
+        : normalizedOriginal;
+
+    if (fixed.includes('\uFFFD') && !normalizedOriginal.includes('\uFFFD')) {
+      return normalizedOriginal;
+    }
+
+    return fixed;
+  }
+
+  private countSuspiciousChars(value: string): number {
+    const matches = value.match(/[ÃƒÃ‚Ã¢Ã…Ã°\uFFFD]/g);
+    return matches ? matches.length : 0;
+  }
+
+  private applyKnownMojibakeReplacements(value: string): string {
+    let result = value;
+
+    const replacements: Array<[string, string]> = [
+      ['ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â', 'ðŸ“'],
+      ['ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â¹', 'ðŸ”¹'],
+      ['ÃƒÂ°Ã…Â¸Ã¢â‚¬â„¢Ã‚Â¡', 'ðŸ’¡'],
+      ['ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â', 'ðŸ“'],
+      ['ÃƒÂ¢Ã‚ÂÃ‚Â°', 'â°'],
+      ['ÃƒÂ¢Ã‚ÂÃ…â€™', 'âŒ'],
+      ['Ã°Å¸â€œÂ', 'ðŸ“'],
+      ['Ã°Å¸â€Â¹', 'ðŸ”¹'],
+      ['Ã°Å¸â€™Â¡', 'ðŸ’¡'],
+      ['Ã°Å¸â€œÂ', 'ðŸ“'],
+      ['Ã°Å¸â€Â', 'ðŸ”'],
+      ['Ã¢ÂÂ°', 'â°'],
+      ['Ã¢ÂÅ’', 'âŒ'],
+      ['Ã¢Å“â€¦', 'âœ…'],
+      ['Ã¢Å¡Â Ã¯Â¸Â', 'âš ï¸'],
+      ['Ã¢Å“Â¨', 'âœ¨'],
+      ['Ã¢â‚¬Â¢', 'â€¢'],
+      ['Ã¢â‚¬Â¦', '...'],
+      ['Ã¢â‚¬Å“', '"'],
+      ['Ã¢â‚¬Â', '"'],
+      ['Ã¢â‚¬â„¢', "'"],
+      ['ÃƒÂ¡', 'Ã¡'],
+      ['ÃƒÂ©', 'Ã©'],
+      ['ÃƒÂ­', 'Ã­'],
+      ['ÃƒÂ³', 'Ã³'],
+      ['ÃƒÂº', 'Ãº'],
+      ['ÃƒÂ', 'Ã'],
+      ['Ãƒâ€°', 'Ã‰'],
+      ['ÃƒÂ', 'Ã'],
+      ['Ãƒâ€œ', 'Ã“'],
+      ['ÃƒÅ¡', 'Ãš'],
+      ['ÃƒÂ±', 'Ã±'],
+      ['Ãƒâ€˜', 'Ã‘'],
+      ['ÃƒÂ¼', 'Ã¼'],
+      ['ÃƒÅ“', 'Ãœ'],
+      ['Ã‚Â¿', 'Â¿'],
+      ['Ã‚Â¡', 'Â¡'],
+      ['Ã‚Â°', 'Â°'],
+      ['Ã‚', ''],
+    ];
+
+    for (const [broken, fixed] of replacements) {
+      result = result.split(broken).join(fixed);
+    }
+
+    return result;
+  }
+
+  private sanitizeBotReply(reply: BotReply): BotReply {
+    const sanitizeText = (value?: string) => (value ? repairMojibakeUtil(value) : value);
+    const sanitizeButtonTitle = (id: string, title: string) =>
+      this.canonicalButtonTitles[id] ?? sanitizeText(title) ?? title;
+    const sanitizeRowTitle = (id: string, title: string) =>
+      this.canonicalRowTitles[id] ?? sanitizeText(title) ?? title;
+    const sanitizeRowDescription = (id: string, description?: string) =>
+      this.canonicalRowDescriptions[id] ?? sanitizeText(description);
+
+    return {
+      ...reply,
+      preMessage: reply.preMessage
+        ? {
+          ...reply.preMessage,
+          text: sanitizeText(reply.preMessage.text) || '',
+        }
+        : undefined,
+      text: sanitizeText(reply.text) || '',
+      listTitle: sanitizeText(reply.listTitle),
+      buttons: reply.buttons?.map((btn) => ({
+        ...btn,
+        title: sanitizeButtonTitle(btn.id, btn.title),
+      })),
+      listSections: reply.listSections?.map((section) => ({
+        ...section,
+        title: sanitizeText(section.title),
+        rows: section.rows.map((row) => ({
+          ...row,
+          title: sanitizeRowTitle(row.id, row.title),
+          description: sanitizeRowDescription(row.id, row.description),
+        })),
+      })),
+      delayedMessage: reply.delayedMessage
+        ? {
+          ...reply.delayedMessage,
+          text: sanitizeText(reply.delayedMessage.text) || '',
+          listTitle: sanitizeText(reply.delayedMessage.listTitle),
+          listSections: reply.delayedMessage.listSections?.map((section) => ({
+            ...section,
+            title: sanitizeText(section.title),
+            rows: section.rows.map((row) => ({
+              ...row,
+              title: sanitizeRowTitle(row.id, row.title),
+              description: sanitizeRowDescription(row.id, row.description),
+            })),
+          })),
+        }
+        : undefined,
+    };
   }
 
   /**
@@ -62,10 +274,10 @@ export class WhatsappService {
           metadata: metadata || {},
         },
       });
-      this.logger.debug(`💾 Mensaje outbound guardado para usuario ${userId.substring(0, 8)}...`);
+      this.logger.debug(`ðŸ’¾ Mensaje outbound guardado para usuario ${userId.substring(0, 8)}...`);
     } catch (error) {
       // No bloquear el envío si falla el guardado
-      this.logger.error(`❌ Error guardando mensaje outbound en historial: ${error}`);
+      this.logger.error(`âŒ Error guardando mensaje outbound en historial: ${error}`);
     }
   }
 
@@ -87,10 +299,10 @@ export class WhatsappService {
           messageId,
         },
       });
-      this.logger.debug(`💾 Mensaje inbound guardado para usuario ${userId.substring(0, 8)}...`);
+      this.logger.debug(`ðŸ’¾ Mensaje inbound guardado para usuario ${userId.substring(0, 8)}...`);
     } catch (error) {
       // No bloquear el procesamiento si falla el guardado
-      this.logger.error(`❌ Error guardando mensaje inbound en historial: ${error}`);
+      this.logger.error(`âŒ Error guardando mensaje inbound en historial: ${error}`);
     }
   }
 
@@ -128,24 +340,24 @@ export class WhatsappService {
    */
   async handleIncomingWebhook(payload: any): Promise<{ status: string }> {
     try {
-      this.logger.log('📨 Webhook recibido');
+      this.logger.log('ðŸ“¨ Webhook recibido');
       this.logger.debug(`Payload: ${JSON.stringify(payload)}`);
 
       // Normalizar mensaje usando el provider
       const normalizedMessage = this.provider.normalizeIncomingMessage(payload);
 
       if (!normalizedMessage) {
-        this.logger.warn('⚠️ No se pudo normalizar el mensaje');
+        this.logger.warn('âš ï¸ No se pudo normalizar el mensaje');
         return { status: 'ignored' };
       }
 
-      // 1. VALIDAR DEDUPLICACIÓN: Verificar si ya procesamos este mensaje
+      // 1. VALIDAR DEDUPLICACIÃ“N: Verificar si ya procesamos este mensaje
       if (
         normalizedMessage.messageId &&
         this.isMessageAlreadyProcessed(normalizedMessage.messageId)
       ) {
         this.logger.warn(
-          `🔁 Mensaje duplicado detectado (ID: ${normalizedMessage.messageId}). Ignorando.`,
+          `ðŸ” Mensaje duplicado detectado (ID: ${normalizedMessage.messageId}). Ignorando.`,
         );
         return { status: 'duplicate' };
       }
@@ -155,14 +367,14 @@ export class WhatsappService {
         const messageAge = Date.now() - normalizedMessage.timestamp.getTime();
         if (messageAge > this.MAX_MESSAGE_AGE_MS) {
           this.logger.warn(
-            `⏰ Mensaje muy antiguo detectado (${Math.round(messageAge / 1000)}s). Ignorando para evitar crear sesiones duplicadas.`,
+            `â° Mensaje muy antiguo detectado (${Math.round(messageAge / 1000)}s). Ignorando para evitar crear sesiones duplicadas.`,
           );
           return { status: 'too_old' };
         }
       }
 
       this.logger.log(
-        `📬 Mensaje de ${normalizedMessage.phone}: ${normalizedMessage.text || '[media]'}`,
+        `ðŸ“¬ Mensaje de ${normalizedMessage.phone}: ${normalizedMessage.text || '[media]'}`,
       );
 
       // 3. MARCAR COMO PROCESADO antes de procesar (para evitar race conditions)
@@ -170,7 +382,7 @@ export class WhatsappService {
         this.markMessageAsProcessed(normalizedMessage.messageId);
       }
 
-      // 💾 GUARDAR MENSAJE ENTRANTE (INBOUND) - Centralizado aquí
+      // ðŸ’¾ GUARDAR MENSAJE ENTRANTE (INBOUND) - Centralizado aquÃ­
       const userId = await this.findUserIdByPhone(normalizedMessage.phone);
       if (userId && normalizedMessage.text) {
         await this.saveInboundMessage(userId, normalizedMessage.text, normalizedMessage.messageId);
@@ -190,8 +402,8 @@ export class WhatsappService {
         // Si falla el envío del mensaje principal, intentar reenviar el mismo mensaje
         // con un texto de error adicional
         const errorMessage = sendError instanceof Error ? sendError.message : 'Unknown error';
-        this.logger.error(`❌ Error enviando respuesta: ${errorMessage}`);
-        this.logger.log(`🔄 Reintentando envío del mensaje...`);
+        this.logger.error(`âŒ Error enviando respuesta: ${errorMessage}`);
+        this.logger.log(`ðŸ”„ Reintentando envÃ­o del mensaje...`);
 
         // Reintentar con el mismo mensaje pero como texto simple si es interactivo
         try {
@@ -217,7 +429,7 @@ export class WhatsappService {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
-      this.logger.error(`❌ Error procesando webhook: ${errorMessage}`, errorStack);
+      this.logger.error(`âŒ Error procesando webhook: ${errorMessage}`, errorStack);
 
       return { status: 'error' };
     }
@@ -236,33 +448,48 @@ export class WhatsappService {
     options?: { userId?: string; source?: 'conversation' | 'scheduler' | 'admin' }
   ): Promise<void> {
     try {
-      // Enviar mensaje principal (sin el delayedMessage)
-      const { delayedMessage, ...mainReply } = reply;
-      await this.provider.sendMessage(to, mainReply);
-      this.logger.log(`✅ Mensaje enviado a ${to}`);
+      const sanitizedReply = this.sanitizeBotReply(reply);
 
-      // 💾 GUARDAR en historial (centralizado aquí)
       const userId = options?.userId || await this.findUserIdByPhone(to);
-      if (userId) {
-        const metadata: any = {
-          type: reply.buttons ? 'interactive' : 'text',
-          source: options?.source || 'scheduler',
-        };
-        if (reply.buttons) {
-          metadata.buttons = reply.buttons;
+
+      // Enviar mensaje previo (si existe)
+      const { preMessage, delayedMessage, ...mainReply } = sanitizedReply;
+      if (preMessage?.text) {
+        await this.provider.sendMessage(to, { text: preMessage.text });
+        this.logger.log(`Mensaje previo enviado a ${to}`);
+
+        if (userId) {
+          await this.saveOutboundMessage(userId, preMessage.text, {
+            type: 'text',
+            source: options?.source || 'scheduler',
+          });
         }
-        if (reply.listTitle) {
-          metadata.listTitle = reply.listTitle;
-          metadata.listSections = reply.listSections;
-          metadata.type = 'interactive';
-        }
-        await this.saveOutboundMessage(userId, reply.text || '', metadata);
       }
 
+      // Enviar mensaje principal (sin preMessage ni delayedMessage)
+      await this.provider.sendMessage(to, mainReply);
+      this.logger.log(`Mensaje enviado a ${to}`);
+
+      // Guardar en historial (centralizado aquí)
+      if (userId) {
+        const metadata: any = {
+          type: sanitizedReply.buttons ? 'interactive' : 'text',
+          source: options?.source || 'scheduler',
+        };
+        if (sanitizedReply.buttons) {
+          metadata.buttons = sanitizedReply.buttons;
+        }
+        if (sanitizedReply.listTitle) {
+          metadata.listTitle = sanitizedReply.listTitle;
+          metadata.listSections = sanitizedReply.listSections;
+          metadata.type = 'interactive';
+        }
+        await this.saveOutboundMessage(userId, sanitizedReply.text || '', metadata);
+      }
       // Si hay mensaje retrasado, programar su envío
       if (delayedMessage) {
         const delayMs = delayedMessage.delayMs || 60000; // Default 1 minuto
-        this.logger.log(`⏰ Programando mensaje retrasado para ${to} en ${delayMs / 1000} segundos`);
+        this.logger.log(`â° Programando mensaje retrasado para ${to} en ${delayMs / 1000} segundos`);
 
         // Buscar userId ahora para capturarlo en el closure
         const delayedUserId = options?.userId || await this.findUserIdByPhone(to);
@@ -274,28 +501,29 @@ export class WhatsappService {
               listTitle: delayedMessage.listTitle,
               listSections: delayedMessage.listSections,
             };
-            await this.provider.sendMessage(to, delayedReply);
-            this.logger.log(`✅ Mensaje retrasado enviado a ${to}`);
+            const sanitizedDelayedReply = this.sanitizeBotReply(delayedReply);
+            await this.provider.sendMessage(to, sanitizedDelayedReply);
+            this.logger.log(`âœ… Mensaje retrasado enviado a ${to}`);
 
             // Guardar mensaje retrasado en historial (siempre, ya que no viene de ConversationService)
             if (delayedUserId) {
-              await this.saveOutboundMessage(delayedUserId, delayedMessage.text || '', {
+              await this.saveOutboundMessage(delayedUserId, sanitizedDelayedReply.text || '', {
                 type: 'delayed',
                 source: options?.source || 'scheduler',
-                listTitle: delayedMessage.listTitle,
-                listSections: delayedMessage.listSections,
+                listTitle: sanitizedDelayedReply.listTitle,
+                listSections: sanitizedDelayedReply.listSections,
               });
             }
           } catch (delayedError) {
             const errorMessage = delayedError instanceof Error ? delayedError.message : 'Unknown error';
-            this.logger.error(`❌ Error enviando mensaje retrasado a ${to}: ${errorMessage}`);
+            this.logger.error(`âŒ Error enviando mensaje retrasado a ${to}: ${errorMessage}`);
           }
         }, delayMs);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
-      this.logger.error(`❌ Error enviando mensaje a ${to}: ${errorMessage}`, errorStack);
+      this.logger.error(`âŒ Error enviando mensaje a ${to}: ${errorMessage}`, errorStack);
       throw error;
     }
   }
@@ -317,13 +545,14 @@ export class WhatsappService {
     options?: { userId?: string; source?: 'conversation' | 'scheduler' | 'admin' }
   ): Promise<void> {
     try {
-      await this.cloudApiProvider.sendTemplateMessage(to, templateName, languageCode, bodyParams);
-      this.logger.log(`✅ Template "${templateName}" enviado a ${to}`);
+      const sanitizedBodyParams = bodyParams.map((param) => repairMojibakeUtil(param));
+      await this.cloudApiProvider.sendTemplateMessage(to, templateName, languageCode, sanitizedBodyParams);
+      this.logger.log(`âœ… Template "${templateName}" enviado a ${to}`);
 
       // Guardar en historial
       const userId = options?.userId || await this.findUserIdByPhone(to);
       if (userId) {
-        const templateContent = `[TEMPLATE: ${templateName}] ${bodyParams.join(' | ')}`;
+        const templateContent = `[TEMPLATE: ${templateName}] ${sanitizedBodyParams.join(' | ')}`;
         await this.saveOutboundMessage(userId, templateContent, {
           type: 'template',
           source: options?.source || 'scheduler',
@@ -332,7 +561,7 @@ export class WhatsappService {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`❌ Error enviando template a ${to}: ${errorMessage}`);
+      this.logger.error(`âŒ Error enviando template a ${to}: ${errorMessage}`);
       throw error;
     }
   }
@@ -367,7 +596,7 @@ export class WhatsappService {
     entriesToDelete.forEach((id) => this.processedMessages.delete(id));
 
     if (entriesToDelete.length > 0) {
-      this.logger.debug(`🧹 Limpieza de cache: ${entriesToDelete.length} mensajes eliminados`);
+      this.logger.debug(`ðŸ§¹ Limpieza de cache: ${entriesToDelete.length} mensajes eliminados`);
     }
   }
 }

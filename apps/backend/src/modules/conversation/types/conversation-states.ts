@@ -8,6 +8,20 @@
 export enum ConversationState {
   NEW = 'NEW',
 
+  // ========================================
+  // FLUJO FREEMIUM V2 (valor antes de registro)
+  // ========================================
+  LEAD_COLLECT_PROFILE = 'LEAD_COLLECT_PROFILE', // Captura rol inicial (texto libre)
+  LEAD_ASK_LOCATION = 'LEAD_ASK_LOCATION', // Captura ubicación faltante
+  LEAD_ASK_EXPERIENCE = 'LEAD_ASK_EXPERIENCE', // Captura experiencia faltante
+  LEAD_SHOW_FIRST_VACANCY = 'LEAD_SHOW_FIRST_VACANCY', // Muestra primera vacante (1 resultado)
+  LEAD_WAIT_INTEREST = 'LEAD_WAIT_INTEREST', // Espera interés/no interés
+  LEAD_WAIT_REJECTION_REASON = 'LEAD_WAIT_REJECTION_REASON', // Motivo de rechazo para ajustar
+  LEAD_WAIT_REJECTION_OTHER_TEXT = 'LEAD_WAIT_REJECTION_OTHER_TEXT', // Texto libre para "otro motivo"
+  LEAD_REGISTER_NAME = 'LEAD_REGISTER_NAME', // Registro diferido: nombre
+  LEAD_REGISTER_EMAIL = 'LEAD_REGISTER_EMAIL', // Registro diferido: email
+  LEAD_TERMS_CONSENT = 'LEAD_TERMS_CONSENT', // Consentimiento posterior al correo
+
   // Estados de registro in-bot (usuario no registrado escribe al bot)
   WA_ASK_NAME = 'WA_ASK_NAME', // Pidiendo nombre al usuario no registrado
   WA_ASK_EMAIL = 'WA_ASK_EMAIL', // Pidiendo email al usuario no registrado
@@ -15,6 +29,16 @@ export enum ConversationState {
   // ASK_NAME = 'ASK_NAME', // [ELIMINADO] Nombre se obtiene del registro en landing
   // ASK_DEVICE = 'ASK_DEVICE', // [ELIMINADO] Siempre asumimos celular/móvil para usar botones interactivos
   ASK_TERMS = 'ASK_TERMS',
+
+  // ========================================
+  // FLUJO PREMIUM V2 (onboarding con rama CV)
+  // ========================================
+  PREMIUM_ASK_CV = 'PREMIUM_ASK_CV', // Pregunta inicial: tiene o no tiene CV
+  PREMIUM_WAITING_CV_FILE = 'PREMIUM_WAITING_CV_FILE', // Esperando documento o foto del CV
+  PREMIUM_PROCESSING_CV = 'PREMIUM_PROCESSING_CV', // Procesando CV recibido
+  PREMIUM_CONFIRM_CV_PROFILE = 'PREMIUM_CONFIRM_CV_PROFILE', // Confirmar perfil extraido de CV
+  PREMIUM_DIAGNOSIS = 'PREMIUM_DIAGNOSIS', // Diagnostico premium (1 vacante inicial)
+
   ASK_ROLE = 'ASK_ROLE',
   ASK_REMOTE = 'ASK_REMOTE', // Pregunta si quiere trabajar remoto (Sí/No)
   ASK_EXPERIENCE = 'ASK_EXPERIENCE', // Pregunta por años de experiencia
