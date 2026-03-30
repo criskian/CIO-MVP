@@ -45,6 +45,7 @@ import {
 } from './helpers/date-utils';
 
 type FlowVariant = 'legacy' | 'freemium_v2';
+type PremiumOnboardingSource = 'restart' | 'direct_payment';
 type LeadRejectionReason = 'role' | 'location' | 'company' | 'salary' | 'remote' | 'experience' | 'other';
 type LeadVacancySearchMode = 'default' | 'reuse_cache' | 'force_fresh';
 type LeadRejectionReasonSource = 'button' | 'free_text' | 'llm';
@@ -144,6 +145,12 @@ export class ConversationService {
         user.id,
         session,
         this.defaultFlowVariant,
+      );
+      const isPaidPlanActive = this.isPaidPlanActive(user.subscription);
+      await this.ensurePremiumOnboardingV2ForPaidUserInNewState(
+        user.id,
+        session,
+        isPaidPlanActive,
       );
       this.logger.debug(`Variante de flujo para ${user.id}: ${flowVariant}`);
 
@@ -3248,6 +3255,21 @@ Puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
       // Usuario confirmó reinicio
       await this.restartUserProfile(userId);
       const onboardingFlags = await this.getOnboardingFlags(userId);
+      const subscription = await this.prisma.subscription.findUnique({
+        where: { userId },
+        select: { plan: true, status: true },
+      });
+      const isPaidPlanActive = this.isPaidPlanActive(subscription);
+
+      if (isPaidPlanActive && onboardingFlags.premiumOnboardingV2) {
+        await this.updateSessionState(userId, ConversationState.NEW);
+        const premiumRestartReply = await this.handleNewState(userId);
+        return {
+          ...premiumRestartReply,
+          text: `${BotMessages.RESTARTED}\n\n${premiumRestartReply.text}`,
+        };
+      }
+
       if (onboardingFlags.flowVariant === this.v2FlowVariant) {
         await this.updateSessionState(userId, ConversationState.LEAD_COLLECT_PROFILE);
         return {
@@ -4668,6 +4690,22 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
     return null;
   }
 
+  private parsePremiumOnboardingSource(value: unknown): PremiumOnboardingSource | null {
+    if (value === 'restart' || value === 'direct_payment') {
+      return value;
+    }
+    return null;
+  }
+
+  private isPaidPlanActive(
+    subscription: { plan?: string | null; status?: string | null } | null | undefined,
+  ): boolean {
+    return (
+      (subscription?.plan === 'PREMIUM' || subscription?.plan === 'PRO')
+      && subscription?.status === 'ACTIVE'
+    );
+  }
+
   /**
    * Garantiza que la sesión tenga una variante de flujo explícita.
    * - Si ya tiene variante válida, la respeta.
@@ -4703,6 +4741,36 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
     );
 
     return preferredVariant;
+  }
+
+  private async ensurePremiumOnboardingV2ForPaidUserInNewState(
+    userId: string,
+    session: { id: string; state: string; data: any },
+    isPaidPlanActive: boolean,
+  ): Promise<void> {
+    if (!isPaidPlanActive) return;
+    if (session.state !== ConversationState.NEW) return;
+
+    const currentData = (session.data as Record<string, any>) || {};
+    if (currentData.premiumOnboardingV2 === true) return;
+
+    const nextData = {
+      ...currentData,
+      premiumOnboardingV2: true,
+      premiumOnboardingSource: 'direct_payment',
+    };
+
+    await this.prisma.session.update({
+      where: { id: session.id },
+      data: {
+        data: nextData,
+        updatedAt: new Date(),
+      },
+    });
+
+    this.logger.log(
+      `premiumOnboardingV2 habilitado para ${userId} (source=direct_payment)`,
+    );
   }
 
   // [ELIMINADO] getDeviceType ya no se usa, todos son tratados como móvil
@@ -4789,6 +4857,8 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
     flowVariant: FlowVariant;
     skipAlertConfigOnboarding: boolean;
     defaultOnboardingAlertTime: string;
+    premiumOnboardingV2: boolean;
+    premiumOnboardingSource: PremiumOnboardingSource | null;
   }> {
     const session = await this.prisma.session.findFirst({
       where: { userId },
@@ -4806,6 +4876,10 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
         typeof sessionData.defaultOnboardingAlertTime === 'string'
           ? sessionData.defaultOnboardingAlertTime
           : this.defaultOnboardingAlertTime,
+      premiumOnboardingV2: sessionData.premiumOnboardingV2 === true,
+      premiumOnboardingSource: this.parsePremiumOnboardingSource(
+        sessionData.premiumOnboardingSource,
+      ),
     };
   }
 
@@ -4925,6 +4999,12 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
    * Reinicia el perfil del usuario (elimina datos pero mantiene el User)
    */
   private async restartUserProfile(userId: string) {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+      select: { plan: true, status: true },
+    });
+    const isPaidPlanActive = this.isPaidPlanActive(subscription);
+
     // Eliminar UserProfile (1:1 con User)
     try {
       await this.prisma.userProfile.delete({ where: { userId } });
@@ -4943,16 +5023,24 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
     await this.prisma.jobSearchLog.deleteMany({ where: { userId } });
     await this.prisma.sentJob.deleteMany({ where: { userId } });
 
+    const nextSessionData = isPaidPlanActive
+      ? {
+        flowVariant: this.defaultFlowVariant,
+        premiumOnboardingV2: true,
+        premiumOnboardingSource: 'restart',
+      }
+      : {
+        flowVariant: this.v2FlowVariant,
+        skipAlertConfigOnboarding: true,
+        defaultOnboardingAlertTime: this.defaultOnboardingAlertTime,
+      };
+
     // Resetear sesión a NEW
     await this.prisma.session.updateMany({
       where: { userId },
       data: {
         state: ConversationState.NEW,
-        data: {
-          flowVariant: this.v2FlowVariant,
-          skipAlertConfigOnboarding: true,
-          defaultOnboardingAlertTime: this.defaultOnboardingAlertTime,
-        },
+        data: nextSessionData,
         updatedAt: new Date(),
       },
     });
