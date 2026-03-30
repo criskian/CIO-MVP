@@ -3,7 +3,7 @@ import { PrismaService } from '../database/prisma.service';
 import { JobSearchService } from '../job-search/job-search.service';
 import { JobPosting } from '../job-search/types/job-posting';
 import { LlmService } from '../llm/llm.service';
-import { CvService } from '../cv/cv.service';
+import { CvService, type CvProfileExtractionResult } from '../cv/cv.service';
 import { ChatHistoryService } from './chat-history.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
@@ -2754,8 +2754,9 @@ export class ConversationService {
 
     await this.updateSessionState(userId, ConversationState.PREMIUM_PROCESSING_CV);
 
+    let extractionResult: CvProfileExtractionResult | null = null;
     try {
-      await this.cvService.processCvFromUrl(userId, mediaUrl);
+      extractionResult = await this.cvService.processCvFromUrl(userId, mediaUrl);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(`No se pudo procesar CV premium para ${userId}: ${message}`);
@@ -2766,6 +2767,31 @@ export class ConversationService {
       select: { role: true, location: true, experienceLevel: true },
     });
     const missingFields = this.getPremiumMissingProfileFields(profile);
+    const shouldAskResend =
+      extractionResult?.warningCode === 'DOC_PARSE_FAILED'
+      || extractionResult?.warningCode === 'UNSUPPORTED_MIME'
+      || extractionResult?.warningCode === 'MEDIA_DOWNLOAD_FAILED'
+      || extractionResult?.warningCode === 'MEDIA_METADATA_FAILED';
+
+    if (shouldAskResend) {
+      await this.updateSessionData(userId, {
+        premiumOnboardingMode: 'cv',
+        premiumCvLastMediaType: messageType,
+        premiumCvLastMediaId: mediaUrl,
+        premiumCvLastWarningCode: extractionResult?.warningCode || null,
+      });
+      await this.updateSessionState(userId, ConversationState.PREMIUM_WAITING_CV_FILE);
+
+      const warningText = extractionResult?.warningMessage
+        || 'No pude leer el archivo. Reenvialo en PDF, DOCX o imagen.';
+
+      return {
+        text: `${warningText}\n\n${BotMessages.PREMIUM_WAITING_CV_FILE}`,
+        buttons: [
+          { id: 'premium_cv_skip_manual', title: 'Seguir sin CV' },
+        ],
+      };
+    }
 
     await this.updateSessionData(userId, {
       premiumOnboardingMode: 'cv',
@@ -2777,16 +2803,22 @@ export class ConversationService {
       premiumCvMissingFields: missingFields,
       premiumCvLastMediaType: messageType,
       premiumCvLastMediaId: mediaUrl,
+      premiumCvLastWarningCode: extractionResult?.warningCode || null,
+      premiumCvLastConfidence: extractionResult?.confidence ?? null,
+      premiumCvLastSourceType: extractionResult?.sourceType || null,
     });
     await this.updateSessionState(userId, ConversationState.PREMIUM_CONFIRM_CV_PROFILE);
 
+    const extractionWarning = extractionResult?.warningMessage?.trim();
+    const confirmationText = BotMessages.PREMIUM_CONFIRM_CV_PROFILE(
+      profile?.role || 'No detectado',
+      this.formatExperienceLevel(profile?.experienceLevel),
+      profile?.location || 'No detectada',
+      this.translatePremiumMissingFieldLabels(missingFields),
+    );
+
     return {
-      text: BotMessages.PREMIUM_CONFIRM_CV_PROFILE(
-        profile?.role || 'No detectado',
-        this.formatExperienceLevel(profile?.experienceLevel),
-        profile?.location || 'No detectada',
-        this.translatePremiumMissingFieldLabels(missingFields),
-      ),
+      text: extractionWarning ? `${extractionWarning}\n\n${confirmationText}` : confirmationText,
       buttons: [
         { id: 'premium_cv_confirm', title: 'Si, continuar' },
         { id: 'premium_cv_manual', title: 'Ajustar manual' },
