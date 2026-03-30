@@ -413,7 +413,7 @@ export class ConversationService {
    * Intenta manejar mensajes fuera de flujo durante onboarding.
    * Si el usuario escribe algo inesperado (preguntas, saludos, etc.),
    * el LLM intenta responder contextualmente o extraer la respuesta real.
-   * Retorna null si no aplica o si el mensaje parece ser una respuesta v?? ?"??????????a??~??? ?"??a?????????????????? ?"??????????????a???? ?"?a???????a??&??a???????a??&??a???? ?"??????????a??~??? ?"?a???????a??&??a??????a???? ?"?????????a???? ?"?a??????????????????a???? ?"?a??????????????????a???? ?"??????????a??~??? ?"??a?????????????????? ?"?????????a???? ?"?a??????????????????a???? ?"??a???????a???? ?"??????????a??~??? ?"?a???????a??&??a??????a???? ?"??????????????????? ?"??a??&?????a??lida.
+   * Retorna null si no aplica o si el mensaje parece ser una respuesta valida.
    */
   private async tryHandleOutOfFlow(
     userId: string,
@@ -625,6 +625,14 @@ export class ConversationService {
         || isRejection(text)
         || normalized === 'premium_cv_confirm'
         || normalized === 'premium_cv_manual';
+    }
+
+    if (currentState === ConversationState.PREMIUM_PROCESSING_CV) {
+      return true;
+    }
+
+    if (currentState === ConversationState.PREMIUM_DIAGNOSIS) {
+      return true;
     }
 
     if (currentState === ConversationState.LEAD_ASK_EXPERIENCE
@@ -1568,6 +1576,18 @@ export class ConversationService {
     };
   }
 
+  private async refineFreeSearchResultWithAi(
+    userId: string,
+    initialResult: JobSearchResult,
+    maxResults: number,
+  ): Promise<JobSearchResult> {
+    const reranked = await this.rerankPremiumJobsWithAi(userId, [...initialResult.jobs], maxResults);
+    return {
+      ...initialResult,
+      jobs: reranked,
+    };
+  }
+
   private normalizeLeadTextForComparison(text: string | null | undefined): string {
     if (!text) return '';
     return text
@@ -2258,7 +2278,12 @@ export class ConversationService {
         return { text: BotMessages.V2_REGISTER_EMAIL(getFirstName(user.name)) };
       }
 
-      if (user.dataAuthorizationAccepted) {
+      const isLandingRegisteredFreemium = Boolean(
+        user.name
+        && user.email
+        && user.dataAuthorizationAccepted,
+      );
+      if (isLandingRegisteredFreemium) {
         await this.activateFreemiumTrialFromLead(userId, this.defaultOnboardingAlertTime);
         await this.updateSessionState(userId, ConversationState.READY);
 
@@ -2432,7 +2457,7 @@ export class ConversationService {
     const freemiumExpiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     const sessionData = await this.getLatestSessionData(userId);
     const preRegistrationSearchesUsed = this.getPreRegistrationSearchesUsed(sessionData);
-    const initialFreemiumUsesLeft = Math.max(0, 5 - preRegistrationSearchesUsed);
+    const initialFreemiumUsesLeft = 5;
 
     const subscription = await this.prisma.subscription.findUnique({
       where: { userId },
@@ -3849,28 +3874,6 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
 
     // Detectar intención de buscar empleos
     if (intent === UserIntent.SEARCH_NOW) {
-      // Freemium V2: al abrir alerta pendiente, mostrar 1 vacante con el texto nuevo.
-      const v2PendingAlert = await this.getLatestNonStalePendingAlert(userId);
-      if (v2PendingAlert) {
-        const onboardingFlags = await this.getOnboardingFlags(userId);
-        const isFreemiumV2 = onboardingFlags.flowVariant === this.v2FlowVariant;
-        const pendingJobs = v2PendingAlert.jobs as any[];
-
-        if (isFreemiumV2 && pendingJobs.length > 0) {
-          await this.prisma.pendingJobAlert.update({
-            where: { id: v2PendingAlert.id },
-            data: { viewedAt: new Date() },
-          });
-          await this.jobSearchService.markJobsAsSent(userId, [pendingJobs[0]]);
-          return {
-            preMessage: {
-              text: this.buildFreemiumV2SingleVacancyLeadInMessage(),
-            },
-            text: this.buildFreemiumV2SingleVacancyMessage(pendingJobs[0] as JobPosting),
-          };
-        }
-      }
-
       // PRIMERO: Verificar si hay alertas pendientes de un template notification
       const isPremiumSearchUser = await this.isPremiumPlanActiveForUser(userId);
       const pendingAlert = isPremiumSearchUser
@@ -3887,15 +3890,9 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
           data: { viewedAt: new Date() },
         });
 
-        // Formatear y enviar ofertas
-        const jobs = pendingAlert.jobs as any[];
-        const formattedJobs = jobs.map((job: any, index: number) => {
-          const cleanUrl = this.jobSearchService.cleanJobUrl(job.url);
-          return `*${index + 1}. ${job.title}*\n` +
-            `🏢 ${job.company || 'Empresa confidencial'}\n` +
-            `📍 ${job.locationRaw || 'Sin ubicación'}\n` +
-            `🔗 ${cleanUrl}`;
-        }).join('\n\n');
+        // Formatear y enviar ofertas (formato multiple estandar)
+        const jobs = pendingAlert.jobs as unknown as JobPosting[];
+        const formattedJobs = this.jobSearchService.formatJobsForWhatsApp(jobs);
 
         // Marcar ofertas como enviadas (evitar duplicados en futuras búsquedas)
         await this.jobSearchService.markJobsAsSent(userId, jobs);
@@ -3976,19 +3973,16 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
     try {
       this.logger.log(`🔍 Usuario ${userId} solicitó búsqueda de empleos`);
 
-      // Determinar maxResults según plan y variante de flujo.
-      // V2 freemium: 1 vacante por interacción.
+      // Determinar volumen post-diagnostico por plan.
       const subscription = await this.prisma.subscription.findUnique({ where: { userId } });
-      const onboardingFlags = await this.getOnboardingFlags(userId);
       const isPaidPlan = subscription?.plan === 'PREMIUM' || subscription?.plan === 'PRO';
-      const isFreemiumV2 = subscription?.plan === 'FREEMIUM' && onboardingFlags.flowVariant === this.v2FlowVariant;
-      const maxResults = isPaidPlan ? 5 : (isFreemiumV2 ? 1 : 3);
+      const maxResults = isPaidPlan ? 5 : 3;
 
       // Ejecutar búsqueda
       const baseResult = await this.jobSearchService.searchJobsForUser(userId, maxResults);
       const result = isPaidPlan
         ? await this.refinePremiumSearchResultWithAi(userId, baseResult, maxResults)
-        : baseResult;
+        : await this.refineFreeSearchResultWithAi(userId, baseResult, maxResults);
 
       // Si no hay ofertas, sugerir roles alternativos con IA
       if (result.jobs.length === 0) {
@@ -4018,15 +4012,7 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
       }
 
       const formattedJobs = this.jobSearchService.formatJobsForWhatsApp(result.jobs);
-      const primarySearchMessage =
-        result.jobs.length === 1
-          ? (
-            isFreemiumV2
-              ? this.buildFreemiumV2SingleVacancyMessage(result.jobs[0])
-              : formattedJobs
-          )
-          : formattedJobs;
-      const shouldSendV2LeadInMessage = isFreemiumV2 && result.jobs.length === 1;
+      const primarySearchMessage = formattedJobs;
 
       await this.jobSearchService.markJobsAsSent(userId, result.jobs);
 
@@ -4073,11 +4059,6 @@ Puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
       return {
         outcome: 'success',
         reply: {
-          preMessage: shouldSendV2LeadInMessage
-            ? {
-              text: this.buildFreemiumV2SingleVacancyLeadInMessage(),
-            }
-            : undefined,
           text: primarySearchMessage + exhaustedMessage,
           delayedMessage: {
             text: menuText,
@@ -4385,7 +4366,7 @@ Selecciona qué quieres editar:`,
       return await this.returnToMainMenu(userId, BotMessages.NOT_READY_YET);
     }
 
-    // Detectar qu?? ?"??????????a??~??? ?"??a?????????????????? ?"??????????????a???? ?"?a???????a??&??a???????a??&??a???? ?"??????????a??~??? ?"?a???????a??&??a??????a???? ?"?????????a???? ?"?a??????????????????a???? ?"?a??????????????????a???? ?"??????????a??~??? ?"??a?????????????????? ?"?????????a???? ?"?a??????????????????a???? ?"??a???????a???? ?"??????????a??~??? ?"?a???????a??&??a??????a???? ?"??????????????????? ?"??a??&?????a?? campo quiere editar
+    // Detectar que campo quiere editar
     // Detectar qué campo quiere editar
     const field = detectEditField(text);
 

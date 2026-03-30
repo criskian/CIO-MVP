@@ -941,16 +941,16 @@ export class JobSearchService {
     const targetPrimary = this.extractPrimaryLocationSegment(targetLocation);
 
     if (jobPrimary && targetPrimary && jobPrimary === targetPrimary) {
-      return 20;
+      return 60;
     }
 
-    if (normalizedJobLocation === normalizedTargetLocation) return 18;
-    if (normalizedJobLocation.includes(normalizedTargetLocation)) return 12;
-    if (normalizedTargetLocation.includes(normalizedJobLocation)) return 10;
+    if (normalizedJobLocation === normalizedTargetLocation) return 55;
+    if (normalizedJobLocation.includes(normalizedTargetLocation)) return 45;
+    if (normalizedTargetLocation.includes(normalizedJobLocation)) return 35;
 
     const targetWords = targetPrimary.split(' ').filter((word) => word.length > 2);
     if (targetWords.length > 0 && targetWords.every((word) => normalizedJobLocation.includes(word))) {
-      return 8;
+      return 28;
     }
 
     return 0;
@@ -1000,13 +1000,15 @@ export class JobSearchService {
       }
     }
 
-    // +8 puntos si la ubicación coincide
-    if (query.location && job.locationRaw) {
-      const locationPriorityScore = this.getLocationPriorityScore(job, query.location);
+    // Prioridad fuerte por ciudad objetivo
+    if (query.location) {
+      const locationPriorityScore = job.locationRaw
+        ? this.getLocationPriorityScore(job, query.location)
+        : 0;
       score += locationPriorityScore;
 
       if (locationPriorityScore === 0) {
-        score -= 3;
+        score -= job.locationRaw ? 20 : 25;
       }
     }
 

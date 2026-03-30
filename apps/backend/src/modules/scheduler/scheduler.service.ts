@@ -671,7 +671,9 @@ export class SchedulerService implements OnModuleInit {
       }
 
       // 3. Buscar empleos usando el JobSearchService
-      const searchResult = await this.jobSearchService.searchJobsForUser(userId);
+      const isPaidPlan = usageCheck.plan === 'PREMIUM' || usageCheck.plan === 'PRO';
+      const maxResults = isPaidPlan ? 5 : 3;
+      const searchResult = await this.jobSearchService.searchJobsForUser(userId, maxResults);
 
       if (searchResult.jobs.length === 0) {
         // No hay ofertas nuevas ?  enviar mensaje simple

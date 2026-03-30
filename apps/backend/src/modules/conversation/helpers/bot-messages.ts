@@ -95,13 +95,13 @@ Puedes escribir una ciudad, un pa\u00EDs o "remoto".`,
 Elige una opci\u00F3n \u{1F447}`,
   PREMIUM_ASK_CV: `Antes de continuar con tu onboarding premium, dime:
 
-\u00BFTienes hoja de vida para leerla y configurar tu perfil mas rapido?`,
-  PREMIUM_WAITING_CV_FILE: `Perfecto. Envia tu hoja de vida en PDF, Word o foto.
+\u00BFTienes hoja de vida para leerla y configurar tu perfil m\u00E1s r\u00E1pido?`,
+  PREMIUM_WAITING_CV_FILE: `Perfecto. Env\u00EDa tu hoja de vida en PDF, Word o foto.
 
-Cuando la reciba, extraigo rol, experiencia y ubicacion.`,
-  PREMIUM_PROCESSING_CV: `Recibi tu hoja de vida.
+Cuando la reciba, extraigo rol, experiencia y ubicaci\u00F3n.`,
+  PREMIUM_PROCESSING_CV: `Recib\u00ED tu hoja de vida.
 
-Estoy procesandola para extraer tus preferencias.`,
+Estoy proces\u00E1ndola para extraer tus preferencias.`,
   PREMIUM_CONFIRM_CV_PROFILE: (
     role: string,
     experience: string,
@@ -112,27 +112,27 @@ Estoy procesandola para extraer tus preferencias.`,
       ? `\n\nNo pude extraer: ${missingLabels.join(', ')}.`
       : '';
 
-    return `Esto fue lo que detecte de tu hoja de vida:
+    return `Esto fue lo que detect\u00E9 de tu hoja de vida:
 
 Rol: ${role}
 Experiencia: ${experience}
-Ubicacion: ${location}${missingText}
+Ubicaci\u00F3n: ${location}${missingText}
 
-\u00BFConfirmas que seguimos con esta informacion?`;
+\u00BFConfirmas que seguimos con esta informaci\u00F3n?`;
   },
   PREMIUM_CV_MISSING_ROLE: `De tu hoja de vida no pude extraer el rol.
 
 Por favor, escribe el cargo o rol que buscas.`,
-  PREMIUM_CV_MISSING_LOCATION: `De tu hoja de vida no pude extraer la ubicacion.
+  PREMIUM_CV_MISSING_LOCATION: `De tu hoja de vida no pude extraer la ubicaci\u00F3n.
 
-Escribe una ciudad, un pais o "remoto".`,
+Escribe una ciudad, un pa\u00EDs o "remoto".`,
   PREMIUM_CV_MISSING_EXPERIENCE: `De tu hoja de vida no pude extraer la experiencia.
 
 Selecciona tu nivel para continuar.`,
   PREMIUM_NO_CV_ASK_ROLE: `Perfecto, lo hacemos sin hoja de vida.
 
-Dime el cargo o rol que buscas para iniciar tu diagnostico premium.`,
-  PREMIUM_DIAGNOSIS_READY: `Listo. Con esto inicio tu diagnostico premium y te comparto una oferta.`,
+Dime el cargo o rol que buscas para iniciar tu diagn\u00F3stico premium.`,
+  PREMIUM_DIAGNOSIS_READY: `Listo. Con esto inicio tu diagn\u00F3stico premium y te comparto una oferta.`,
   V2_REGISTER_NAME: `Listo. Para seguir envi\u00E1ndote ofertas, vamos a registrarte en CIO.
 
 Tendr\u00E1s una prueba gratuita de 7 d\u00EDas.

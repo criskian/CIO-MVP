@@ -551,11 +551,13 @@ export class LlmService {
     };
 
     const systemPrompt = [
-      'Eres un ranking engine para ofertas de empleo premium.',
+      'Eres un ranking engine para ofertas de empleo.',
       'Debes ordenar las ofertas de mayor a menor calidad para el usuario.',
       'Responde SOLO JSON valido con: {"orderedIndexes": number[], "rationale": string}.',
       'orderedIndexes debe incluir todos los indices exactamente una vez.',
-      'Prioriza relevancia del rol, ubicacion, seniority y calidad de fuente.',
+      'Regla critica: prioriza con maxima fuerza la coincidencia de ciudad objetivo (location).',
+      'Si una oferta coincide exactamente en ciudad con location, debe quedar por encima de ofertas de otras ciudades, salvo incompatibilidad extrema de rol.',
+      'Luego prioriza relevancia del rol, seniority y calidad de fuente.',
     ].join('\n');
 
     const raw = await this.callOpenAI(systemPrompt, JSON.stringify(input));
