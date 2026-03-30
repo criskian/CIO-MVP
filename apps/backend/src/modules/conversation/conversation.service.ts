@@ -46,6 +46,7 @@ import {
 
 type FlowVariant = 'legacy' | 'freemium_v2';
 type PremiumOnboardingSource = 'restart' | 'direct_payment';
+type PremiumOnboardingMode = 'cv' | 'no_cv';
 type LeadRejectionReason = 'role' | 'location' | 'company' | 'salary' | 'remote' | 'experience' | 'other';
 type LeadVacancySearchMode = 'default' | 'reuse_cache' | 'force_fresh';
 type LeadRejectionReasonSource = 'button' | 'free_text' | 'llm';
@@ -157,9 +158,16 @@ export class ConversationService {
       // NOTA: Los mensajes entrantes y salientes se guardan centralizadamente en WhatsappService
 
       // 5. Si hay media (documento/imagen), podría ser un CV
-      if (mediaUrl && messageType === 'document') {
-        const response = await this.handleCVUpload(user.id, mediaUrl);
-        return response;
+      if (mediaUrl && (messageType === 'document' || messageType === 'image')) {
+        const mediaReply = await this.handleMediaUploadByState(
+          user.id,
+          session.state,
+          messageType,
+          mediaUrl,
+        );
+        if (mediaReply) {
+          return mediaReply;
+        }
       }
 
       // 6. Si no hay texto, no podemos procesar - mostrar menú de ayuda
@@ -278,6 +286,23 @@ export class ConversationService {
 
       case ConversationState.ASK_TERMS:
         return await this.handleAskTermsState(userId, text, intent);
+
+      case ConversationState.PREMIUM_ASK_CV:
+        return await this.handlePremiumAskCvState(userId, text, intent);
+
+      case ConversationState.PREMIUM_WAITING_CV_FILE:
+        return await this.handlePremiumWaitingCvFileState(userId, text, intent);
+
+      case ConversationState.PREMIUM_PROCESSING_CV:
+        return {
+          text: BotMessages.PREMIUM_PROCESSING_CV,
+        };
+
+      case ConversationState.PREMIUM_CONFIRM_CV_PROFILE:
+        return await this.handlePremiumConfirmCvProfileState(userId, text);
+
+      case ConversationState.PREMIUM_DIAGNOSIS:
+        return await this.handlePremiumDiagnosisState(userId);
 
       case ConversationState.ASK_ROLE:
         return await this.handleAskRoleState(userId, text);
@@ -404,6 +429,11 @@ export class ConversationService {
       ConversationState.WA_ASK_NAME,
       ConversationState.WA_ASK_EMAIL,
       ConversationState.ASK_TERMS,
+      ConversationState.PREMIUM_ASK_CV,
+      ConversationState.PREMIUM_WAITING_CV_FILE,
+      ConversationState.PREMIUM_PROCESSING_CV,
+      ConversationState.PREMIUM_CONFIRM_CV_PROFILE,
+      ConversationState.PREMIUM_DIAGNOSIS,
       ConversationState.ASK_ROLE,
       ConversationState.ASK_EXPERIENCE,
       ConversationState.ASK_LOCATION,
@@ -561,6 +591,30 @@ export class ConversationService {
       return trimmed.length >= 3;
     }
 
+    if (currentState === ConversationState.PREMIUM_ASK_CV) {
+      return isAcceptance(text)
+        || isRejection(text)
+        || intent === UserIntent.UPLOAD_CV
+        || normalized === 'premium_cv_yes'
+        || normalized === 'premium_cv_no';
+    }
+
+    if (currentState === ConversationState.PREMIUM_WAITING_CV_FILE) {
+      return isRejection(text)
+        || intent === UserIntent.UPLOAD_CV
+        || normalized === 'premium_cv_skip_manual'
+        || normalized.includes('cv')
+        || normalized.includes('hoja de vida')
+        || normalized.includes('curriculum');
+    }
+
+    if (currentState === ConversationState.PREMIUM_CONFIRM_CV_PROFILE) {
+      return isAcceptance(text)
+        || isRejection(text)
+        || normalized === 'premium_cv_confirm'
+        || normalized === 'premium_cv_manual';
+    }
+
     if (currentState === ConversationState.LEAD_ASK_EXPERIENCE
       || currentState === ConversationState.ASK_EXPERIENCE
       || currentState === ConversationState.EDIT_EXPERIENCE) {
@@ -657,6 +711,11 @@ export class ConversationService {
       [ConversationState.LEAD_REGISTER_NAME]: 'Para continuar con el registro, escríbeme tu nombre completo.',
       [ConversationState.LEAD_REGISTER_EMAIL]: 'Ahora necesito tu correo para completar el registro.',
       [ConversationState.LEAD_TERMS_CONSENT]: 'Para activar tu prueba, elige Acepto o No acepto.',
+      [ConversationState.PREMIUM_ASK_CV]: 'Responde si tienes hoja de vida para leerla ahora.',
+      [ConversationState.PREMIUM_WAITING_CV_FILE]: 'Envia tu hoja de vida en PDF, Word o foto para continuar.',
+      [ConversationState.PREMIUM_PROCESSING_CV]: 'Estoy procesando tu hoja de vida. Dame un momento.',
+      [ConversationState.PREMIUM_CONFIRM_CV_PROFILE]: 'Confirma si seguimos con el perfil detectado de tu hoja de vida.',
+      [ConversationState.PREMIUM_DIAGNOSIS]: 'Estoy preparando tu oferta de diagnostico premium.',
       [ConversationState.ASK_ROLE]: 'Para continuar, dime tu cargo o rol principal.',
       [ConversationState.ASK_LOCATION]: 'Para continuar, escribe una sola ubicación (ciudad o país).',
       [ConversationState.ASK_EXPERIENCE]: 'Selecciona tu nivel de experiencia para continuar.',
@@ -696,6 +755,35 @@ export class ConversationService {
         text: message,
         listTitle: 'Seleccionar nivel',
         listSections: this.getLeadExperienceListSections(),
+      };
+    }
+
+    if (currentState === ConversationState.PREMIUM_ASK_CV) {
+      return {
+        text: message,
+        buttons: [
+          { id: 'premium_cv_yes', title: 'Si tengo CV' },
+          { id: 'premium_cv_no', title: 'No tengo CV' },
+        ],
+      };
+    }
+
+    if (currentState === ConversationState.PREMIUM_WAITING_CV_FILE) {
+      return {
+        text: message,
+        buttons: [
+          { id: 'premium_cv_skip_manual', title: 'Seguir sin CV' },
+        ],
+      };
+    }
+
+    if (currentState === ConversationState.PREMIUM_CONFIRM_CV_PROFILE) {
+      return {
+        text: message,
+        buttons: [
+          { id: 'premium_cv_confirm', title: 'Si, continuar' },
+          { id: 'premium_cv_manual', title: 'Ajustar manual' },
+        ],
       };
     }
 
@@ -1935,6 +2023,23 @@ export class ConversationService {
         reasonSource: 'button',
       });
 
+      const subscription = await this.prisma.subscription.findUnique({
+        where: { userId },
+        select: { plan: true, status: true },
+      });
+      if (this.isPaidPlanActive(subscription)) {
+        await this.upsertAlertPreference(userId, this.defaultOnboardingAlertTime, 'daily');
+        await this.updateSessionData(userId, {
+          premiumOnboardingMode: null,
+          premiumCvMissingFields: [],
+        });
+        await this.updateSessionState(userId, ConversationState.READY);
+        return await this.returnToMainMenu(
+          userId,
+          'Perfecto. Ya tengo tu feedback inicial y active tu flujo premium.',
+        );
+      }
+
       const user = await (this.prisma.user as any).findUnique({
         where: { id: userId },
         select: {
@@ -2418,15 +2523,582 @@ export class ConversationService {
     text: string,
     intent: UserIntent,
   ): Promise<BotReply> {
-    // Cualquier interacción (botón o texto) avanza al siguiente paso
+    const onboardingFlags = await this.getOnboardingFlags(userId);
+
     if (isAcceptance(text) || intent === UserIntent.ACCEPT || text.toLowerCase().includes('continu')) {
+      if (onboardingFlags.premiumOnboardingV2) {
+        await this.updateSessionData(userId, {
+          premiumOnboardingMode: null,
+          premiumCvDetectedProfile: null,
+          premiumCvMissingFields: [],
+        });
+        await this.updateSessionState(userId, ConversationState.PREMIUM_ASK_CV);
+        return {
+          text: BotMessages.PREMIUM_ASK_CV,
+          buttons: [
+            { id: 'premium_cv_yes', title: 'Si tengo CV' },
+            { id: 'premium_cv_no', title: 'No tengo CV' },
+          ],
+        };
+      }
+
       await this.updateSessionState(userId, ConversationState.ASK_ROLE);
       return { text: BotMessages.ASK_ROLE };
     }
 
-    // Si el usuario escribe cualquier cosa, también continuar
+    if (onboardingFlags.premiumOnboardingV2) {
+      await this.updateSessionData(userId, {
+        premiumOnboardingMode: null,
+        premiumCvDetectedProfile: null,
+        premiumCvMissingFields: [],
+      });
+      await this.updateSessionState(userId, ConversationState.PREMIUM_ASK_CV);
+      return {
+        text: BotMessages.PREMIUM_ASK_CV,
+        buttons: [
+          { id: 'premium_cv_yes', title: 'Si tengo CV' },
+          { id: 'premium_cv_no', title: 'No tengo CV' },
+        ],
+      };
+    }
+
     await this.updateSessionState(userId, ConversationState.ASK_ROLE);
     return { text: BotMessages.ASK_ROLE };
+  }
+
+  private async handlePremiumAskCvState(
+    userId: string,
+    text: string,
+    intent: UserIntent,
+  ): Promise<BotReply> {
+    const normalized = this.normalizeLeadSignalToken(text);
+    const wantsCv =
+      intent === UserIntent.UPLOAD_CV
+      || normalized === 'premium_cv_yes'
+      || normalized.includes('tengo cv')
+      || normalized.includes('hoja de vida')
+      || normalized.includes('curriculum')
+      || isAcceptance(text);
+    const noCv =
+      normalized === 'premium_cv_no'
+      || isRejection(text);
+
+    if (wantsCv && !noCv) {
+      await this.updateSessionData(userId, {
+        premiumOnboardingMode: 'cv',
+        premiumCvDetectedProfile: null,
+        premiumCvMissingFields: [],
+      });
+      await this.updateSessionState(userId, ConversationState.PREMIUM_WAITING_CV_FILE);
+      return {
+        text: BotMessages.PREMIUM_WAITING_CV_FILE,
+        buttons: [
+          { id: 'premium_cv_skip_manual', title: 'Seguir sin CV' },
+        ],
+      };
+    }
+
+    if (noCv) {
+      await this.updateSessionData(userId, {
+        premiumOnboardingMode: 'no_cv',
+        premiumCvDetectedProfile: null,
+        premiumCvMissingFields: [],
+      });
+      await this.updateSessionState(userId, ConversationState.ASK_ROLE);
+      return { text: BotMessages.PREMIUM_NO_CV_ASK_ROLE };
+    }
+
+    return {
+      text: BotMessages.PREMIUM_ASK_CV,
+      buttons: [
+        { id: 'premium_cv_yes', title: 'Si tengo CV' },
+        { id: 'premium_cv_no', title: 'No tengo CV' },
+      ],
+    };
+  }
+
+  private async handlePremiumWaitingCvFileState(
+    userId: string,
+    text: string,
+    intent: UserIntent,
+  ): Promise<BotReply> {
+    const normalized = this.normalizeLeadSignalToken(text);
+    const wantsManualFlow =
+      normalized === 'premium_cv_skip_manual'
+      || isRejection(text);
+
+    if (wantsManualFlow) {
+      await this.updateSessionData(userId, {
+        premiumOnboardingMode: 'no_cv',
+        premiumCvDetectedProfile: null,
+        premiumCvMissingFields: [],
+      });
+      await this.updateSessionState(userId, ConversationState.ASK_ROLE);
+      return { text: BotMessages.PREMIUM_NO_CV_ASK_ROLE };
+    }
+
+    if (intent === UserIntent.UPLOAD_CV || normalized.includes('cv') || normalized.includes('hoja de vida')) {
+      return {
+        text: BotMessages.PREMIUM_WAITING_CV_FILE,
+        buttons: [
+          { id: 'premium_cv_skip_manual', title: 'Seguir sin CV' },
+        ],
+      };
+    }
+
+    return {
+      text: BotMessages.PREMIUM_WAITING_CV_FILE,
+      buttons: [
+        { id: 'premium_cv_skip_manual', title: 'Seguir sin CV' },
+      ],
+    };
+  }
+
+  private async handlePremiumConfirmCvProfileState(
+    userId: string,
+    text: string,
+  ): Promise<BotReply> {
+    const normalized = this.normalizeLeadSignalToken(text);
+    const confirm = isAcceptance(text) || normalized === 'premium_cv_confirm';
+    const manual = isRejection(text) || normalized === 'premium_cv_manual';
+
+    if (confirm && !manual) {
+      return await this.routePremiumOnboardingToNextMissingField(userId);
+    }
+
+    if (manual) {
+      await this.updateSessionData(userId, {
+        premiumOnboardingMode: 'no_cv',
+        premiumCvDetectedProfile: null,
+        premiumCvMissingFields: [],
+      });
+      await this.updateSessionState(userId, ConversationState.ASK_ROLE);
+      return { text: BotMessages.PREMIUM_NO_CV_ASK_ROLE };
+    }
+
+    const sessionData = await this.getLatestSessionData(userId);
+    const detected = (sessionData.premiumCvDetectedProfile as Record<string, any> | null) || null;
+    const missing = Array.isArray(sessionData.premiumCvMissingFields)
+      ? sessionData.premiumCvMissingFields.filter((field: any) => typeof field === 'string')
+      : [];
+
+    return {
+      text: BotMessages.PREMIUM_CONFIRM_CV_PROFILE(
+        detected?.role || 'No detectado',
+        this.formatExperienceLevel(detected?.experienceLevel),
+        detected?.location || 'No detectada',
+        this.translatePremiumMissingFieldLabels(missing),
+      ),
+      buttons: [
+        { id: 'premium_cv_confirm', title: 'Si, continuar' },
+        { id: 'premium_cv_manual', title: 'Ajustar manual' },
+      ],
+    };
+  }
+
+  private async handlePremiumDiagnosisState(userId: string): Promise<BotReply> {
+    const diagnosisReply = await this.handleLeadShowFirstVacancyState(
+      userId,
+      'default',
+      { diagnosisMode: 'premium_v2' },
+    );
+
+    if (!diagnosisReply.preMessage?.text) {
+      return {
+        ...diagnosisReply,
+        preMessage: { text: BotMessages.PREMIUM_DIAGNOSIS_READY },
+      };
+    }
+
+    return {
+      ...diagnosisReply,
+      preMessage: {
+        text: `${BotMessages.PREMIUM_DIAGNOSIS_READY}\n\n${diagnosisReply.preMessage.text}`,
+      },
+    };
+  }
+
+  private async handleMediaUploadByState(
+    userId: string,
+    currentState: string,
+    messageType: 'text' | 'image' | 'document',
+    mediaUrl: string,
+  ): Promise<BotReply | null> {
+    if (
+      currentState === ConversationState.PREMIUM_WAITING_CV_FILE
+      || currentState === ConversationState.PREMIUM_ASK_CV
+    ) {
+      await this.updateSessionData(userId, {
+        premiumOnboardingMode: 'cv',
+      });
+      return await this.processPremiumCvUpload(userId, mediaUrl, messageType);
+    }
+
+    if (messageType === 'document') {
+      return await this.handleCVUpload(userId, mediaUrl);
+    }
+
+    return null;
+  }
+
+  private async processPremiumCvUpload(
+    userId: string,
+    mediaUrl: string,
+    messageType: 'text' | 'image' | 'document',
+  ): Promise<BotReply> {
+    if (messageType !== 'document' && messageType !== 'image') {
+      return {
+        text: BotMessages.PREMIUM_WAITING_CV_FILE,
+      };
+    }
+
+    await this.updateSessionState(userId, ConversationState.PREMIUM_PROCESSING_CV);
+
+    try {
+      await this.cvService.processCvFromUrl(userId, mediaUrl);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`No se pudo procesar CV premium para ${userId}: ${message}`);
+    }
+
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select: { role: true, location: true, experienceLevel: true },
+    });
+    const missingFields = this.getPremiumMissingProfileFields(profile);
+
+    await this.updateSessionData(userId, {
+      premiumOnboardingMode: 'cv',
+      premiumCvDetectedProfile: {
+        role: profile?.role || null,
+        location: profile?.location || null,
+        experienceLevel: profile?.experienceLevel || null,
+      },
+      premiumCvMissingFields: missingFields,
+      premiumCvLastMediaType: messageType,
+      premiumCvLastMediaId: mediaUrl,
+    });
+    await this.updateSessionState(userId, ConversationState.PREMIUM_CONFIRM_CV_PROFILE);
+
+    return {
+      text: BotMessages.PREMIUM_CONFIRM_CV_PROFILE(
+        profile?.role || 'No detectado',
+        this.formatExperienceLevel(profile?.experienceLevel),
+        profile?.location || 'No detectada',
+        this.translatePremiumMissingFieldLabels(missingFields),
+      ),
+      buttons: [
+        { id: 'premium_cv_confirm', title: 'Si, continuar' },
+        { id: 'premium_cv_manual', title: 'Ajustar manual' },
+      ],
+    };
+  }
+
+  private async routePremiumOnboardingToNextMissingField(userId: string): Promise<BotReply> {
+    const sessionData = await this.getLatestSessionData(userId);
+    const mode = this.parsePremiumOnboardingMode(sessionData.premiumOnboardingMode);
+
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select: { role: true, location: true, experienceLevel: true },
+    });
+    const missingFields = this.getPremiumMissingProfileFields(profile);
+
+    await this.updateSessionData(userId, {
+      premiumCvMissingFields: missingFields,
+    });
+
+    const isCvMode = mode === 'cv';
+
+    if (!profile?.role) {
+      await this.updateSessionState(userId, ConversationState.ASK_ROLE);
+      return {
+        text: isCvMode ? BotMessages.PREMIUM_CV_MISSING_ROLE : BotMessages.PREMIUM_NO_CV_ASK_ROLE,
+      };
+    }
+
+    if (!profile.location) {
+      await this.updateSessionState(userId, ConversationState.ASK_LOCATION);
+      return {
+        text: isCvMode ? BotMessages.PREMIUM_CV_MISSING_LOCATION : BotMessages.V2_ASK_LOCATION,
+      };
+    }
+
+    if (!profile.experienceLevel) {
+      await this.updateSessionState(userId, ConversationState.ASK_EXPERIENCE);
+      return {
+        text: isCvMode ? BotMessages.PREMIUM_CV_MISSING_EXPERIENCE : BotMessages.V2_ASK_EXPERIENCE,
+        listTitle: 'Seleccionar nivel',
+        listSections: this.getLeadExperienceListSections(),
+      };
+    }
+
+    await this.updateSessionState(userId, ConversationState.PREMIUM_DIAGNOSIS);
+    return await this.handlePremiumDiagnosisState(userId);
+  }
+
+  private async handlePremiumSmartRoleCaptureState(userId: string, text: string): Promise<BotReply> {
+    const minConfidence = 0.55;
+    const profileUpdates: Record<string, string> = {};
+
+    const inferred = await this.inferLeadSignals(text);
+    const multipleLocationChoices = this.extractMultipleLocationChoices(text);
+    const roleChoicesFromText = this.extractRoleChoicesFromText(text);
+    const normalizedText = text.toLowerCase().trim();
+    const remotePatterns = ['remoto', 'remote', 'trabajo remoto', 'home office', 'teletrabajo'];
+    const isRemoteIntent = remotePatterns.some((pattern) => normalizedText.includes(pattern));
+    const remoteRequested = inferred.modality === 'remote' || isRemoteIntent;
+
+    if (inferred.experienceLevel && inferred.confidence >= minConfidence) {
+      profileUpdates.experienceLevel = inferred.experienceLevel;
+    } else {
+      const regexExperience = normalizeExperienceLevel(text);
+      if (regexExperience) {
+        profileUpdates.experienceLevel = regexExperience;
+      }
+    }
+
+    if (multipleLocationChoices.length > 1) {
+      // No fijar ubicacion aun.
+    } else if (remoteRequested) {
+      profileUpdates.location = 'Remoto';
+    } else if (inferred.location && inferred.confidence >= minConfidence) {
+      const locationValidation = validateAndNormalizeLocation(inferred.location);
+      if (locationValidation.isValid && locationValidation.location) {
+        profileUpdates.location = locationValidation.location;
+      } else {
+        const aiLocation = await this.llmService.validateAndCorrectLocation(inferred.location);
+        if (aiLocation?.isValid && aiLocation.location) {
+          profileUpdates.location = aiLocation.location;
+        }
+      }
+    }
+
+    let roleCandidate: string | null = null;
+    let roleWarning: string | null = null;
+
+    const roleAiFromText = await this.llmService.validateAndCorrectRole(text);
+    if (roleAiFromText) {
+      if (roleAiFromText.isValid && roleAiFromText.role) {
+        roleCandidate = roleAiFromText.role;
+      } else {
+        roleWarning = roleAiFromText.warning || roleAiFromText.suggestion || null;
+      }
+    }
+
+    if (!roleCandidate) {
+      if (inferred.role && inferred.confidence >= minConfidence) {
+        roleCandidate = inferred.role;
+      } else {
+        roleCandidate = normalizeRole(text);
+      }
+
+      if (roleCandidate) {
+        const roleAi = await this.llmService.validateAndCorrectRole(roleCandidate);
+        if (roleAi) {
+          if (roleAi.isValid && roleAi.role) {
+            roleCandidate = roleAi.role;
+          } else {
+            roleWarning = roleAi.warning || roleAi.suggestion || null;
+            roleCandidate = null;
+          }
+        }
+      }
+    }
+
+    if (roleChoicesFromText.length > 1) {
+      if (!roleWarning) {
+        roleWarning = this.buildSingleRoleChoiceMessage(roleChoicesFromText);
+      }
+      roleCandidate = null;
+    }
+
+    if (roleCandidate && this.isGenericSingleWordRole(roleCandidate)) {
+      roleWarning = `Tu cargo es muy general. Para que la busqueda sea precisa, escribe una especialidad.\n\nEjemplo: *Auxiliar Administrativo*, *Analista de Datos* o *Ingeniero Industrial*.`;
+      roleCandidate = null;
+    }
+
+    if (roleCandidate && remoteRequested && !/\b(remoto|remote)\b/i.test(roleCandidate)) {
+      roleCandidate = `${roleCandidate} remoto`;
+    }
+
+    if (roleCandidate) {
+      profileUpdates.role = roleCandidate;
+    }
+
+    if (Object.keys(profileUpdates).length > 0) {
+      await this.updateUserProfile(userId, profileUpdates);
+    }
+
+    if (!roleCandidate) {
+      const conversational = await this.llmService.generateConversationalResponse(
+        text,
+        ConversationState.ASK_ROLE,
+      );
+      const conversationalText = this.normalizeConversationalMessage(conversational);
+      if (conversationalText) {
+        return { text: conversationalText };
+      }
+
+      if (roleWarning) {
+        return { text: roleWarning };
+      }
+
+      const profile = await this.prisma.userProfile.findUnique({
+        where: { userId },
+        select: { location: true, experienceLevel: true },
+      });
+
+      const hasHints = Boolean(
+        profileUpdates.location
+        || profileUpdates.experienceLevel
+        || profile?.location
+        || profile?.experienceLevel,
+      );
+
+      if (hasHints) {
+        return {
+          text: 'Perfecto, ya tome parte de tu info. Ahora dime solo el cargo o rol que estas buscando.',
+        };
+      }
+
+      return { text: BotMessages.ERROR_ROLE_INVALID };
+    }
+
+    if (multipleLocationChoices.length > 1) {
+      await this.updateSessionState(userId, ConversationState.ASK_LOCATION);
+      return {
+        text: this.buildSingleLocationChoiceMessage(multipleLocationChoices),
+      };
+    }
+
+    return await this.routePremiumOnboardingToNextMissingField(userId);
+  }
+
+  private async handlePremiumAskExperienceState(
+    userId: string,
+    text: string,
+    mode: PremiumOnboardingMode,
+  ): Promise<BotReply> {
+    const minConfidence = 0.55;
+    const inferred = await this.inferLeadSignals(text);
+    let experienceLevel: string | null = normalizeExperienceLevel(text);
+
+    if (!experienceLevel && inferred.experienceLevel) {
+      experienceLevel = inferred.experienceLevel;
+    }
+
+    if (!experienceLevel) {
+      return {
+        text: mode === 'cv'
+          ? BotMessages.PREMIUM_CV_MISSING_EXPERIENCE
+          : this.normalizeConversationalMessage(
+            await this.llmService.generateConversationalResponse(text, 'ASK_EXPERIENCE'),
+          ) || 'Selecciona tu nivel de experiencia:',
+        listTitle: 'Seleccionar nivel',
+        listSections: this.getLeadExperienceListSections(),
+      };
+    }
+
+    const profileUpdates: Record<string, string> = { experienceLevel };
+    if (inferred.location && inferred.confidence >= minConfidence) {
+      const locationValidation = validateAndNormalizeLocation(inferred.location);
+      if (locationValidation.isValid && locationValidation.location) {
+        profileUpdates.location = locationValidation.location;
+      }
+    }
+
+    await this.updateUserProfile(userId, profileUpdates);
+    return await this.routePremiumOnboardingToNextMissingField(userId);
+  }
+
+  private async handlePremiumAskLocationState(
+    userId: string,
+    text: string,
+    mode: PremiumOnboardingMode,
+  ): Promise<BotReply> {
+    const minConfidence = 0.55;
+    const inferred = await this.inferLeadSignals(text);
+    const multipleLocationChoices = this.extractMultipleLocationChoices(text);
+    const validation = validateAndNormalizeLocation(text);
+    const resolvedMultipleChoices =
+      multipleLocationChoices.length > 1
+        ? multipleLocationChoices
+        : validation.errorType === 'multiple' && validation.options
+          ? validation.options
+          : [];
+    const normalizedText = text.toLowerCase().trim();
+    const remotePatterns = ['remoto', 'remote', 'trabajo remoto', 'home office', 'teletrabajo'];
+    const isRemoteIntent = remotePatterns.some((pattern) => normalizedText.includes(pattern));
+    const remoteRequested = inferred.modality === 'remote' || isRemoteIntent;
+
+    if (resolvedMultipleChoices.length > 1) {
+      return {
+        text: this.buildSingleLocationChoiceMessage(resolvedMultipleChoices),
+      };
+    }
+
+    let finalLocation: string | null = null;
+    if (remoteRequested) {
+      finalLocation = 'Remoto';
+    } else {
+      const preferredLocationInput =
+        inferred.location && inferred.confidence >= minConfidence ? inferred.location : text;
+      const aiResult = await this.llmService.validateAndCorrectLocation(preferredLocationInput);
+      if (aiResult?.isValid && aiResult.location) {
+        finalLocation = aiResult.location;
+      } else if (validation.isValid && validation.location) {
+        finalLocation = validation.location;
+      }
+    }
+
+    if (!finalLocation) {
+      if (validation.errorType === 'too_vague') {
+        return { text: this.getTooVagueLocationMessage(text) };
+      }
+
+      const conversational = await this.llmService.generateConversationalResponse(
+        text,
+        ConversationState.ASK_LOCATION,
+      );
+
+      return {
+        text: this.normalizeConversationalMessage(conversational)
+          || (mode === 'cv' ? BotMessages.PREMIUM_CV_MISSING_LOCATION : BotMessages.ERROR_LOCATION_INVALID),
+      };
+    }
+
+    const profileUpdates: Record<string, string> = { location: finalLocation };
+    if (inferred.experienceLevel && inferred.confidence >= minConfidence) {
+      profileUpdates.experienceLevel = inferred.experienceLevel;
+    }
+
+    await this.updateUserProfile(userId, profileUpdates);
+    return await this.routePremiumOnboardingToNextMissingField(userId);
+  }
+
+  private getPremiumMissingProfileFields(profile: {
+    role?: string | null;
+    location?: string | null;
+    experienceLevel?: string | null;
+  } | null): string[] {
+    const missing: string[] = [];
+
+    if (!profile?.role) missing.push('role');
+    if (!profile?.location) missing.push('location');
+    if (!profile?.experienceLevel) missing.push('experienceLevel');
+
+    return missing;
+  }
+
+  private translatePremiumMissingFieldLabels(fields: string[]): string[] {
+    const labels: Record<string, string> = {
+      role: 'rol',
+      location: 'ubicacion',
+      experienceLevel: 'experiencia',
+    };
+
+    return fields.map((field) => labels[field] || field);
   }
 
   /**
@@ -2434,6 +3106,11 @@ export class ConversationService {
    * ACTUALIZADO: Siempre muestra lista interactiva
    */
   private async handleAskRoleState(userId: string, text: string): Promise<BotReply> {
+    const premiumContext = await this.getPremiumOnboardingV2Context(userId);
+    if (premiumContext.isActive && premiumContext.mode) {
+      return await this.handlePremiumSmartRoleCaptureState(userId, text);
+    }
+
     // Paso 1: Intentar con regex (gratis)
     let role = normalizeRole(text);
 
@@ -2578,6 +3255,15 @@ export class ConversationService {
    * ACTUALIZADO: Siempre muestra lista interactiva en errores
    */
   private async handleAskExperienceState(userId: string, text: string): Promise<BotReply> {
+    const premiumContext = await this.getPremiumOnboardingV2Context(userId);
+    if (premiumContext.isActive && premiumContext.mode) {
+      return await this.handlePremiumAskExperienceState(
+        userId,
+        text,
+        premiumContext.mode,
+      );
+    }
+
     const experienceLevel = normalizeExperienceLevel(text);
 
     if (!experienceLevel) {
@@ -2635,6 +3321,15 @@ export class ConversationService {
    * Para usuarios existentes, mantiene flujo anterior de OFFER_ALERTS.
    */
   private async handleAskLocationState(userId: string, text: string): Promise<BotReply> {
+    const premiumContext = await this.getPremiumOnboardingV2Context(userId);
+    if (premiumContext.isActive && premiumContext.mode) {
+      return await this.handlePremiumAskLocationState(
+        userId,
+        text,
+        premiumContext.mode,
+      );
+    }
+
     const multipleLocationChoices = this.extractMultipleLocationChoices(text);
     const validation = validateAndNormalizeLocation(text);
     const resolvedMultipleChoices =
@@ -4697,6 +5392,13 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
     return null;
   }
 
+  private parsePremiumOnboardingMode(value: unknown): PremiumOnboardingMode | null {
+    if (value === 'cv' || value === 'no_cv') {
+      return value;
+    }
+    return null;
+  }
+
   private isPaidPlanActive(
     subscription: { plan?: string | null; status?: string | null } | null | undefined,
   ): boolean {
@@ -4880,6 +5582,23 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
       premiumOnboardingSource: this.parsePremiumOnboardingSource(
         sessionData.premiumOnboardingSource,
       ),
+    };
+  }
+
+  private async getPremiumOnboardingV2Context(userId: string): Promise<{
+    isActive: boolean;
+    mode: PremiumOnboardingMode | null;
+  }> {
+    const onboardingFlags = await this.getOnboardingFlags(userId);
+    if (!onboardingFlags.premiumOnboardingV2) {
+      return { isActive: false, mode: null };
+    }
+
+    const sessionData = await this.getLatestSessionData(userId);
+    const mode = this.parsePremiumOnboardingMode(sessionData.premiumOnboardingMode);
+    return {
+      isActive: true,
+      mode,
     };
   }
 
