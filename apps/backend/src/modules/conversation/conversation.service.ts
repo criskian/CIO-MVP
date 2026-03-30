@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { JobSearchService } from '../job-search/job-search.service';
-import { JobPosting } from '../job-search/types/job-posting';
+import { JobPosting, JobSearchResult } from '../job-search/types/job-posting';
 import { LlmService } from '../llm/llm.service';
 import { CvService, type CvProfileExtractionResult } from '../cv/cv.service';
 import { ChatHistoryService } from './chat-history.service';
@@ -50,6 +50,12 @@ type PremiumOnboardingMode = 'cv' | 'no_cv';
 type LeadRejectionReason = 'role' | 'location' | 'company' | 'salary' | 'remote' | 'experience' | 'other';
 type LeadVacancySearchMode = 'default' | 'reuse_cache' | 'force_fresh';
 type LeadRejectionReasonSource = 'button' | 'free_text' | 'llm';
+type JobSearchOutcome = 'success' | 'no_results' | 'error';
+
+interface JobSearchExecutionResult {
+  reply: BotReply;
+  outcome: JobSearchOutcome;
+}
 
 /**
  * Servicio de conversación (Orquestador)
@@ -522,6 +528,7 @@ export class ConversationService {
 
   private isCriticalCommandBeforeAi(text: string, intent: UserIntent): boolean {
     if (intent === UserIntent.SEARCH_NOW) return true;
+    if (intent === UserIntent.UPLOAD_CV) return true;
     if (isEditIntent(text) || isRestartIntent(text) || isCancelServiceIntent(text)) return true;
 
     const normalized = this.normalizeLeadSignalToken(text);
@@ -537,10 +544,13 @@ export class ConversationService {
       'cmd_editar',
       'cmd_reiniciar',
       'cmd_cancelar',
+      'cmd_adjuntar_hv',
       'cmd_verificar',
       'cmd_pagar',
       'cmd_ofertas',
       'ver ofertas',
+      'adjuntar hv',
+      'adjuntar_hv',
     ];
 
     return criticalPatterns.some((pattern) => normalized.includes(pattern));
@@ -603,6 +613,8 @@ export class ConversationService {
       return isRejection(text)
         || intent === UserIntent.UPLOAD_CV
         || normalized === 'premium_cv_skip_manual'
+        || normalized === 'premium_cv_back_menu'
+        || normalized === 'volver al menu'
         || normalized.includes('cv')
         || normalized.includes('hoja de vida')
         || normalized.includes('curriculum');
@@ -769,11 +781,10 @@ export class ConversationService {
     }
 
     if (currentState === ConversationState.PREMIUM_WAITING_CV_FILE) {
+      const buttons = await this.getPremiumCvWaitingButtons(userId);
       return {
         text: message,
-        buttons: [
-          { id: 'premium_cv_skip_manual', title: 'Seguir sin CV' },
-        ],
+        buttons,
       };
     }
 
@@ -859,6 +870,91 @@ export class ConversationService {
     if (isEditIntent(text)) return true;
     if (intent === UserIntent.CHANGE_PREFERENCES) return true;
     return isPreferenceUpdateIntent(text);
+  }
+
+  private isAttachHvCommand(text: string): boolean {
+    const normalized = this.normalizeLeadSignalToken(text);
+    return normalized === 'adjuntar hv'
+      || normalized === 'adjuntar_hv'
+      || normalized === 'cmd_adjuntar_hv'
+      || normalized.includes('adjuntar hoja de vida')
+      || normalized.includes('adjuntar hv');
+  }
+
+  private async isPremiumPlanActiveForUser(userId: string): Promise<boolean> {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+      select: { plan: true, status: true },
+    });
+    return this.isPaidPlanActive(subscription);
+  }
+
+  private async buildMainMenuRows(
+    userId: string,
+    options?: {
+      searchDescription?: string;
+      restartDescription?: string;
+      cancelDescription?: string;
+    },
+  ): Promise<Array<{ id: string; title: string; description: string }>> {
+    const rows: Array<{ id: string; title: string; description: string }> = [
+      {
+        id: 'cmd_buscar',
+        title: 'Buscar empleos',
+        description: options?.searchDescription || 'Encontrar ofertas ahora',
+      },
+      {
+        id: 'cmd_editar',
+        title: 'Editar perfil',
+        description: 'Cambiar tus preferencias',
+      },
+      {
+        id: 'cmd_reiniciar',
+        title: 'Reiniciar',
+        description: options?.restartDescription || 'Reconfigurar desde cero',
+      },
+      {
+        id: 'cmd_cancelar',
+        title: 'Cancelar servicio',
+        description: options?.cancelDescription || 'Dejar de usar el servicio',
+      },
+    ];
+
+    if (await this.isPremiumPlanActiveForUser(userId)) {
+      rows.push({
+        id: 'cmd_adjuntar_hv',
+        title: 'Adjuntar HV',
+        description: 'Enviar hoja de vida',
+      });
+    }
+
+    return rows;
+  }
+
+  private async getPremiumCvWaitingButtons(
+    userId: string,
+  ): Promise<Array<{ id: string; title: string }>> {
+    const sessionData = await this.getLatestSessionData(userId);
+    const isFromReadyMenu = sessionData.premiumCvEntryPoint === 'ready_menu';
+
+    if (isFromReadyMenu) {
+      return [{ id: 'premium_cv_back_menu', title: 'Volver al menu' }];
+    }
+
+    return [{ id: 'premium_cv_skip_manual', title: 'Seguir sin CV' }];
+  }
+
+  private async startPremiumAttachHvFromReady(userId: string): Promise<BotReply> {
+    await this.updateSessionData(userId, {
+      premiumOnboardingMode: 'cv',
+      premiumCvEntryPoint: 'ready_menu',
+    });
+    await this.updateSessionState(userId, ConversationState.PREMIUM_WAITING_CV_FILE);
+
+    return {
+      text: BotMessages.PREMIUM_WAITING_CV_FILE,
+      buttons: await this.getPremiumCvWaitingButtons(userId),
+    };
   }
 
   private async redirectReadyUserToEditFlow(userId: string): Promise<BotReply> {
@@ -1367,6 +1463,109 @@ export class ConversationService {
     const summary = snippet || 'Esta vacante puede encajar con tu perfil.';
 
     return `Te comparto una vacante que se ajusta a tu perfil:\n\n*${title}*\nEmpresa: ${company}\nUbicación: ${location}\nFuente: ${source}\n\n${summary}\n\n${cleanUrl}`;
+  }
+
+  private mergeUniqueJobsByUrl(jobs: JobPosting[]): JobPosting[] {
+    const unique = new Map<string, JobPosting>();
+
+    for (const job of jobs) {
+      const cleanedUrl = this.jobSearchService.cleanJobUrl(job.url || '').trim().toLowerCase();
+      const fallbackKey = `${(job.title || '').trim().toLowerCase()}::${(job.company || '').trim().toLowerCase()}::${(job.locationRaw || '').trim().toLowerCase()}`;
+      const key = cleanedUrl || fallbackKey;
+
+      const existing = unique.get(key);
+      if (!existing) {
+        unique.set(key, job);
+        continue;
+      }
+
+      const existingScore = typeof existing.score === 'number' ? existing.score : -1;
+      const candidateScore = typeof job.score === 'number' ? job.score : -1;
+      if (candidateScore > existingScore) {
+        unique.set(key, job);
+      }
+    }
+
+    return Array.from(unique.values());
+  }
+
+  private async rerankPremiumJobsWithAi(
+    userId: string,
+    jobs: JobPosting[],
+    maxResults: number,
+  ): Promise<JobPosting[]> {
+    if (jobs.length <= 1) return jobs.slice(0, maxResults);
+
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select: { role: true, location: true, experienceLevel: true },
+    });
+
+    const rerank = await this.llmService.rerankPremiumJobs({
+      role: profile?.role || null,
+      location: profile?.location || null,
+      experienceLevel: profile?.experienceLevel || null,
+      jobs: jobs.slice(0, 15).map((job) => ({
+        title: job.title,
+        company: job.company || null,
+        locationRaw: job.locationRaw || null,
+        source: job.source || null,
+        snippet: job.snippet || null,
+        score: typeof job.score === 'number' ? job.score : null,
+      })),
+    });
+
+    if (!rerank || rerank.orderedIndexes.length === 0) {
+      return jobs.slice(0, maxResults);
+    }
+
+    const ordered: JobPosting[] = [];
+    for (const index of rerank.orderedIndexes) {
+      if (index >= 0 && index < jobs.length) {
+        ordered.push(jobs[index]);
+      }
+    }
+
+    const mergedOrdered = this.mergeUniqueJobsByUrl(ordered);
+    return mergedOrdered.slice(0, maxResults);
+  }
+
+  private async refinePremiumSearchResultWithAi(
+    userId: string,
+    initialResult: JobSearchResult,
+    maxResults: number,
+  ): Promise<JobSearchResult> {
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select: { role: true, location: true, experienceLevel: true },
+    });
+
+    const decision = await this.llmService.shouldFetchMorePremiumJobs({
+      role: profile?.role || null,
+      location: profile?.location || null,
+      experienceLevel: profile?.experienceLevel || null,
+      jobs: initialResult.jobs.slice(0, 10).map((job) => ({
+        title: job.title,
+        company: job.company || null,
+        locationRaw: job.locationRaw || null,
+        source: job.source || null,
+        score: typeof job.score === 'number' ? job.score : null,
+      })),
+      targetResults: maxResults,
+      offersExhausted: initialResult.offersExhausted === true,
+    });
+
+    if (decision?.shouldFetchMore && !initialResult.offersExhausted) {
+      this.logger.log(
+        `IA sugiere ampliar busqueda premium para ${userId} (confidence=${decision.confidence.toFixed(2)}), pero se mantiene una sola busqueda por solicitud.`,
+      );
+    }
+
+    const reranked = await this.rerankPremiumJobsWithAi(userId, [...initialResult.jobs], maxResults);
+    return {
+      ...initialResult,
+      jobs: reranked,
+    };
   }
 
   private normalizeLeadTextForComparison(text: string | null | undefined): string {
@@ -2586,21 +2785,21 @@ export class ConversationService {
     if (wantsCv && !noCv) {
       await this.updateSessionData(userId, {
         premiumOnboardingMode: 'cv',
+        premiumCvEntryPoint: 'onboarding',
         premiumCvDetectedProfile: null,
         premiumCvMissingFields: [],
       });
       await this.updateSessionState(userId, ConversationState.PREMIUM_WAITING_CV_FILE);
       return {
         text: BotMessages.PREMIUM_WAITING_CV_FILE,
-        buttons: [
-          { id: 'premium_cv_skip_manual', title: 'Seguir sin CV' },
-        ],
+        buttons: await this.getPremiumCvWaitingButtons(userId),
       };
     }
 
     if (noCv) {
       await this.updateSessionData(userId, {
         premiumOnboardingMode: 'no_cv',
+        premiumCvEntryPoint: null,
         premiumCvDetectedProfile: null,
         premiumCvMissingFields: [],
       });
@@ -2623,13 +2822,27 @@ export class ConversationService {
     intent: UserIntent,
   ): Promise<BotReply> {
     const normalized = this.normalizeLeadSignalToken(text);
+    const sessionData = await this.getLatestSessionData(userId);
+    const isFromReadyMenu = sessionData.premiumCvEntryPoint === 'ready_menu';
     const wantsManualFlow =
       normalized === 'premium_cv_skip_manual'
       || isRejection(text);
+    const wantsBackToMenu =
+      normalized === 'premium_cv_back_menu'
+      || normalized === 'volver al menu';
+
+    if (isFromReadyMenu && (wantsBackToMenu || isRejection(text))) {
+      await this.updateSessionData(userId, {
+        premiumCvEntryPoint: null,
+      });
+      await this.updateSessionState(userId, ConversationState.READY);
+      return await this.returnToMainMenu(userId, 'Perfecto, volvimos al menu principal.');
+    }
 
     if (wantsManualFlow) {
       await this.updateSessionData(userId, {
         premiumOnboardingMode: 'no_cv',
+        premiumCvEntryPoint: null,
         premiumCvDetectedProfile: null,
         premiumCvMissingFields: [],
       });
@@ -2640,17 +2853,13 @@ export class ConversationService {
     if (intent === UserIntent.UPLOAD_CV || normalized.includes('cv') || normalized.includes('hoja de vida')) {
       return {
         text: BotMessages.PREMIUM_WAITING_CV_FILE,
-        buttons: [
-          { id: 'premium_cv_skip_manual', title: 'Seguir sin CV' },
-        ],
+        buttons: await this.getPremiumCvWaitingButtons(userId),
       };
     }
 
     return {
       text: BotMessages.PREMIUM_WAITING_CV_FILE,
-      buttons: [
-        { id: 'premium_cv_skip_manual', title: 'Seguir sin CV' },
-      ],
+      buttons: await this.getPremiumCvWaitingButtons(userId),
     };
   }
 
@@ -2749,6 +2958,7 @@ export class ConversationService {
     if (messageType !== 'document' && messageType !== 'image') {
       return {
         text: BotMessages.PREMIUM_WAITING_CV_FILE,
+        buttons: await this.getPremiumCvWaitingButtons(userId),
       };
     }
 
@@ -2787,9 +2997,7 @@ export class ConversationService {
 
       return {
         text: `${warningText}\n\n${BotMessages.PREMIUM_WAITING_CV_FILE}`,
-        buttons: [
-          { id: 'premium_cv_skip_manual', title: 'Seguir sin CV' },
-        ],
+        buttons: await this.getPremiumCvWaitingButtons(userId),
       };
     }
 
@@ -3568,6 +3776,7 @@ export class ConversationService {
 
     await this.upsertAlertPreference(userId, alertTime, 'daily');
     await this.updateSessionState(userId, ConversationState.READY);
+    const menuRows = await this.buildMainMenuRows(userId);
 
     const confirmationMessage = `✅ ¡Listo! 🎉
 Alertas activadas ✔️ a las ${alertTime}
@@ -3588,28 +3797,7 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
       listSections: [
         {
           title: 'Comandos disponibles',
-          rows: [
-            {
-              id: 'cmd_buscar',
-              title: 'Buscar empleos',
-              description: 'Encontrar ofertas ahora',
-            },
-            {
-              id: 'cmd_editar',
-              title: 'Editar perfil',
-              description: 'Cambiar tus preferencias',
-            },
-            {
-              id: 'cmd_reiniciar',
-              title: 'Reiniciar',
-              description: 'Reconfigurar desde cero',
-            },
-            {
-              id: 'cmd_cancelar',
-              title: 'Cancelar servicio',
-              description: 'Dejar de usar el servicio',
-            },
-          ],
+          rows: menuRows,
         },
       ],
     };
@@ -3649,6 +3837,12 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
     }
 
     // Detectar intención de editar/cambiar preferencias
+    if (intent === UserIntent.UPLOAD_CV || this.isAttachHvCommand(text)) {
+      if (await this.isPremiumPlanActiveForUser(userId)) {
+        return await this.startPremiumAttachHvFromReady(userId);
+      }
+    }
+
     if (this.shouldRedirectToEditFlow(text, intent)) {
       return await this.redirectReadyUserToEditFlow(userId);
     }
@@ -3678,7 +3872,10 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
       }
 
       // PRIMERO: Verificar si hay alertas pendientes de un template notification
-      const pendingAlert = await this.getLatestNonStalePendingAlert(userId);
+      const isPremiumSearchUser = await this.isPremiumPlanActiveForUser(userId);
+      const pendingAlert = isPremiumSearchUser
+        ? null
+        : await this.getLatestNonStalePendingAlert(userId);
 
       if (pendingAlert) {
         // Hay ofertas pendientes del template → enviarlas
@@ -3745,13 +3942,18 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
       // Ejecutar búsqueda con el usesLeft actualizado
       const searchResult = await this.performJobSearch(userId, deduction.usesLeft);
 
-      // Si hubo error en la búsqueda, el uso ya fue descontado (comportamiento esperado)
-      const isError = searchResult.text?.includes('Lo siento, no pude buscar ofertas');
-      if (isError) {
-        this.logger.log(`⚠️ Búsqueda falló para usuario ${userId}, pero el uso ya fue descontado`);
+      // Si no hubo resultados o hubo error, restaurar el uso descontado
+      if (searchResult.outcome !== 'success') {
+        try {
+          await this.restoreUsage(userId);
+          this.logger.log(`Uso restaurado para usuario ${userId} tras búsqueda sin resultados o con error`);
+        } catch (restoreError) {
+          const restoreErrorMessage = restoreError instanceof Error ? restoreError.message : 'Unknown restore error';
+          this.logger.error(`No se pudo restaurar uso para ${userId}: ${restoreErrorMessage}`);
+        }
       }
 
-      return searchResult;
+      return searchResult.reply;
     }
 
     // Siempre mostrar menú de comandos con lista interactiva
@@ -3761,28 +3963,7 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
       listSections: [
         {
           title: 'Comandos disponibles',
-          rows: [
-            {
-              id: 'cmd_buscar',
-              title: 'Buscar empleos',
-              description: 'Encontrar ofertas ahora',
-            },
-            {
-              id: 'cmd_editar',
-              title: 'Editar perfil',
-              description: 'Cambiar tus preferencias',
-            },
-            {
-              id: 'cmd_reiniciar',
-              title: 'Reiniciar',
-              description: 'Reconfigurar desde cero',
-            },
-            {
-              id: 'cmd_cancelar',
-              title: 'Cancelar servicio',
-              description: 'Dejar de usar el servicio',
-            },
-          ],
+          rows: await this.buildMainMenuRows(userId),
         },
       ],
     };
@@ -3791,7 +3972,7 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
   /**
    * Ejecuta búsqueda de empleos y devuelve resultados formateados
    */
-  private async performJobSearch(userId: string, usesLeftAfterDeduction?: number): Promise<BotReply> {
+  private async performJobSearch(userId: string, usesLeftAfterDeduction?: number): Promise<JobSearchExecutionResult> {
     try {
       this.logger.log(`🔍 Usuario ${userId} solicitó búsqueda de empleos`);
 
@@ -3804,10 +3985,22 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
       const maxResults = isPaidPlan ? 5 : (isFreemiumV2 ? 1 : 3);
 
       // Ejecutar búsqueda
-      const result = await this.jobSearchService.searchJobsForUser(userId, maxResults);
+      const baseResult = await this.jobSearchService.searchJobsForUser(userId, maxResults);
+      const result = isPaidPlan
+        ? await this.refinePremiumSearchResultWithAi(userId, baseResult, maxResults)
+        : baseResult;
 
       // Si no hay ofertas, sugerir roles alternativos con IA
       if (result.jobs.length === 0) {
+        if (result.offersExhausted) {
+          return {
+            outcome: 'no_results',
+            reply: {
+              text: '*Atencion:* Has visto todas las ofertas disponibles para tu perfil actual. Puedes esperar nuevas publicaciones o escribir "editar" para ajustar tu perfil.',
+            },
+          };
+        }
+
         const profile = await this.prisma.userProfile.findUnique({ where: { userId } });
         const currentRole = profile?.role || 'tu perfil';
 
@@ -3817,7 +4010,10 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
           : `\n\nIntenta de nuevo más tarde o escribe *"editar"* para ajustar tus preferencias.`;
 
         return {
-          text: `No encontró ofertas que coincidan con *"${currentRole}"* en este momento. 😔${suggestionsText}`,
+          outcome: 'no_results',
+          reply: {
+            text: `No encontró ofertas que coincidan con *"${currentRole}"* en este momento. 😔${suggestionsText}`,
+          },
         };
       }
 
@@ -3827,7 +4023,7 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
           ? (
             isFreemiumV2
               ? this.buildFreemiumV2SingleVacancyMessage(result.jobs[0])
-              : this.buildReadySearchSingleVacancyMessage(result.jobs[0])
+              : formattedJobs
           )
           : formattedJobs;
       const shouldSendV2LeadInMessage = isFreemiumV2 && result.jobs.length === 1;
@@ -3835,7 +4031,7 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
       await this.jobSearchService.markJobsAsSent(userId, result.jobs);
 
       let exhaustedMessage = '';
-      if (result.offersExhausted) {
+      if (result.offersExhausted && result.jobs.length === 0) {
         exhaustedMessage = `\n\n🔴 *⚠️ ¡Atención!* Has visto todas las ofertas disponibles para tu perfil actual. Para tu próxima búsqueda puedes:\n• Esperar un tiempo mientras se publican nuevas ofertas\n• Escribir *"editar"* para ajustar tus preferencias y encontrar más opciones`;
       }
 
@@ -3875,27 +4071,29 @@ Puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
       }
 
       return {
-        preMessage: shouldSendV2LeadInMessage
-          ? {
-            text: this.buildFreemiumV2SingleVacancyLeadInMessage(),
-          }
-          : undefined,
-        text: primarySearchMessage + exhaustedMessage,
-        delayedMessage: {
-          text: menuText,
-          delayMs: DELAY_MS,
-          listTitle: 'Ver opciones',
-          listSections: [
-            {
-              title: 'Acciones disponibles',
-              rows: [
-                { id: 'cmd_buscar', title: 'Buscar empleos', description: 'Encontrar más ofertas' },
-                { id: 'cmd_editar', title: 'Editar perfil', description: 'Cambiar tus preferencias' },
-                { id: 'cmd_reiniciar', title: 'Reiniciar', description: 'Reconfigurar tu perfil' },
-                { id: 'cmd_cancelar', title: 'Cancelar servicio', description: 'Dejar de usar el CIO' },
-              ],
-            },
-          ],
+        outcome: 'success',
+        reply: {
+          preMessage: shouldSendV2LeadInMessage
+            ? {
+              text: this.buildFreemiumV2SingleVacancyLeadInMessage(),
+            }
+            : undefined,
+          text: primarySearchMessage + exhaustedMessage,
+          delayedMessage: {
+            text: menuText,
+            delayMs: DELAY_MS,
+            listTitle: 'Ver opciones',
+            listSections: [
+              {
+                title: 'Acciones disponibles',
+                rows: await this.buildMainMenuRows(userId, {
+                  searchDescription: 'Encontrar mas ofertas',
+                  restartDescription: 'Reconfigurar tu perfil',
+                  cancelDescription: 'Dejar de usar el CIO',
+                }),
+              },
+            ],
+          },
         },
       };
     } catch (error) {
@@ -3922,8 +4120,11 @@ Puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
 
       const editMenu = await this.showProfileForEditing(userId);
       return {
-        ...editMenu,
-        text: `${diagnosisText || 'No pude buscar ofertas en este momento. Ajusta tu perfil y vuelve a intentar.'}\n\n${editMenu.text || ''}`,
+        outcome: 'error',
+        reply: {
+          ...editMenu,
+          text: `${diagnosisText || 'No pude buscar ofertas en este momento. Ajusta tu perfil y vuelve a intentar.'}\n\n${editMenu.text || ''}`,
+        },
       };
     }
   }
@@ -5101,6 +5302,34 @@ Ejemplo: "Toronto", "Miami", "New York", "Canadá", "Estados Unidos".`;
   }
 
   /**
+   * Restaura un uso descontado cuando la búsqueda falla o no arroja resultados.
+   */
+  async restoreUsage(userId: string): Promise<void> {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+    });
+
+    if (!subscription) {
+      return;
+    }
+
+    if ((subscription.plan === 'PREMIUM' || subscription.plan === 'PRO') && subscription.status === 'ACTIVE') {
+      const restoredUses = Math.min(subscription.premiumUsesLeft + 1, 5);
+      await this.prisma.subscription.update({
+        where: { userId },
+        data: { premiumUsesLeft: restoredUses },
+      });
+      return;
+    }
+
+    const restoredUses = Math.min(subscription.freemiumUsesLeft + 1, 5);
+    await this.prisma.subscription.update({
+      where: { userId },
+      data: { freemiumUsesLeft: restoredUses },
+    });
+  }
+
+  /**
    * [LEGACY] Verifica si el usuario puede usar el servicio y deduce un uso
    * NOTA: Usar checkUsageAvailable + deductUsage para mejor control
    * @returns { allowed: boolean, message?: string, usesLeft?: number }
@@ -5514,7 +5743,8 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
    * Helper: Regresar al menú principal con opciones interactivas
    * ACTUALIZADO: Siempre muestra lista interactiva (todos tratados como móvil)
    */
-  private async returnToMainMenu(_userId: string, message: string): Promise<BotReply> {
+  private async returnToMainMenu(userId: string, message: string): Promise<BotReply> {
+    const menuRows = await this.buildMainMenuRows(userId);
     // Siempre retornar lista interactiva
     return {
       text: `${message}\n\n¿Qué te gustaría hacer?`,
@@ -5522,28 +5752,7 @@ Entra a *Editar perfil*, ajusta tu ciudad o país y vuelve a buscar.`;
       listSections: [
         {
           title: 'Comandos disponibles',
-          rows: [
-            {
-              id: 'cmd_buscar',
-              title: 'Buscar empleos',
-              description: 'Encontrar ofertas ahora',
-            },
-            {
-              id: 'cmd_editar',
-              title: 'Editar perfil',
-              description: 'Cambiar tus preferencias',
-            },
-            {
-              id: 'cmd_reiniciar',
-              title: 'Reiniciar',
-              description: 'Reconfigurar desde cero',
-            },
-            {
-              id: 'cmd_cancelar',
-              title: 'Cancelar servicio',
-              description: 'Dejar de usar el servicio',
-            },
-          ],
+          rows: menuRows,
         },
       ],
     };

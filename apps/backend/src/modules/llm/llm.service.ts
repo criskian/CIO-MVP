@@ -47,6 +47,17 @@ export interface VacancyReuseScoreResult {
   rationale: string;
 }
 
+export interface PremiumSearchExpansionDecision {
+  shouldFetchMore: boolean;
+  confidence: number;
+  rationale: string;
+}
+
+export interface PremiumJobRerankResult {
+  orderedIndexes: number[];
+  rationale: string;
+}
+
 export interface InitialProfileExtractionResult {
   role: string | null;
   location: string | null;
@@ -444,6 +455,133 @@ export class LlmService {
       reason: reason as RejectionReasonClassificationResult['reason'],
       confidence,
       rationale: result.rationale || '',
+    };
+  }
+
+  /**
+   * Decide si conviene ejecutar una busqueda adicional para premium.
+   * Si el LLM no esta disponible, usa una heuristica conservadora.
+   */
+  async shouldFetchMorePremiumJobs(input: {
+    role?: string | null;
+    location?: string | null;
+    experienceLevel?: string | null;
+    jobs: Array<{
+      title?: string | null;
+      company?: string | null;
+      locationRaw?: string | null;
+      source?: string | null;
+      score?: number | null;
+    }>;
+    targetResults: number;
+    offersExhausted?: boolean;
+  }): Promise<PremiumSearchExpansionDecision | null> {
+    if (input.offersExhausted) {
+      return {
+        shouldFetchMore: false,
+        confidence: 1,
+        rationale: 'No hay mas paginas disponibles segun el buscador.',
+      };
+    }
+
+    const fallbackDecision: PremiumSearchExpansionDecision = {
+      shouldFetchMore: input.jobs.length < input.targetResults,
+      confidence: 0.6,
+      rationale: 'Heuristica local por cantidad de resultados disponibles.',
+    };
+
+    const systemPrompt = [
+      'Eres un evaluador de calidad de resultados para un buscador de empleo premium.',
+      'Debes decidir si conviene ejecutar UNA busqueda adicional de pagina.',
+      'Responde SOLO JSON valido con: {"shouldFetchMore": boolean, "confidence": number, "rationale": string}.',
+      'Criterios:',
+      '- Si hay pocas ofertas para el objetivo del plan premium, prioriza shouldFetchMore=true.',
+      '- Si la relevancia promedio parece baja o repetitiva, prioriza shouldFetchMore=true.',
+      '- Si ya hay variedad y alta relevancia suficiente, puedes responder false.',
+      '- confidence debe estar entre 0 y 1.',
+    ].join('\n');
+
+    const raw = await this.callOpenAI(systemPrompt, JSON.stringify(input));
+    if (!raw) return fallbackDecision;
+
+    const parsed = this.parseJSON<PremiumSearchExpansionDecision>(raw, fallbackDecision);
+    const confidence = Number.isFinite(parsed.confidence)
+      ? Math.min(1, Math.max(0, parsed.confidence))
+      : fallbackDecision.confidence;
+
+    return {
+      shouldFetchMore: parsed.shouldFetchMore === true,
+      confidence,
+      rationale: parsed.rationale || fallbackDecision.rationale,
+    };
+  }
+
+  /**
+   * Reordena candidatas de oferta para premium segun calidad global.
+   * Si el LLM no esta disponible, usa el score local existente.
+   */
+  async rerankPremiumJobs(input: {
+    role?: string | null;
+    location?: string | null;
+    experienceLevel?: string | null;
+    jobs: Array<{
+      title?: string | null;
+      company?: string | null;
+      locationRaw?: string | null;
+      source?: string | null;
+      snippet?: string | null;
+      score?: number | null;
+    }>;
+  }): Promise<PremiumJobRerankResult | null> {
+    if (input.jobs.length <= 1) {
+      return {
+        orderedIndexes: input.jobs.map((_, index) => index),
+        rationale: 'No se requiere reordenamiento con una sola oferta.',
+      };
+    }
+
+    const fallbackIndexes = input.jobs
+      .map((job, index) => ({ index, score: typeof job.score === 'number' ? job.score : -1 }))
+      .sort((a, b) => b.score - a.score)
+      .map((item) => item.index);
+
+    const fallback: PremiumJobRerankResult = {
+      orderedIndexes: fallbackIndexes,
+      rationale: 'Orden por score local al no disponer de IA.',
+    };
+
+    const systemPrompt = [
+      'Eres un ranking engine para ofertas de empleo premium.',
+      'Debes ordenar las ofertas de mayor a menor calidad para el usuario.',
+      'Responde SOLO JSON valido con: {"orderedIndexes": number[], "rationale": string}.',
+      'orderedIndexes debe incluir todos los indices exactamente una vez.',
+      'Prioriza relevancia del rol, ubicacion, seniority y calidad de fuente.',
+    ].join('\n');
+
+    const raw = await this.callOpenAI(systemPrompt, JSON.stringify(input));
+    if (!raw) return fallback;
+
+    const parsed = this.parseJSON<PremiumJobRerankResult>(raw, fallback);
+    const used = new Set<number>();
+    const validOrder: number[] = [];
+
+    for (const maybeIndex of parsed.orderedIndexes || []) {
+      if (!Number.isInteger(maybeIndex)) continue;
+      if (maybeIndex < 0 || maybeIndex >= input.jobs.length) continue;
+      if (used.has(maybeIndex)) continue;
+      used.add(maybeIndex);
+      validOrder.push(maybeIndex);
+    }
+
+    for (let index = 0; index < input.jobs.length; index += 1) {
+      if (!used.has(index)) {
+        validOrder.push(index);
+      }
+    }
+
+    return {
+      orderedIndexes: validOrder.length > 0 ? validOrder : fallback.orderedIndexes,
+      rationale: parsed.rationale || fallback.rationale,
     };
   }
 

@@ -34,12 +34,14 @@ export class WhatsappService {
     cmd_ofertas: 'Ver ofertas ahora',
     cmd_pagar: 'Activar premium',
     cmd_verificar: 'Verificar pago',
+    premium_cv_back_menu: 'Volver al menu',
   };
   private readonly canonicalRowTitles: Record<string, string> = {
     cmd_buscar: 'Buscar empleos',
     cmd_editar: 'Editar perfil',
     cmd_reiniciar: 'Reiniciar',
     cmd_cancelar: 'Cancelar servicio',
+    cmd_adjuntar_hv: 'Adjuntar HV',
     cmd_ofertas: 'Ver ofertas ahora',
     cmd_pagar: 'Activar premium',
     edit_rol: 'ðŸ”¹ Rol',
@@ -67,6 +69,7 @@ export class WhatsappService {
     cmd_editar: 'Cambiar tus preferencias',
     cmd_reiniciar: 'Reconfigurar desde cero',
     cmd_cancelar: 'Dejar de usar el servicio',
+    cmd_adjuntar_hv: 'Enviar hoja de vida',
     cmd_ofertas: 'Revisar las ofertas disponibles',
     reason_role: 'El cargo no encaja',
     reason_location: 'La ciudad no me sirve',
