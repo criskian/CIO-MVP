@@ -51,6 +51,7 @@ export class SchedulerService implements OnModuleInit {
   private readonly BATCH_SIZE = 10; // Procesar 10 usuarios en paralelo
   private readonly DELAY_BETWEEN_BATCHES_MS = 2000; // 2 segundos entre lotes para respetar rate limits
   private readonly MAX_PROCESSING_TIME_MINUTES = 4; // Máximo tiempo de procesamiento para estar dentro de ventana
+  private readonly ALERT_INACTIVITY_STREAK_DAYS = 2; // Pausar alertas tras 2 templates diarios consecutivos sin interaccion
 
   constructor(
     private readonly prisma: PrismaService,
@@ -552,6 +553,83 @@ export class SchedulerService implements OnModuleInit {
     }
   }
 
+  private async shouldPauseAlertsForInactivity(userId: string): Promise<boolean> {
+    const alertPreference = await this.prisma.alertPreference.findUnique({
+      where: { userId },
+      select: { timezone: true, enabled: true },
+    });
+
+    if (!alertPreference?.enabled) {
+      return false;
+    }
+
+    const templateMessages = await this.prisma.chatMessage.findMany({
+      where: {
+        userId,
+        direction: 'outbound',
+        content: { startsWith: '[TEMPLATE: job_alert_notification]' },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: this.ALERT_INACTIVITY_STREAK_DAYS,
+      select: { createdAt: true },
+    });
+
+    if (templateMessages.length < this.ALERT_INACTIVITY_STREAK_DAYS) {
+      return false;
+    }
+
+    const timezoneName = alertPreference.timezone || 'America/Bogota';
+    const latestTemplateAt = templateMessages[0].createdAt;
+    const previousTemplateAt = templateMessages[1].createdAt;
+
+    const latestDay = dayjs(latestTemplateAt).tz(timezoneName).startOf('day');
+    const previousDay = dayjs(previousTemplateAt).tz(timezoneName).startOf('day');
+    const areConsecutiveDays = latestDay.diff(previousDay, 'day') === 1;
+
+    if (!areConsecutiveDays) {
+      return false;
+    }
+
+    const inboundAfterPreviousTemplate = await this.prisma.chatMessage.findFirst({
+      where: {
+        userId,
+        direction: 'inbound',
+        createdAt: { gt: previousTemplateAt },
+      },
+      select: { id: true },
+    });
+
+    if (inboundAfterPreviousTemplate) {
+      return false;
+    }
+
+    const viewedPendingAlertAfterPreviousTemplate = await this.prisma.pendingJobAlert.findFirst({
+      where: {
+        userId,
+        viewedAt: {
+          not: null,
+          gt: previousTemplateAt,
+        },
+      },
+      select: { id: true },
+    });
+
+    return !viewedPendingAlertAfterPreviousTemplate;
+  }
+
+  private async disableAlertsForInactivity(userId: string): Promise<void> {
+    await this.prisma.alertPreference.updateMany({
+      where: {
+        userId,
+        enabled: true,
+      },
+      data: {
+        enabled: false,
+        updatedAt: new Date(),
+      },
+    });
+  }
+
   /**
    * Ejecuta búsqueda de empleos y notifica a un usuario específico
    * Método reutilizable para scheduler Y búsquedas manuales
@@ -560,6 +638,15 @@ export class SchedulerService implements OnModuleInit {
   async runJobSearchAndNotifyUser(userId: string): Promise<void> {
     try {
       this.logger.log(`Buscando empleos para usuario ${userId}...`);
+
+      const shouldPauseByInactivity = await this.shouldPauseAlertsForInactivity(userId);
+      if (shouldPauseByInactivity) {
+        await this.disableAlertsForInactivity(userId);
+        this.logger.log(
+          `Usuario ${userId}: alertas pausadas por 2 templates consecutivos sin interaccion. No se ejecuta busqueda ni envio de template.`,
+        );
+        return;
+      }
 
       // 1. Verificar usos disponibles ANTES de buscar
       const usageCheck = await this.checkAndDeductAlertUsage(userId);
