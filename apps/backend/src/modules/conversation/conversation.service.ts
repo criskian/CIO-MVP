@@ -135,6 +135,15 @@ export class ConversationService {
           }
 
           const intent = detectIntent(text || '');
+          const forcedSearchReply = await this.tryHandleGlobalSearchNowOverride(
+            user.id,
+            session.state,
+            text || '',
+            intent,
+          );
+          if (forcedSearchReply) {
+            return forcedSearchReply;
+          }
           return await this.handleStateTransition(user.id, session.state, text || '', intent);
         }
         // Si por alguna razón no tiene sesión en WA_ASK_NAME, ponerlo ahí
@@ -197,6 +206,16 @@ export class ConversationService {
           intent = aiIntent;
           this.logger.log(`🤖 Intent detectado por IA: ${intent}`);
         }
+      }
+
+      const forcedSearchReply = await this.tryHandleGlobalSearchNowOverride(
+        user.id,
+        session.state,
+        text,
+        intent,
+      );
+      if (forcedSearchReply) {
+        return forcedSearchReply;
       }
 
       // 7.6. Si estamos en onboarding y el texto no parece una respuesta válida, manejar out-of-flow
@@ -554,6 +573,23 @@ export class ConversationService {
     ];
 
     return criticalPatterns.some((pattern) => normalized.includes(pattern));
+  }
+
+  private async tryHandleGlobalSearchNowOverride(
+    userId: string,
+    currentState: string,
+    text: string,
+    intent: UserIntent,
+  ): Promise<BotReply | null> {
+    if (intent !== UserIntent.SEARCH_NOW) return null;
+    if (currentState === ConversationState.READY) return null;
+
+    this.logger.log(
+      `Comando de busqueda detectado en estado ${currentState}. Se cancela el flujo activo y se redirige a READY.`,
+    );
+
+    await this.updateSessionState(userId, ConversationState.READY);
+    return await this.handleReadyState(userId, text, UserIntent.SEARCH_NOW);
   }
 
   private isLikelyValidAnswerForState(
