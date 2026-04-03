@@ -198,3 +198,35 @@ export class UpdateEmailCampaignDto {
     @IsIn(['DRAFT', 'SCHEDULED', 'PROCESSING', 'SENT', 'FAILED', 'CANCELLED'])
     status?: 'DRAFT' | 'SCHEDULED' | 'PROCESSING' | 'SENT' | 'FAILED' | 'CANCELLED';
 }
+
+/**
+ * DTO para enviar template de WhatsApp a un usuario puntual desde admin.
+ */
+export class SendWhatsAppTemplateDto {
+    @IsString()
+    userId!: string;
+
+    @IsString()
+    @IsOptional()
+    templateName?: string;
+
+    @IsString()
+    @IsOptional()
+    languageCode?: string;
+
+    @IsString()
+    @IsOptional()
+    name?: string;
+
+    @IsString()
+    @IsOptional()
+    jobCount?: string;
+
+    @IsString()
+    @IsOptional()
+    role?: string;
+
+    @IsString()
+    @IsOptional()
+    buttonPayload?: string;
+}

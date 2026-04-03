@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { LayoutDashboard, Users, CreditCard, MessageSquare, Mail, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, CreditCard, MessageSquare, Mail, Send, LogOut } from 'lucide-react';
 import { logout, getAuthUser } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 
@@ -32,6 +32,11 @@ const menuItems = [
     name: 'Emails',
     href: '/dashboard/emails',
     icon: Mail,
+  },
+  {
+    name: 'Templates WA',
+    href: '/dashboard/templates-whatsapp',
+    icon: Send,
   },
 ];
 
