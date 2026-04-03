@@ -152,7 +152,17 @@ export class ConversationService {
           return { text: BotMessages.NOT_REGISTERED };
         }
         // Continuar con el flujo normal de estados
-        return await this.handleStateTransition(user.id, session.state, text || '', detectIntent(text || ''));
+        const preRegistrationIntent = detectIntent(text || '');
+        const forcedSearchReply = await this.tryHandleGlobalSearchNowOverride(
+          user.id,
+          session.state,
+          text || '',
+          preRegistrationIntent,
+        );
+        if (forcedSearchReply) {
+          return forcedSearchReply;
+        }
+        return await this.handleStateTransition(user.id, session.state, text || '', preRegistrationIntent);
       }
 
       // 4. Obtener o crear sesión activa

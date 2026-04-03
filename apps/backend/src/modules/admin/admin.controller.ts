@@ -21,6 +21,7 @@ import {
     UpdateEmailTemplateDto,
     CreateEmailCampaignDto,
     UpdateEmailCampaignDto,
+    SendWhatsAppTemplateDto,
 } from './dto/admin.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -367,6 +368,16 @@ export class AdminController {
             message: `Template enviado a ${body.phone}`,
             params: { name, jobCount, role }
         };
+    }
+
+    /**
+     * POST /api/admin/templates/whatsapp/send
+     * Envía una template de WhatsApp a un usuario puntual seleccionado en admin.
+     */
+    @Post('templates/whatsapp/send')
+    async sendWhatsAppTemplate(@Body() dto: SendWhatsAppTemplateDto) {
+        this.logger.log(`Enviando template WhatsApp desde admin a userId=${dto.userId}`);
+        return this.adminService.sendWhatsAppTemplateToUser(dto);
     }
 }
 

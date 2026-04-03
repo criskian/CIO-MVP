@@ -17,6 +17,7 @@ import {
     UpdateEmailTemplateDto,
     CreateEmailCampaignDto,
     UpdateEmailCampaignDto,
+    SendWhatsAppTemplateDto,
 } from './dto/admin.dto';
 
 /**
@@ -1417,6 +1418,68 @@ export class AdminService {
                 status: 'EXPIRED',
             },
         });
+    }
+
+    private extractFirstName(name: string | null | undefined): string {
+        if (!name) return 'Usuario';
+        const cleaned = name.trim();
+        if (!cleaned) return 'Usuario';
+        return cleaned.split(/\s+/)[0] || 'Usuario';
+    }
+
+    /**
+     * Envía una template de WhatsApp a un usuario puntual desde admin.
+     */
+    async sendWhatsAppTemplateToUser(dto: SendWhatsAppTemplateDto) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: dto.userId },
+            include: {
+                profile: {
+                    select: { role: true },
+                },
+            },
+        });
+
+        if (!user) {
+            throw new NotFoundException('Usuario no encontrado');
+        }
+
+        if (!user.phone) {
+            throw new BadRequestException('El usuario no tiene teléfono registrado');
+        }
+
+        const templateName = dto.templateName?.trim() || 'job_alert_notification';
+        const languageCode = dto.languageCode?.trim() || 'es_CO';
+        const buttonPayload = dto.buttonPayload?.trim() || 'SEARCH_NOW';
+        const userName = dto.name?.trim() || this.extractFirstName(user.name);
+        const jobCount = dto.jobCount?.trim() || '3';
+        const role = dto.role?.trim() || user.profile?.role || 'tu perfil';
+
+        await this.whatsappService.sendTemplateMessage(
+            user.phone,
+            templateName,
+            languageCode,
+            [userName, jobCount, role],
+            {
+                userId: user.id,
+                source: 'admin',
+                buttonPayload,
+            },
+        );
+
+        this.logger.log(
+            `Template ${templateName} enviada desde admin a userId=${user.id} con payload=${buttonPayload}`,
+        );
+
+        return {
+            success: true,
+            userId: user.id,
+            phone: user.phone,
+            templateName,
+            languageCode,
+            buttonPayload,
+            bodyParams: [userName, jobCount, role],
+        };
     }
 
     // ==============================

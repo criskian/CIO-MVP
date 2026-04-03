@@ -328,5 +328,26 @@ export async function getSentEmails(
   return data;
 }
 
+export async function sendWhatsAppTemplateToUser(payload: {
+  userId: string;
+  templateName?: string;
+  languageCode?: string;
+  name?: string;
+  jobCount?: string;
+  role?: string;
+  buttonPayload?: string;
+}): Promise<{
+  success: boolean;
+  userId: string;
+  phone: string;
+  templateName: string;
+  languageCode: string;
+  buttonPayload: string;
+  bodyParams: string[];
+}> {
+  const { data } = await api.post('/api/admin/templates/whatsapp/send', payload);
+  return data;
+}
+
 export default api;
 

@@ -445,7 +445,11 @@ export class WhatsappService {
   async sendBotReply(
     to: string,
     reply: BotReply,
-    options?: { userId?: string; source?: 'conversation' | 'scheduler' | 'admin' }
+    options?: {
+      userId?: string;
+      source?: 'conversation' | 'scheduler' | 'admin';
+      buttonPayload?: string;
+    }
   ): Promise<void> {
     try {
       const sanitizedReply = this.sanitizeBotReply(reply);
@@ -542,11 +546,21 @@ export class WhatsappService {
     templateName: string,
     languageCode: string,
     bodyParams: string[],
-    options?: { userId?: string; source?: 'conversation' | 'scheduler' | 'admin' }
+    options?: {
+      userId?: string;
+      source?: 'conversation' | 'scheduler' | 'admin';
+      buttonPayload?: string;
+    }
   ): Promise<void> {
     try {
       const sanitizedBodyParams = bodyParams.map((param) => repairMojibakeUtil(param));
-      await this.cloudApiProvider.sendTemplateMessage(to, templateName, languageCode, sanitizedBodyParams);
+      await this.cloudApiProvider.sendTemplateMessage(
+        to,
+        templateName,
+        languageCode,
+        sanitizedBodyParams,
+        options?.buttonPayload || 'SEARCH_NOW',
+      );
       this.logger.log(`âœ… Template "${templateName}" enviado a ${to}`);
 
       // Guardar en historial
