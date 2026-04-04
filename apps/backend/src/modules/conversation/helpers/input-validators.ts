@@ -461,14 +461,22 @@ export function isLikelyHumanNameInput(text: string): boolean {
   }
 
   const normalized = normalizeSemanticText(raw).replace(/[.,;:!]/g, ' ');
+  if (
+    /^(para|porque|por que|que|como|cual|donde|cuando)\b/.test(normalized)
+    || /\b(para que|por que|que es|como funciona|de que se trata)\b/.test(normalized)
+  ) {
+    return false;
+  }
+
   const tokens = normalized.split(' ').map((token) => token.trim()).filter(Boolean);
   if (tokens.length === 0 || tokens.length > 5) return false;
 
-  const connectors = new Set(['de', 'del', 'la', 'las', 'los', 'da', 'do', 'dos', 'y']);
+  const connectors = new Set(['de', 'del', 'la', 'las', 'los', 'da', 'do', 'dos', 'y', 'para']);
   const blockedWords = new Set([
     'precio', 'valor', 'plan', 'premium', 'pro', 'prueba', 'correo', 'email',
     'buscar', 'editar', 'reiniciar', 'cancelar', 'ofertas', 'trabajo', 'empleo',
     'hola', 'buenas', 'gracias', 'ayuda', 'quiero', 'necesito', 'como', 'cuanto',
+    'para', 'que', 'eso', 'esto', 'cual', 'donde', 'cuando', 'porque', 'motivo',
   ]);
 
   let meaningfulTokenCount = 0;

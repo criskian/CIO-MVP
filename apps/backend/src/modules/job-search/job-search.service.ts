@@ -1549,12 +1549,20 @@ export class JobSearchService {
    * Retorna null si no se puede determinar
    */
   private getJobAgeDays(job: JobPosting): number | null {
-    if (!job.publishedAt) {
+    const rawPublishedAt = (job as JobPosting & { publishedAt?: Date | string }).publishedAt;
+    if (!rawPublishedAt) {
+      return null;
+    }
+
+    const publishedAt =
+      rawPublishedAt instanceof Date ? rawPublishedAt : new Date(rawPublishedAt);
+
+    if (Number.isNaN(publishedAt.getTime())) {
       return null;
     }
 
     const now = new Date();
-    const diffMs = now.getTime() - job.publishedAt.getTime();
+    const diffMs = now.getTime() - publishedAt.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
     return diffDays >= 0 ? diffDays : null;
