@@ -1634,6 +1634,125 @@ export class ConversationService {
     };
   }
 
+  private async decideFreeSearchStrategy(
+    userId: string,
+    maxResults: number,
+    role: string | null,
+    location: string | null,
+  ): Promise<{ strategy: 'reuse_cache' | 'force_fresh'; confidence: number; rationale: string }> {
+    const sessionData = await this.getLatestSessionData(userId);
+    const cache = (sessionData?.jobSearchCache as Record<string, any> | undefined) || {};
+    const cachedJobs = Array.isArray(cache.cachedJobs)
+      ? cache.cachedJobs as Array<{ locationRaw?: string | null }>
+      : [];
+    const hasNextPageToken = typeof cache.nextPageToken === 'string' && cache.nextPageToken.trim().length > 0;
+
+    let cacheAgeMinutes: number | null = null;
+    if (typeof cache.lastSearchAt === 'string') {
+      const cacheDate = new Date(cache.lastSearchAt);
+      if (!Number.isNaN(cacheDate.getTime())) {
+        cacheAgeMinutes = Math.max(0, Math.floor((Date.now() - cacheDate.getTime()) / 60000));
+      }
+    }
+
+    const cityMatchRatio = this.calculateCityMatchRatio(cachedJobs, location);
+    const decision = await this.llmService.decideFreeSearchStrategy({
+      cacheCount: cachedJobs.length,
+      hasNextPageToken,
+      cacheAgeMinutes,
+      cityMatchRatio,
+      role,
+      location,
+      targetResults: maxResults,
+    });
+
+    return decision;
+  }
+
+  private applyDeterministicCityPriority(
+    jobs: JobPosting[],
+    targetLocation: string | null | undefined,
+  ): JobPosting[] {
+    if (!targetLocation || jobs.length <= 1) {
+      return jobs;
+    }
+
+    const ranked = jobs
+      .map((job, index) => ({
+        job,
+        index,
+        cityTier: this.getCityMatchTier(job.locationRaw, targetLocation),
+        score: typeof job.score === 'number' ? job.score : Number.NEGATIVE_INFINITY,
+      }))
+      .sort((a, b) => {
+        if (b.cityTier !== a.cityTier) return b.cityTier - a.cityTier;
+        if (b.score !== a.score) return b.score - a.score;
+        return a.index - b.index;
+      });
+
+    return ranked.map((item) => item.job);
+  }
+
+  private calculateCityMatchRatio(
+    jobs: Array<{ locationRaw?: string | null }>,
+    targetLocation: string | null | undefined,
+  ): number {
+    if (!targetLocation || jobs.length === 0) return 0;
+    const matches = jobs.filter((job) => this.getCityMatchTier(job.locationRaw, targetLocation) > 0).length;
+    return matches / jobs.length;
+  }
+
+  private getCityMatchTier(
+    jobLocation: string | null | undefined,
+    targetLocation: string | null | undefined,
+  ): number {
+    const normalizedJob = this.normalizeLocationForComparison(jobLocation);
+    const normalizedTarget = this.normalizeLocationForComparison(targetLocation);
+    if (!normalizedJob || !normalizedTarget) return 0;
+
+    const jobPrimary = this.extractPrimaryLocationForComparison(normalizedJob);
+    const targetPrimary = this.extractPrimaryLocationForComparison(normalizedTarget);
+
+    if (targetPrimary === 'remoto' || targetPrimary === 'remote') {
+      if (/(^|\s)(remoto|remote|teletrabajo|work from home)(\s|$)/i.test(normalizedJob)) {
+        return 3;
+      }
+      return 0;
+    }
+
+    if (jobPrimary && targetPrimary && jobPrimary === targetPrimary) return 3;
+    if (normalizedJob === normalizedTarget) return 3;
+    if (
+      (targetPrimary && normalizedJob.includes(targetPrimary))
+      || (jobPrimary && normalizedTarget.includes(jobPrimary))
+      || normalizedJob.includes(normalizedTarget)
+      || normalizedTarget.includes(normalizedJob)
+    ) {
+      return 2;
+    }
+
+    const targetWords = targetPrimary.split(' ').filter((word) => word.length > 2);
+    if (targetWords.length > 0 && targetWords.every((word) => normalizedJob.includes(word))) {
+      return 1;
+    }
+
+    return 0;
+  }
+
+  private extractPrimaryLocationForComparison(value: string): string {
+    return value.split(',')[0]?.trim() || value.trim();
+  }
+
+  private normalizeLocationForComparison(value: string | null | undefined): string {
+    if (!value) return '';
+    return value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   private normalizeLeadTextForComparison(text: string | null | undefined): string {
     if (!text) return '';
     return text
@@ -3920,20 +4039,23 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
 
     // Detectar intención de buscar empleos
     if (intent === UserIntent.SEARCH_NOW) {
-      // PRIMERO: Verificar si hay alertas pendientes de un template notification
-      const isPremiumSearchUser = await this.isPremiumPlanActiveForUser(userId);
-      const pendingAlert = isPremiumSearchUser
-        ? null
-        : await this.getLatestNonStalePendingAlert(userId);
+      // PRIMERO: Verificar si hay alertas pendientes de template (todos los planes)
+      const pendingAlert = await this.getLatestNonStalePendingAlert(userId);
 
       if (pendingAlert) {
-        // Hay ofertas pendientes del template → enviarlas
-        this.logger.log(`📬 Usuario ${userId} tiene ${pendingAlert.jobCount} ofertas pendientes`);
+        const now = new Date();
+        this.logger.log(
+          `SEARCH_NOW: pending encontrado -> entregar pendientes (${pendingAlert.jobCount}) para ${userId}`,
+        );
+        this.logger.log(`SEARCH_NOW: uso no descontado por entrega de pending para ${userId}`);
 
         // Marcar como vistas
         await this.prisma.pendingJobAlert.update({
           where: { id: pendingAlert.id },
-          data: { viewedAt: new Date() },
+          data: {
+            viewedAt: now,
+            sentAt: pendingAlert.sentAt ?? now,
+          },
         });
 
         // Formatear y enviar ofertas (formato multiple estandar)
@@ -3947,6 +4069,8 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
           text: `📢 *📬 Aquí están tus ofertas de empleo!*\n\n${formattedJobs}\n\n💡 _Recuerda: aplicar a vacantes buenas es mejor que aplicar masivamente._`
         };
       }
+
+      this.logger.log(`SEARCH_NOW: pending no encontrado -> estrategia de busqueda por plan para ${userId}`);
 
       // No hay alertas pendientes → hacer búsqueda normal
       // Verificar usos disponibles ANTES de buscar (sin descontar)
@@ -4023,15 +4147,35 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
       const subscription = await this.prisma.subscription.findUnique({ where: { userId } });
       const isPaidPlan = subscription?.plan === 'PREMIUM' || subscription?.plan === 'PRO';
       const maxResults = isPaidPlan ? 5 : 3;
+      const profile = await this.prisma.userProfile.findUnique({
+        where: { userId },
+        select: { role: true, location: true },
+      });
 
-      // Ejecutar búsqueda
-      const baseResult = await this.jobSearchService.searchJobsForUser(userId, maxResults);
+      // Definir estrategia de busqueda por plan.
+      let searchOptions: { forceFreshSearch?: boolean; cacheOnlyIfAvailable?: boolean } = {};
+      if (isPaidPlan) {
+        searchOptions = { forceFreshSearch: true };
+        this.logger.log(`SEARCH_NOW premium: forzando busqueda fresca para ${userId}`);
+      } else {
+        const freeStrategy = await this.decideFreeSearchStrategy(userId, maxResults, profile?.role || null, profile?.location || null);
+        searchOptions = freeStrategy.strategy === 'reuse_cache'
+          ? { cacheOnlyIfAvailable: true }
+          : { forceFreshSearch: true };
+        this.logger.log(
+          `SEARCH_NOW free: estrategia IA=${freeStrategy.strategy} confidence=${freeStrategy.confidence.toFixed(2)} para ${userId}`,
+        );
+      }
+
+      // Ejecutar busqueda
+      const baseResult = await this.jobSearchService.searchJobsForUser(userId, maxResults, searchOptions);
       const result = isPaidPlan
         ? await this.refinePremiumSearchResultWithAi(userId, baseResult, maxResults)
         : await this.refineFreeSearchResultWithAi(userId, baseResult, maxResults);
+      const cityPrioritizedJobs = this.applyDeterministicCityPriority(result.jobs, profile?.location || null);
 
       // Si no hay ofertas, sugerir roles alternativos con IA
-      if (result.jobs.length === 0) {
+      if (cityPrioritizedJobs.length === 0) {
         if (result.offersExhausted) {
           return {
             outcome: 'no_results',
@@ -4057,10 +4201,10 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
         };
       }
 
-      const formattedJobs = this.jobSearchService.formatJobsForWhatsApp(result.jobs);
+      const formattedJobs = this.jobSearchService.formatJobsForWhatsApp(cityPrioritizedJobs);
       const primarySearchMessage = formattedJobs;
 
-      await this.jobSearchService.markJobsAsSent(userId, result.jobs);
+      await this.jobSearchService.markJobsAsSent(userId, cityPrioritizedJobs);
 
       let exhaustedMessage = '';
       if (result.offersExhausted && result.jobs.length === 0) {
