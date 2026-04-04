@@ -59,6 +59,8 @@ model User {
   // Datos de identidad (se piden en onboarding)
   name      String?              // Nombre del usuario
   email     String?  @unique     // Email (se pide al agotar freemium)
+  profileUpdateDay5SentAt  DateTime?
+  profileUpdateDay15SentAt DateTime?
   dataAuthorizationAccepted   Boolean   @default(false)
   dataAuthorizationAcceptedAt DateTime?
   privacyPolicyVersion        String?

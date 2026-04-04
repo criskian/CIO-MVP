@@ -31,6 +31,7 @@ import { PrismaService } from '../database/prisma.service';
 import { JobSearchService } from '../job-search/job-search.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { AdminService } from '../admin/admin.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { getFirstName } from '../conversation/helpers/input-validators';
 import { shouldExpireFreemiumByPolicy } from '../conversation/helpers/date-utils';
 import * as cron from 'node-cron';
@@ -58,6 +59,7 @@ export class SchedulerService implements OnModuleInit {
     private readonly jobSearchService: JobSearchService,
     private readonly whatsappService: WhatsappService,
     private readonly adminService: AdminService,
+    private readonly notificationsService: NotificationsService,
   ) { }
 
   onModuleInit() {
@@ -67,6 +69,7 @@ export class SchedulerService implements OnModuleInit {
     this.startFreemiumExpirationCron();
     this.startPremiumExpirationCron();
     this.startScheduledEmailsCron();
+    this.startProfileUpdateReminderCron();
   }
 
   /**
@@ -98,6 +101,154 @@ export class SchedulerService implements OnModuleInit {
 
     this.logger.log('Scheduler de campañas de email iniciado (cada minuto)');
   }
+
+  /**
+   * Inicia el cron diario para recordatorio de actualización de portales de empleo.
+   * Reglas:
+   * - Día 5: enviar 1 vez.
+   * - Día 15: enviar 1 vez.
+   * - >15 días: no enviar retroactivos.
+   */
+  private startProfileUpdateReminderCron() {
+    cron.schedule(
+      '0 9 * * *',
+      async () => {
+        this.logger.log('Ejecutando recordatorios de portales (dia 5 y dia 15)...');
+        await this.processProfileUpdateReminderEmails();
+      },
+      { timezone: 'America/Bogota' },
+    );
+
+    this.logger.log('Scheduler de recordatorio de portales iniciado (09:00 America/Bogota)');
+  }
+
+  private async processProfileUpdateReminderEmails(): Promise<void> {
+    const nowBogota = dayjs().tz('America/Bogota').startOf('day');
+    let evaluated = 0;
+    let sentDay5 = 0;
+    let sentDay15 = 0;
+    let skippedByRule = 0;
+    let skippedAlreadySent = 0;
+    let failed = 0;
+
+    try {
+      const users = await (this.prisma as any).user.findMany({
+        where: {
+          email: { not: null },
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          createdAt: true,
+          profileUpdateDay5SentAt: true,
+          profileUpdateDay15SentAt: true,
+        },
+      });
+
+      for (const user of users) {
+        evaluated++;
+        const email = typeof user.email === 'string' ? user.email.trim().toLowerCase() : '';
+        const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        if (!isValidEmail) {
+          skippedByRule++;
+          this.logger.debug(`PROFILE_UPDATE_EMAIL omitted_by_rule user=${user.id} reason=invalid_email`);
+          continue;
+        }
+
+        const createdAtBogota = dayjs(user.createdAt).tz('America/Bogota').startOf('day');
+        const ageDays = nowBogota.diff(createdAtBogota, 'day');
+
+        if (ageDays < 5 || (ageDays > 5 && ageDays < 15) || ageDays > 15) {
+          skippedByRule++;
+          this.logger.debug(
+            `PROFILE_UPDATE_EMAIL omitted_by_rule user=${user.id} ageDays=${ageDays}`,
+          );
+          continue;
+        }
+
+        if (ageDays === 5) {
+          if (user.profileUpdateDay5SentAt) {
+            skippedAlreadySent++;
+            this.logger.debug(
+              `PROFILE_UPDATE_EMAIL omitted_already_sent user=${user.id} milestone=day5`,
+            );
+            continue;
+          }
+
+          try {
+            await this.notificationsService.sendProfileUpdateEmail(
+              email,
+              user.name || 'Usuario',
+              {
+                userId: user.id,
+                recipientName: user.name || null,
+              },
+            );
+
+            await (this.prisma as any).user.update({
+              where: { id: user.id },
+              data: { profileUpdateDay5SentAt: new Date() },
+            });
+
+            sentDay5++;
+            this.logger.log(`PROFILE_UPDATE_EMAIL sent user=${user.id} milestone=day5`);
+          } catch (error) {
+            failed++;
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.logger.error(
+              `PROFILE_UPDATE_EMAIL failed user=${user.id} milestone=day5 error=${errorMessage}`,
+            );
+          }
+
+          continue;
+        }
+
+        if (ageDays === 15) {
+          if (user.profileUpdateDay15SentAt) {
+            skippedAlreadySent++;
+            this.logger.debug(
+              `PROFILE_UPDATE_EMAIL omitted_already_sent user=${user.id} milestone=day15`,
+            );
+            continue;
+          }
+
+          try {
+            await this.notificationsService.sendProfileUpdateEmail(
+              email,
+              user.name || 'Usuario',
+              {
+                userId: user.id,
+                recipientName: user.name || null,
+              },
+            );
+
+            await (this.prisma as any).user.update({
+              where: { id: user.id },
+              data: { profileUpdateDay15SentAt: new Date() },
+            });
+
+            sentDay15++;
+            this.logger.log(`PROFILE_UPDATE_EMAIL sent user=${user.id} milestone=day15`);
+          } catch (error) {
+            failed++;
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.logger.error(
+              `PROFILE_UPDATE_EMAIL failed user=${user.id} milestone=day15 error=${errorMessage}`,
+            );
+          }
+        }
+      }
+
+      this.logger.log(
+        `PROFILE_UPDATE_EMAIL summary evaluated=${evaluated} sent_day5=${sentDay5} sent_day15=${sentDay15} omitted_by_rule=${skippedByRule} omitted_already_sent=${skippedAlreadySent} failed=${failed}`,
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error en processProfileUpdateReminderEmails: ${errorMessage}`);
+    }
+  }
+
   /**
    * Inicia el cron para enviar recordatorios de freemium (23 horas después)
    */
