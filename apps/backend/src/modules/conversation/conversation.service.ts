@@ -4757,13 +4757,18 @@ Puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
         diagnosisText = diagnosis?.userMessage || null;
       }
 
-      const editMenu = await this.showProfileForEditing(userId);
+      await this.updateSessionState(userId, ConversationState.READY);
+
+      const diagnosisForUser = diagnosisText
+        || 'No pude buscar ofertas en este momento por un problema temporal.';
+      const menuReply = await this.returnToMainMenu(
+        userId,
+        `${diagnosisForUser}\n\nIntenta de nuevo ahora o en unos minutos.`,
+      );
+
       return {
         outcome: 'error',
-        reply: {
-          ...editMenu,
-          text: `${diagnosisText || 'No pude buscar ofertas en este momento. Ajusta tu perfil y vuelve a intentar.'}\n\n${editMenu.text || ''}`,
-        },
+        reply: menuReply,
       };
     }
   }
