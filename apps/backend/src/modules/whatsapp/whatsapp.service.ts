@@ -249,6 +249,74 @@ export class WhatsappService {
     };
   }
 
+  private async sendMainReplyWithInteractiveFallback(to: string, mainReply: BotReply): Promise<BotReply> {
+    try {
+      await this.provider.sendMessage(to, mainReply);
+      return mainReply;
+    } catch (primaryError) {
+      const hasList = Array.isArray(mainReply.listSections) && mainReply.listSections.length > 0;
+      if (!hasList) {
+        throw primaryError;
+      }
+
+      this.logger.warn(`Fallo enviando lista interactiva a ${to}. Reintentando lista una vez.`);
+
+      try {
+        await this.provider.sendMessage(to, mainReply);
+        this.logger.log(`Lista interactiva enviada en reintento a ${to}`);
+        return mainReply;
+      } catch (retryError) {
+        const buttonFallback = this.buildButtonsFallbackFromList(mainReply);
+        if (!buttonFallback) {
+          throw retryError;
+        }
+
+        this.logger.warn(`Segundo intento de lista fallo para ${to}. Enviando fallback con botones.`);
+        await this.provider.sendMessage(to, buttonFallback);
+        this.logger.log(`Fallback con botones enviado a ${to}`);
+        return buttonFallback;
+      }
+    }
+  }
+
+  private buildButtonsFallbackFromList(reply: BotReply): BotReply | null {
+    if (!reply.listSections || reply.listSections.length === 0) {
+      return null;
+    }
+
+    const allRows = reply.listSections.flatMap((section) => section.rows || []);
+    if (allRows.length === 0) {
+      return null;
+    }
+
+    const preferredOrder = ['edit_ubicacion', 'edit_rol', 'edit_experiencia', 'edit_horario', 'cmd_cancelar'];
+    const uniqueRows = allRows.filter((row, index, arr) => arr.findIndex((candidate) => candidate.id === row.id) === index);
+    const orderedRows = [
+      ...preferredOrder
+        .map((id) => uniqueRows.find((row) => row.id === id))
+        .filter((row): row is NonNullable<typeof row> => Boolean(row)),
+      ...uniqueRows.filter((row) => !preferredOrder.includes(row.id)),
+    ];
+
+    const selectedRows = orderedRows.slice(0, 3);
+    if (selectedRows.length === 0) {
+      return null;
+    }
+
+    const hintOptions = orderedRows
+      .slice(0, 5)
+      .map((row) => this.canonicalRowTitles[row.id] || row.title)
+      .join(', ');
+
+    return {
+      text: `${reply.text}\n\nSi no ves tu opcion, puedes escribirla directamente: ${hintOptions}.`,
+      buttons: selectedRows.map((row) => ({
+        id: row.id,
+        title: this.canonicalRowTitles[row.id] || row.title,
+      })),
+    };
+  }
+
   /**
    * Guarda un mensaje saliente en el historial (para mostrar en admin)
    */
@@ -471,24 +539,24 @@ export class WhatsappService {
       }
 
       // Enviar mensaje principal (sin preMessage ni delayedMessage)
-      await this.provider.sendMessage(to, mainReply);
+      const deliveredMainReply = await this.sendMainReplyWithInteractiveFallback(to, mainReply);
       this.logger.log(`Mensaje enviado a ${to}`);
 
       // Guardar en historial (centralizado aquí)
       if (userId) {
         const metadata: any = {
-          type: sanitizedReply.buttons ? 'interactive' : 'text',
+          type: deliveredMainReply.buttons || deliveredMainReply.listSections ? 'interactive' : 'text',
           source: options?.source || 'scheduler',
         };
-        if (sanitizedReply.buttons) {
-          metadata.buttons = sanitizedReply.buttons;
+        if (deliveredMainReply.buttons) {
+          metadata.buttons = deliveredMainReply.buttons;
         }
-        if (sanitizedReply.listTitle) {
-          metadata.listTitle = sanitizedReply.listTitle;
-          metadata.listSections = sanitizedReply.listSections;
+        if (deliveredMainReply.listTitle) {
+          metadata.listTitle = deliveredMainReply.listTitle;
+          metadata.listSections = deliveredMainReply.listSections;
           metadata.type = 'interactive';
         }
-        await this.saveOutboundMessage(userId, sanitizedReply.text || '', metadata);
+        await this.saveOutboundMessage(userId, deliveredMainReply.text || '', metadata);
       }
       // Si hay mensaje retrasado, programar su envío
       if (delayedMessage) {
