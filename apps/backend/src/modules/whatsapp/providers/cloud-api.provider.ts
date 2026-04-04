@@ -79,9 +79,9 @@ export class CloudApiProvider implements IWhatsappProvider {
               text: safeReply.text,
             },
             action: {
-              button: safeReply.listTitle || 'Ver opciones',
+              button: (safeReply.listTitle || 'Ver opciones').substring(0, 20),
               sections: safeReply.listSections.map((section) => ({
-                title: section.title,
+                title: section.title?.substring(0, 24),
                 rows: section.rows.slice(0, 10).map((row) => ({
                   id: row.id,
                   title: row.title.substring(0, 24), // Máximo 24 caracteres
@@ -121,10 +121,14 @@ export class CloudApiProvider implements IWhatsappProvider {
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
+      const transportCode = error?.code || error?.cause?.code || 'unknown';
 
       // Log detallado del error de Meta
       if (error?.response?.data) {
         this.logger.error(`âŒ Error de Meta API: ${JSON.stringify(error.response.data, null, 2)}`);
+      }
+      if (!error?.response?.data) {
+        this.logger.error(`Error de transporte Cloud API (code=${transportCode}): ${errorMessage}`);
       }
 
       this.logger.error(`Error enviando mensaje: ${errorMessage}`, errorStack);

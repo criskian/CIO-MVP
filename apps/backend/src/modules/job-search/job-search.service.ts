@@ -135,7 +135,7 @@ export class JobSearchService {
       const cacheOnlyIfAvailable = options.cacheOnlyIfAvailable === true;
 
       if (forceFreshSearch) {
-        this.logger.log(`🆕 [FORCE_FRESH] Ignorando caché para ${userId}`);
+        this.logger.log(`🆕 [FORCE_FRESH] Ejecutando búsqueda nueva y combinando con caché válido para ${userId}`);
       }
 
       if (cacheOnlyIfAvailable && isCacheValid && cache?.cachedJobs?.length > 0 && !forceFreshSearch) {
@@ -145,14 +145,14 @@ export class JobSearchService {
       } else if (isPremium) {
         // === LOGICA PREMIUM: siempre hacer busqueda nueva y combinar con cache ===
         const cachedJobs =
-          !forceFreshSearch && isCacheValid && Array.isArray(cache?.cachedJobs)
+          isCacheValid && Array.isArray(cache?.cachedJobs)
             ? cache.cachedJobs
             : [];
 
         let apiResult: { jobs: JobPosting[]; nextPageToken?: string };
-        if (!forceFreshSearch && isCacheValid && cache?.nextPageToken) {
+        if (isCacheValid && cache?.nextPageToken) {
           this.logger.log(
-            `🆕 [PREMIUM] Ejecutando nueva busqueda con next_page_token y combinando con cache (${cachedJobs.length})`,
+            `🆕 [PREMIUM] Ejecutando nueva busqueda con next_page_token y combinando con cache (${cachedJobs.length})${forceFreshSearch ? ' [FORCE_FRESH]' : ''}`,
           );
           apiResult = await this.searchJobsSinglePage(searchQuery, cache.nextPageToken);
         } else {
@@ -200,13 +200,31 @@ export class JobSearchService {
           if (cache && cache.profileHash !== profileHash) {
             this.logger.log(`🔄 [FREE] Perfil cambió, iniciando búsqueda nueva...`);
           } else if (forceFreshSearch) {
-            this.logger.log(`🆕 [FREE] Forzando búsqueda nueva por estrategia de conversación`);
+            this.logger.log(`🆕 [FREE] Forzando búsqueda nueva por estrategia de conversación (combinando con caché si es válido)`);
           } else {
             this.logger.log(`🆕 [FREE] Primera búsqueda para este perfil`);
           }
-          const result = await this.searchJobsSinglePage(searchQuery);
-          allJobs = result.jobs;
+
+          const freshToken = forceFreshSearch && isCacheValid ? cache?.nextPageToken : undefined;
+          const result = freshToken
+            ? await this.searchJobsSinglePage(searchQuery, freshToken)
+            : await this.searchJobsSinglePage(searchQuery);
+
+          const cachedJobsForFresh =
+            forceFreshSearch && isCacheValid && Array.isArray(cache?.cachedJobs)
+              ? cache.cachedJobs
+              : [];
+
+          allJobs = cachedJobsForFresh.length > 0
+            ? this.removeDuplicateJobs([...cachedJobsForFresh, ...result.jobs])
+            : result.jobs;
           newNextPageToken = result.nextPageToken;
+
+          if (forceFreshSearch) {
+            this.logger.log(
+              `📊 [FREE][FORCE_FRESH] Pool final combinado: cache=${cachedJobsForFresh.length}, api=${result.jobs.length}, total_unico=${allJobs.length}`,
+            );
+          }
         } else {
           // Cache válido pero sin ofertas ni token - ofertas agotadas
           this.logger.log(`⚠️ [FREE] Sin ofertas disponibles para este perfil`);
@@ -214,7 +232,10 @@ export class JobSearchService {
         }
       }
 
-      // 6. Registrar en log
+      // 6. Ponderar siempre el pool completo final (cache + API) antes de decidir envios.
+      allJobs = this.rankJobs(this.removeDuplicateJobs(allJobs), searchQuery);
+
+      // 7. Registrar en log
       await this.logSearch(userId, {
         jobs: allJobs,
         total: allJobs.length,
@@ -222,10 +243,10 @@ export class JobSearchService {
         executedAt: new Date(),
       });
 
-      // 7. Filtrar ofertas ya enviadas
+      // 8. Filtrar ofertas ya enviadas
       const filteredJobs = await this.filterAlreadySentJobs(userId, allJobs);
 
-      // 8. Separar: maxResults para enviar, resto para cache
+      // 9. Separar: maxResults para enviar, resto para cache
       const jobsToSend = filteredJobs.slice(0, maxResults);
       const jobsToCache = filteredJobs.slice(maxResults);
 
@@ -236,7 +257,7 @@ export class JobSearchService {
         `✅ Búsqueda completada: ${jobsToSend.length} para enviar, ${jobsToCache.length} para caché${offersExhausted ? ' (OFERTAS AGOTADAS)' : ''}`,
       );
 
-      // 9. Guardar cache actualizado en sesión
+      // 10. Guardar cache actualizado en sesión
       if (session) {
         await this.prisma.session.update({
           where: { id: session.id },
@@ -1528,12 +1549,20 @@ export class JobSearchService {
    * Retorna null si no se puede determinar
    */
   private getJobAgeDays(job: JobPosting): number | null {
-    if (!job.publishedAt) {
+    const rawPublishedAt = (job as JobPosting & { publishedAt?: Date | string }).publishedAt;
+    if (!rawPublishedAt) {
+      return null;
+    }
+
+    const publishedAt =
+      rawPublishedAt instanceof Date ? rawPublishedAt : new Date(rawPublishedAt);
+
+    if (Number.isNaN(publishedAt.getTime())) {
       return null;
     }
 
     const now = new Date();
-    const diffMs = now.getTime() - job.publishedAt.getTime();
+    const diffMs = now.getTime() - publishedAt.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
     return diffDays >= 0 ? diffDays : null;

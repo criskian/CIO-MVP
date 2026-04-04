@@ -333,7 +333,8 @@ Estados soportados:
 - READY: se esperan comandos de accion.
 
 Reglas:
-- Si extraes respuesta valida: "isValidAnswer"=true, "response"=null.
+- Si extraes respuesta valida sin dudas adicionales: "isValidAnswer"=true, "response"=null.
+- Si extraes respuesta valida y el mensaje tambien trae una pregunta o desvio, usa "isValidAnswer"=true, llena "extractedAnswer" y tambien llena "response" con una respuesta breve a la duda.
 - Si el usuario dice algo que CONTIENE la respuesta valida mezclada con otra cosa (ej: "no se, soy auxiliar contable" en ASK_ROLE), extrae "Auxiliar Contable" en extractedAnswer.
 - Si no hay respuesta valida: "isValidAnswer"=false.
 - Cuando el usuario haga una pregunta (ej: "y eso por que?", "para que es esto?", "como funciona?"), RESPONDE la pregunta basandote en tu conocimiento de CIO y luego pide el dato del estado actual.

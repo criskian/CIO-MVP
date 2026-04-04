@@ -38,6 +38,9 @@ import {
   alertFrequencyToText,
   generateTimeOptions,
   getFirstName,
+  isLikelyHumanNameInput,
+  extractLikelyHumanName,
+  isPricingOrPlanQuestion,
 } from './helpers/input-validators';
 import {
   FREEMIUM_POLICY_V2,
@@ -144,6 +147,15 @@ export class ConversationService {
           if (forcedSearchReply) {
             return forcedSearchReply;
           }
+          const outOfFlowResponse = await this.tryHandleOutOfFlow(
+            user.id,
+            text || '',
+            session.state,
+            intent,
+          );
+          if (outOfFlowResponse) {
+            return outOfFlowResponse;
+          }
           return await this.handleStateTransition(user.id, session.state, text || '', intent);
         }
         // Si por alguna razón no tiene sesión en WA_ASK_NAME, ponerlo ahí
@@ -161,6 +173,15 @@ export class ConversationService {
         );
         if (forcedSearchReply) {
           return forcedSearchReply;
+        }
+        const outOfFlowResponse = await this.tryHandleOutOfFlow(
+          user.id,
+          text || '',
+          session.state,
+          preRegistrationIntent,
+        );
+        if (outOfFlowResponse) {
+          return outOfFlowResponse;
         }
         return await this.handleStateTransition(user.id, session.state, text || '', preRegistrationIntent);
       }
@@ -488,29 +509,123 @@ export class ConversationService {
     ]);
 
     if (!interactiveStates.has(currentState)) return null;
+    if (currentState === ConversationState.LEAD_WAIT_INTEREST) return null;
     if (this.isCriticalCommandBeforeAi(text, intent)) return null;
-    if (this.isLikelyValidAnswerForState(currentState, text, intent)) return null;
+    if (this.isLikelyValidAnswerForState(currentState, text, intent)) {
+      this.logger.debug(`STATE_GUARD valid_answer=true state=${currentState}`);
+      return null;
+    }
+    this.logger.log(`STATE_GUARD valid_answer=false state=${currentState}`);
 
     if (currentState === ConversationState.READY && this.shouldRedirectToEditFlow(text, intent)) {
       return await this.redirectReadyUserToEditFlow(userId);
     }
 
     const outOfFlow = await this.llmService.handleOutOfFlowMessage(text, currentState);
+    const normalizedResponseFromExtraction = this.normalizeConversationalMessage(outOfFlow?.response || null);
+
     if (outOfFlow?.isValidAnswer && outOfFlow.extractedAnswer) {
       const extracted = outOfFlow.extractedAnswer.trim();
       if (extracted.length > 0) {
         const extractedIntent = detectIntent(extracted);
-        this.logger.log(`IA extrajo respuesta valida en ${currentState}: "${extracted}"`);
-        return await this.handleStateTransition(userId, currentState, extracted, extractedIntent);
+        this.logger.log(`STATE_GUARD action=continue_with_extracted state=${currentState} extracted=${JSON.stringify(extracted)}`);
+        const transitionReply = await this.handleStateTransition(userId, currentState, extracted, extractedIntent);
+
+        if (normalizedResponseFromExtraction) {
+          return this.attachPreMessageToReply(
+            transitionReply,
+            this.clampToMaxLines(normalizedResponseFromExtraction, 5),
+          );
+        }
+
+        return transitionReply;
       }
+    }
+
+    const shouldSkipHeuristicFallback =
+      Boolean(normalizedResponseFromExtraction)
+      && !(outOfFlow?.isValidAnswer && outOfFlow.extractedAnswer);
+
+    if (!shouldSkipHeuristicFallback) {
+      const fallbackExtracted = this.extractFallbackAnswerForState(currentState, text);
+      if (fallbackExtracted) {
+        const extractedIntent = detectIntent(fallbackExtracted);
+        if (this.isLikelyValidAnswerForState(currentState, fallbackExtracted, extractedIntent)) {
+          this.logger.log(`STATE_GUARD action=continue_with_extracted state=${currentState} extracted=${JSON.stringify(fallbackExtracted)}`);
+          let transitionReply = await this.handleStateTransition(userId, currentState, fallbackExtracted, extractedIntent);
+
+          if (normalizedResponseFromExtraction) {
+            transitionReply = this.attachPreMessageToReply(
+              transitionReply,
+              this.clampToMaxLines(normalizedResponseFromExtraction, 5),
+            );
+          } else if (isPricingOrPlanQuestion(text)) {
+            this.logger.log(`STATE_GUARD faq_detected=true state=${currentState}`);
+            transitionReply = this.attachPreMessageToReply(
+              transitionReply,
+              this.clampToMaxLines(BotMessages.FAQ_PRICING_BRIEF, 5),
+            );
+          }
+
+          return transitionReply;
+        }
+      }
+    }
+
+    const faqDetected = isPricingOrPlanQuestion(text);
+    if (faqDetected) {
+      this.logger.log(`STATE_GUARD faq_detected=true state=${currentState}`);
     }
 
     const aiResponse = outOfFlow?.response
       || await this.llmService.generateConversationalResponse(text, currentState);
     const fallback = this.getOutOfFlowFallbackMessage(currentState);
-    const message = this.normalizeConversationalMessage(aiResponse) || fallback;
+    const message = faqDetected
+      ? BotMessages.FAQ_PRICING_BRIEF
+      : (this.normalizeConversationalMessage(aiResponse) || fallback);
     const conciseMessage = this.clampToMaxLines(message, 5);
+    this.logger.log(`STATE_GUARD action=reply_and_stay state=${currentState}`);
     return await this.buildOutOfFlowReinforcementReply(userId, currentState, conciseMessage);
+  }
+
+  private attachPreMessageToReply(reply: BotReply, preMessageText: string): BotReply {
+    const preText = preMessageText.trim();
+    if (!preText) return reply;
+
+    if (reply.preMessage?.text?.trim()) {
+      return {
+        ...reply,
+        preMessage: {
+          text: `${preText}\n\n${reply.preMessage.text.trim()}`,
+        },
+      };
+    }
+
+    return {
+      ...reply,
+      preMessage: { text: preText },
+    };
+  }
+
+  private extractFallbackAnswerForState(currentState: string, text: string): string | null {
+    if (
+      currentState === ConversationState.LEAD_REGISTER_NAME
+      || currentState === ConversationState.WA_ASK_NAME
+    ) {
+      return extractLikelyHumanName(text);
+    }
+
+    if (
+      currentState === ConversationState.LEAD_REGISTER_EMAIL
+      || currentState === ConversationState.WA_ASK_EMAIL
+      || currentState === ConversationState.ASK_EMAIL
+      || currentState === ConversationState.WAITING_PAYMENT
+    ) {
+      const emailMatch = text.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
+      return emailMatch?.[0]?.trim().toLowerCase() || null;
+    }
+
+    return null;
   }
 
   private normalizeConversationalMessage(message: string | null): string | null {
@@ -585,6 +700,31 @@ export class ConversationService {
     return criticalPatterns.some((pattern) => normalized.includes(pattern));
   }
 
+  private isSearchNowOverrideBlockedState(currentState: string): boolean {
+    if (currentState.startsWith('LEAD_')) return true;
+
+    const blockedStates = new Set<string>([
+      ConversationState.NEW,
+      ConversationState.WA_ASK_NAME,
+      ConversationState.WA_ASK_EMAIL,
+      ConversationState.ASK_TERMS,
+      ConversationState.ASK_ROLE,
+      ConversationState.ASK_EXPERIENCE,
+      ConversationState.ASK_LOCATION,
+      ConversationState.OFFER_ALERTS,
+      ConversationState.ASK_ALERT_TIME,
+      ConversationState.ASK_EMAIL,
+      ConversationState.WAITING_PAYMENT,
+      ConversationState.PREMIUM_ASK_CV,
+      ConversationState.PREMIUM_WAITING_CV_FILE,
+      ConversationState.PREMIUM_PROCESSING_CV,
+      ConversationState.PREMIUM_CONFIRM_CV_PROFILE,
+      ConversationState.PREMIUM_DIAGNOSIS,
+    ]);
+
+    return blockedStates.has(currentState);
+  }
+
   private async tryHandleGlobalSearchNowOverride(
     userId: string,
     currentState: string,
@@ -593,6 +733,10 @@ export class ConversationService {
   ): Promise<BotReply | null> {
     if (intent !== UserIntent.SEARCH_NOW) return null;
     if (currentState === ConversationState.READY) return null;
+    if (this.isSearchNowOverrideBlockedState(currentState)) {
+      this.logger.log(`LEAD_DIAG_LOCK search_override_blocked state=${currentState} userId=${userId}`);
+      return null;
+    }
 
     this.logger.log(
       `Comando de busqueda detectado en estado ${currentState}. Se cancela el flujo activo y se redirige a READY.`,
@@ -610,7 +754,7 @@ export class ConversationService {
     const normalized = this.normalizeLeadSignalToken(text);
     const trimmed = text.trim();
     const hasEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed.toLowerCase());
-    const hasName = trimmed.length >= 2 && trimmed.length <= 50 && /[a-zA-Z\u00C0-\u017F]/.test(trimmed);
+    const hasName = isLikelyHumanNameInput(trimmed);
 
     if (currentState === ConversationState.EDITING_PROFILE) {
       return Boolean(detectEditField(text)) || normalized === 'cancelar';
@@ -708,11 +852,6 @@ export class ConversationService {
       || currentState === ConversationState.ASK_EMAIL
       || currentState === ConversationState.WAITING_PAYMENT) {
       return hasEmail;
-    }
-
-    // En estado EDITING_PROFILE, toda respuesta es valida (seleccion de campo a editar)
-    if (currentState === ConversationState.EDITING_PROFILE) {
-      return true;
     }
 
     if (currentState === ConversationState.LEAD_REGISTER_NAME
@@ -885,6 +1024,26 @@ export class ConversationService {
     if (currentState === ConversationState.LEAD_TERMS_CONSENT) {
       const termsReply = this.buildLeadTermsConsentReply();
       return { ...termsReply, text: message };
+    }
+
+    if (
+      currentState === ConversationState.LEAD_REGISTER_NAME
+      || currentState === ConversationState.WA_ASK_NAME
+    ) {
+      return {
+        text: `${message}\n\nPara continuar con el registro, escribeme tu nombre completo.`,
+      };
+    }
+
+    if (
+      currentState === ConversationState.LEAD_REGISTER_EMAIL
+      || currentState === ConversationState.WA_ASK_EMAIL
+      || currentState === ConversationState.ASK_EMAIL
+      || currentState === ConversationState.WAITING_PAYMENT
+    ) {
+      return {
+        text: `${message}\n\nPara continuar, escribeme tu correo electronico.`,
+      };
     }
 
     if (currentState === ConversationState.OFFER_ALERTS) {
@@ -1485,7 +1644,7 @@ export class ConversationService {
     return await this.handleLeadShowFirstVacancyState(userId);
   }
 
-  private buildLeadVacancyMessage(job: JobPosting): string {
+  private buildLeadVacancyMessage(job: Partial<JobPosting>): string {
     return this.buildFreemiumV2SingleVacancyMessage(job);
   }
 
@@ -1632,6 +1791,125 @@ export class ConversationService {
       ...initialResult,
       jobs: reranked,
     };
+  }
+
+  private async decideFreeSearchStrategy(
+    userId: string,
+    maxResults: number,
+    role: string | null,
+    location: string | null,
+  ): Promise<{ strategy: 'reuse_cache' | 'force_fresh'; confidence: number; rationale: string }> {
+    const sessionData = await this.getLatestSessionData(userId);
+    const cache = (sessionData?.jobSearchCache as Record<string, any> | undefined) || {};
+    const cachedJobs = Array.isArray(cache.cachedJobs)
+      ? cache.cachedJobs as Array<{ locationRaw?: string | null }>
+      : [];
+    const hasNextPageToken = typeof cache.nextPageToken === 'string' && cache.nextPageToken.trim().length > 0;
+
+    let cacheAgeMinutes: number | null = null;
+    if (typeof cache.lastSearchAt === 'string') {
+      const cacheDate = new Date(cache.lastSearchAt);
+      if (!Number.isNaN(cacheDate.getTime())) {
+        cacheAgeMinutes = Math.max(0, Math.floor((Date.now() - cacheDate.getTime()) / 60000));
+      }
+    }
+
+    const cityMatchRatio = this.calculateCityMatchRatio(cachedJobs, location);
+    const decision = await this.llmService.decideFreeSearchStrategy({
+      cacheCount: cachedJobs.length,
+      hasNextPageToken,
+      cacheAgeMinutes,
+      cityMatchRatio,
+      role,
+      location,
+      targetResults: maxResults,
+    });
+
+    return decision;
+  }
+
+  private applyDeterministicCityPriority(
+    jobs: JobPosting[],
+    targetLocation: string | null | undefined,
+  ): JobPosting[] {
+    if (!targetLocation || jobs.length <= 1) {
+      return jobs;
+    }
+
+    const ranked = jobs
+      .map((job, index) => ({
+        job,
+        index,
+        cityTier: this.getCityMatchTier(job.locationRaw, targetLocation),
+        score: typeof job.score === 'number' ? job.score : Number.NEGATIVE_INFINITY,
+      }))
+      .sort((a, b) => {
+        if (b.cityTier !== a.cityTier) return b.cityTier - a.cityTier;
+        if (b.score !== a.score) return b.score - a.score;
+        return a.index - b.index;
+      });
+
+    return ranked.map((item) => item.job);
+  }
+
+  private calculateCityMatchRatio(
+    jobs: Array<{ locationRaw?: string | null }>,
+    targetLocation: string | null | undefined,
+  ): number {
+    if (!targetLocation || jobs.length === 0) return 0;
+    const matches = jobs.filter((job) => this.getCityMatchTier(job.locationRaw, targetLocation) > 0).length;
+    return matches / jobs.length;
+  }
+
+  private getCityMatchTier(
+    jobLocation: string | null | undefined,
+    targetLocation: string | null | undefined,
+  ): number {
+    const normalizedJob = this.normalizeLocationForComparison(jobLocation);
+    const normalizedTarget = this.normalizeLocationForComparison(targetLocation);
+    if (!normalizedJob || !normalizedTarget) return 0;
+
+    const jobPrimary = this.extractPrimaryLocationForComparison(normalizedJob);
+    const targetPrimary = this.extractPrimaryLocationForComparison(normalizedTarget);
+
+    if (targetPrimary === 'remoto' || targetPrimary === 'remote') {
+      if (/(^|\s)(remoto|remote|teletrabajo|work from home)(\s|$)/i.test(normalizedJob)) {
+        return 3;
+      }
+      return 0;
+    }
+
+    if (jobPrimary && targetPrimary && jobPrimary === targetPrimary) return 3;
+    if (normalizedJob === normalizedTarget) return 3;
+    if (
+      (targetPrimary && normalizedJob.includes(targetPrimary))
+      || (jobPrimary && normalizedTarget.includes(jobPrimary))
+      || normalizedJob.includes(normalizedTarget)
+      || normalizedTarget.includes(normalizedJob)
+    ) {
+      return 2;
+    }
+
+    const targetWords = targetPrimary.split(' ').filter((word) => word.length > 2);
+    if (targetWords.length > 0 && targetWords.every((word) => normalizedJob.includes(word))) {
+      return 1;
+    }
+
+    return 0;
+  }
+
+  private extractPrimaryLocationForComparison(value: string): string {
+    return value.split(',')[0]?.trim() || value.trim();
+  }
+
+  private normalizeLocationForComparison(value: string | null | undefined): string {
+    if (!value) return '';
+    return value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private normalizeLeadTextForComparison(text: string | null | undefined): string {
@@ -2020,6 +2298,8 @@ export class ConversationService {
       || /\b\d+\s*(ano|anos|año|años)\b/i.test(normalized)
     ) return 'experience';
     if (normalized.includes('cargo') || normalized.includes('rol') || normalized.includes('puesto')) return 'role';
+    const detectedLocations = extractNormalizedLocations(text);
+    if (detectedLocations.length > 0) return 'location';
     if (normalized.includes('ciudad') || normalized.includes('ubicacion') || normalized.includes('pais')) return 'location';
     if (normalized.includes('empresa')) return 'company';
     if (normalized.includes('salario') || normalized.includes('sueldo')) return 'salary';
@@ -2253,6 +2533,191 @@ export class ConversationService {
     };
   }
 
+  private buildLeadInterestButtons(): Array<{ id: string; title: string }> {
+    return [
+      { id: 'lead_interest_yes', title: 'Sí, me interesó' },
+      { id: 'lead_interest_no', title: 'No me interesó' },
+    ];
+  }
+
+  private async extractImplicitLeadPreferenceAdjustments(
+    text: string,
+  ): Promise<{
+    updates: Partial<{ role: string; location: string; experienceLevel: string }>;
+    reason: LeadRejectionReason;
+    confidence: number;
+    reasonSource: LeadRejectionReasonSource;
+    metadata: Record<string, any>;
+  } | null> {
+    const updates: Partial<{ role: string; location: string; experienceLevel: string }> = {};
+    const updatedFields: string[] = [];
+    let reason: LeadRejectionReason | null = null;
+    let usedHeuristic = false;
+    let usedLlm = false;
+
+    const normalizedText = this.normalizeLeadSignalToken(text);
+    const explicitRemote = /\b(remoto|remote|desde casa|home office|teletrabajo)\b/i.test(
+      normalizedText,
+    );
+
+    if (explicitRemote) {
+      updates.location = 'Remoto';
+      updatedFields.push('location');
+      reason = 'remote';
+      usedHeuristic = true;
+    }
+
+    if (!updates.location) {
+      const extractedLocations = extractNormalizedLocations(text);
+      if (extractedLocations.length === 1) {
+        const normalizedLocation = validateAndNormalizeLocation(extractedLocations[0]);
+        if (normalizedLocation.isValid && normalizedLocation.location) {
+          updates.location = normalizedLocation.location;
+          updatedFields.push('location');
+          reason = reason || 'location';
+          usedHeuristic = true;
+        }
+      }
+    }
+
+    const directExperience = normalizeExperienceLevel(text);
+    if (directExperience) {
+      updates.experienceLevel = directExperience;
+      updatedFields.push('experienceLevel');
+      reason = reason || 'experience';
+      usedHeuristic = true;
+    }
+
+    const inferred = await this.inferLeadSignals(text);
+    const inferenceConfidence = Number.isFinite(inferred.confidence) ? inferred.confidence : 0;
+
+    if (!updates.location && inferred.modality === 'remote' && inferenceConfidence >= 0.7) {
+      updates.location = 'Remoto';
+      updatedFields.push('location');
+      reason = reason || 'remote';
+      usedLlm = true;
+    }
+
+    if (!updates.location && inferred.location && inferenceConfidence >= 0.7) {
+      const inferredLocation = validateAndNormalizeLocation(inferred.location);
+      if (inferredLocation.isValid && inferredLocation.location) {
+        updates.location = inferredLocation.location;
+        updatedFields.push('location');
+        reason = reason || 'location';
+        usedLlm = true;
+      }
+    }
+
+    if (!updates.experienceLevel && inferred.experienceLevel && inferenceConfidence >= 0.65) {
+      updates.experienceLevel = inferred.experienceLevel;
+      updatedFields.push('experienceLevel');
+      reason = reason || 'experience';
+      usedLlm = true;
+    }
+
+    const roleHintPattern =
+      /\b(rol|cargo|puesto|soy|trabajo como|quiero trabajar como|vacantes de|ofertas de|busco|buscar)\b/i;
+    const explicitRoleKeyword = /\b(rol|cargo|puesto|soy|trabajo como|quiero trabajar como)\b/i.test(text);
+    if (
+      !updates.role
+      && inferred.role
+      && inferenceConfidence >= 0.72
+      && roleHintPattern.test(text)
+      && (explicitRoleKeyword || !updates.location)
+      && !isNonRoleInput(inferred.role)
+      && !isPricingOrPlanQuestion(text)
+    ) {
+      const normalizedRole = normalizeRole(inferred.role);
+      if (normalizedRole) {
+        updates.role = normalizedRole;
+        updatedFields.push('role');
+        reason = reason || 'role';
+        usedLlm = true;
+      }
+    }
+
+    if (updatedFields.length === 0) {
+      return null;
+    }
+
+    const effectiveReason =
+      reason
+      || (updates.location ? 'location' : updates.role ? 'role' : updates.experienceLevel ? 'experience' : 'other');
+    const reasonSource: LeadRejectionReasonSource =
+      usedLlm && !usedHeuristic ? 'llm' : 'free_text';
+
+    return {
+      updates,
+      reason: effectiveReason,
+      confidence: usedLlm ? Math.max(0.6, inferenceConfidence) : 0.9,
+      reasonSource,
+      metadata: {
+        updatedFields,
+        usedHeuristic,
+        usedLlm,
+        inferredConfidence: inferenceConfidence,
+      },
+    };
+  }
+
+  private async continueLeadAfterImplicitPreferenceAdjustment(
+    userId: string,
+    text: string,
+    implicitAdjustment: {
+      updates: Partial<{ role: string; location: string; experienceLevel: string }>;
+      reason: LeadRejectionReason;
+      confidence: number;
+      reasonSource: LeadRejectionReasonSource;
+      metadata: Record<string, any>;
+    },
+  ): Promise<BotReply> {
+    await this.updateUserProfile(userId, implicitAdjustment.updates);
+
+    this.logger.log(
+      `LEAD_WAIT_INTEREST implicit_rejection_detected reason=${implicitAdjustment.reason} updated_fields=${implicitAdjustment.metadata.updatedFields.join(',')} userId=${userId}`,
+    );
+
+    await this.persistLeadFeedback(userId, {
+      interested: false,
+      reason: implicitAdjustment.reason,
+      reasonText: text,
+      reasonSource: implicitAdjustment.reasonSource,
+      confidence: implicitAdjustment.confidence,
+      metadata: {
+        implicitAdjustment: true,
+        ...implicitAdjustment.metadata,
+      },
+    });
+    await this.persistLeadSignalInSession(userId, {
+      interested: false,
+      reason: implicitAdjustment.reason,
+      reasonText: text,
+      reasonSource: implicitAdjustment.reasonSource,
+      confidence: implicitAdjustment.confidence,
+      metadata: {
+        implicitAdjustment: true,
+        ...implicitAdjustment.metadata,
+      },
+    });
+
+    await this.updateSessionState(userId, ConversationState.LEAD_SHOW_FIRST_VACANCY);
+    this.logger.log(`LEAD_WAIT_INTEREST diagnostic_search_triggered mode=force_fresh userId=${userId}`);
+    const nextVacancyReply = await this.handleLeadShowFirstVacancyState(
+      userId,
+      'force_fresh',
+      {
+        rejectionReason: implicitAdjustment.reason,
+        implicitAdjustment: true,
+        updatedFields: implicitAdjustment.metadata.updatedFields,
+      },
+    );
+
+    return {
+      ...nextVacancyReply,
+      text: `Perfecto, ajusto tu perfil y te muestro una oferta mas alineada.\n\n${nextVacancyReply.text}`,
+    };
+  }
+
   private async handleLeadWaitInterestState(
     userId: string,
     text: string,
@@ -2343,7 +2808,17 @@ export class ConversationService {
       return this.buildLeadTermsConsentReply();
     }
 
+    const implicitAdjustment = await this.extractImplicitLeadPreferenceAdjustments(text);
+
     if (isNegativeInterest) {
+      if (implicitAdjustment) {
+        return await this.continueLeadAfterImplicitPreferenceAdjustment(
+          userId,
+          text,
+          implicitAdjustment,
+        );
+      }
+
       await this.updateSessionState(userId, ConversationState.LEAD_WAIT_REJECTION_REASON);
       return {
         text: BotMessages.V2_REJECTION_REASON,
@@ -2364,18 +2839,30 @@ export class ConversationService {
       };
     }
 
+    if (implicitAdjustment) {
+      return await this.continueLeadAfterImplicitPreferenceAdjustment(
+        userId,
+        text,
+        implicitAdjustment,
+      );
+    }
+
+    const conversational = this.normalizeConversationalMessage(
+      await this.llmService.generateConversationalResponse(text, ConversationState.LEAD_WAIT_INTEREST),
+    );
+    this.logger.log(`LEAD_WAIT_INTEREST reply_and_stay userId=${userId}`);
+
     return {
-      text: 'Para seguir, elige una opción:',
-      buttons: [
-        { id: 'lead_interest_yes', title: 'Sí, me interesó' },
-        { id: 'lead_interest_no', title: 'No me interesó' },
-      ],
+      text: conversational
+        ? `${this.clampToMaxLines(conversational, 4)}\n\nPara seguir, dime si la oferta te intereso o no.`
+        : 'Para seguir, dime si la oferta te intereso o no.',
+      buttons: this.buildLeadInterestButtons(),
     };
   }
 
   private async handleLeadWaitRejectionReasonState(userId: string, text: string): Promise<BotReply> {
-    const reason = this.resolveLeadRejectionReason(text);
     const normalizedText = this.normalizeLeadSignalToken(text);
+    let reason = this.resolveLeadRejectionReason(text);
     const explicitOtherSelection =
       normalizedText === 'reason_other'
       || normalizedText === 'otro motivo'
@@ -2394,10 +2881,38 @@ export class ConversationService {
       'reason_role', 'reason_location', 'reason_company', 'reason_salary', 'reason_remote',
       'cargo', 'ciudad', 'empresa', 'salario', 'remoto',
     ]);
-    const source: LeadRejectionReasonSource = buttonIds.has(normalizedText) ? 'button' : 'free_text';
+    const isButtonReason = buttonIds.has(normalizedText);
+    let source: LeadRejectionReasonSource = isButtonReason ? 'button' : 'free_text';
+    let confidence: number | null = null;
+    let metadata: Record<string, any> | undefined;
+
+    if (!isButtonReason && reason === 'other') {
+      const classified = await this.llmService.classifyRejectionReason(text);
+      if (classified && classified.reason !== 'other' && (classified.confidence ?? 0) >= 0.68) {
+        reason = classified.reason;
+        source = 'llm';
+        confidence = classified.confidence ?? null;
+        metadata = {
+          classificationRationale: classified.rationale || null,
+        };
+        this.logger.log(
+          `LEAD_WAIT_REJECTION_REASON llm_classified reason=${reason} confidence=${(classified.confidence ?? 0).toFixed(2)} userId=${userId}`,
+        );
+      } else {
+        await this.updateSessionData(userId, { leadPendingRejectionReason: 'other' });
+        await this.updateSessionState(userId, ConversationState.LEAD_WAIT_REJECTION_OTHER_TEXT);
+        this.logger.log(`LEAD_WAIT_REJECTION_REASON need_clarification reason=other userId=${userId}`);
+        return {
+          text: 'Entiendo. Cuentame en una frase breve que no te gusto para ajustar mejor la siguiente oferta.',
+        };
+      }
+    }
+
     return await this.continueLeadAfterRejection(userId, reason, {
       reasonText: text,
       reasonSource: source,
+      confidence,
+      metadata,
     });
   }
 
@@ -2445,9 +2960,10 @@ export class ConversationService {
   }
 
   private async handleLeadRegisterNameState(userId: string, text: string): Promise<BotReply> {
-    const name = text.trim();
+    const extractedName = extractLikelyHumanName(text) || text.trim();
+    const name = extractedName.trim().replace(/\s+/g, ' ');
 
-    if (name.length < 2 || name.length > 50 || !/[a-zA-Z]/.test(name)) {
+    if (!isLikelyHumanNameInput(name)) {
       return {
         text: `Por favor escribe tu nombre completo (entre 2 y 50 caracteres).`,
       };
@@ -2604,19 +3120,13 @@ export class ConversationService {
    * Estado WA_ASK_NAME: Usuario no registrado, pidiendo nombre
    */
   private async handleWaAskNameState(userId: string, text: string): Promise<BotReply> {
-    const name = text.trim();
+    const extractedName = extractLikelyHumanName(text) || text.trim();
+    const name = extractedName.trim().replace(/\s+/g, ' ');
 
     // Validar nombre: mínimo 2 caracteres, máximo 50, solo letras y espacios
-    if (name.length < 2 || name.length > 50) {
+    if (!isLikelyHumanNameInput(name)) {
       return {
         text: 'Por favor, escribe tu *nombre completo* (entre 2 y 50 caracteres).\n\n✏️ Ejemplo: Juan Pérez',
-      };
-    }
-
-    // Validar que contenga al menos letras
-    if (!/[a-zA-ZÀ-ÿ\s]/i.test(name)) {
-      return {
-        text: 'Hmm, eso no parece un nombre válido. Por favor, escribe tu *nombre completo*:',
       };
     }
 
@@ -3878,11 +4388,88 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
    * Estado READY: Usuario completó onboarding
    * ACTUALIZADO: Siempre usa botones/listas interactivas
    */
+  private async sanitizeContaminatedReadyState(userId: string): Promise<BotReply | null> {
+    const [user, subscription] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true, email: true, dataAuthorizationAccepted: true },
+      }),
+      this.prisma.subscription.findUnique({
+        where: { userId },
+        select: { plan: true, status: true },
+      }),
+    ]);
+
+    const sessionData = await this.getLatestSessionData(userId);
+    const flowVariant = this.parseFlowVariant(sessionData.flowVariant);
+    const isPaidPlan = this.isPaidPlanActive(subscription);
+    const missingIdentity = !user?.name || !user?.email;
+    const missingConsent = user?.dataAuthorizationAccepted !== true;
+    const isV2PreRegistrationReady =
+      flowVariant === this.v2FlowVariant
+      && !isPaidPlan
+      && sessionData.leadTrialActivated !== true
+      && (
+        missingIdentity
+        || missingConsent
+      );
+
+    if (!isV2PreRegistrationReady) {
+      return null;
+    }
+
+    this.logger.log(`READY_SANITIZER reroute_to_diagnosis userId=${userId}`);
+
+    const leadSnapshot = sessionData?.leadCurrentVacancy;
+    if (leadSnapshot && typeof leadSnapshot === 'object') {
+      await this.updateSessionState(userId, ConversationState.LEAD_WAIT_INTEREST);
+      return {
+        preMessage: { text: this.buildFreemiumV2SingleVacancyLeadInMessage() },
+        text: this.buildLeadVacancyMessage(leadSnapshot as Partial<JobPosting>),
+        buttons: this.buildLeadInterestButtons(),
+      };
+    }
+
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select: { role: true, location: true, experienceLevel: true },
+    });
+
+    if (!profile?.role) {
+      await this.updateSessionState(userId, ConversationState.LEAD_COLLECT_PROFILE);
+      return { text: BotMessages.V2_WELCOME_ROLE };
+    }
+
+    if (!profile?.location) {
+      await this.updateSessionState(userId, ConversationState.LEAD_ASK_LOCATION);
+      return { text: BotMessages.V2_ASK_LOCATION };
+    }
+
+    if (!profile?.experienceLevel) {
+      await this.updateSessionState(userId, ConversationState.LEAD_ASK_EXPERIENCE);
+      return {
+        text: 'Selecciona tu nivel de experiencia:',
+        listTitle: 'Seleccionar nivel',
+        listSections: this.getLeadExperienceListSections(),
+      };
+    }
+
+    await this.updateSessionState(userId, ConversationState.LEAD_SHOW_FIRST_VACANCY);
+    return await this.handleLeadShowFirstVacancyState(userId, 'force_fresh', {
+      readySanitizer: true,
+    });
+  }
+
   private async handleReadyState(
     userId: string,
     text: string,
     intent: UserIntent,
   ): Promise<BotReply> {
+    const sanitizedReply = await this.sanitizeContaminatedReadyState(userId);
+    if (sanitizedReply) {
+      return sanitizedReply;
+    }
+
     // Detectar intención de reiniciar perfil
     if (isRestartIntent(text)) {
       await this.updateSessionState(userId, ConversationState.CONFIRM_RESTART);
@@ -3920,20 +4507,23 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
 
     // Detectar intención de buscar empleos
     if (intent === UserIntent.SEARCH_NOW) {
-      // PRIMERO: Verificar si hay alertas pendientes de un template notification
-      const isPremiumSearchUser = await this.isPremiumPlanActiveForUser(userId);
-      const pendingAlert = isPremiumSearchUser
-        ? null
-        : await this.getLatestNonStalePendingAlert(userId);
+      // PRIMERO: Verificar si hay alertas pendientes de template (todos los planes)
+      const pendingAlert = await this.getLatestNonStalePendingAlert(userId);
 
       if (pendingAlert) {
-        // Hay ofertas pendientes del template → enviarlas
-        this.logger.log(`📬 Usuario ${userId} tiene ${pendingAlert.jobCount} ofertas pendientes`);
+        const now = new Date();
+        this.logger.log(
+          `SEARCH_NOW: pending encontrado -> entregar pendientes (${pendingAlert.jobCount}) para ${userId}`,
+        );
+        this.logger.log(`SEARCH_NOW: uso no descontado por entrega de pending para ${userId}`);
 
         // Marcar como vistas
         await this.prisma.pendingJobAlert.update({
           where: { id: pendingAlert.id },
-          data: { viewedAt: new Date() },
+          data: {
+            viewedAt: now,
+            sentAt: pendingAlert.sentAt ?? now,
+          },
         });
 
         // Formatear y enviar ofertas (formato multiple estandar)
@@ -3947,6 +4537,8 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
           text: `📢 *📬 Aquí están tus ofertas de empleo!*\n\n${formattedJobs}\n\n💡 _Recuerda: aplicar a vacantes buenas es mejor que aplicar masivamente._`
         };
       }
+
+      this.logger.log(`SEARCH_NOW: pending no encontrado -> estrategia de busqueda por plan para ${userId}`);
 
       // No hay alertas pendientes → hacer búsqueda normal
       // Verificar usos disponibles ANTES de buscar (sin descontar)
@@ -4023,15 +4615,35 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
       const subscription = await this.prisma.subscription.findUnique({ where: { userId } });
       const isPaidPlan = subscription?.plan === 'PREMIUM' || subscription?.plan === 'PRO';
       const maxResults = isPaidPlan ? 5 : 3;
+      const profile = await this.prisma.userProfile.findUnique({
+        where: { userId },
+        select: { role: true, location: true },
+      });
 
-      // Ejecutar búsqueda
-      const baseResult = await this.jobSearchService.searchJobsForUser(userId, maxResults);
+      // Definir estrategia de busqueda por plan.
+      let searchOptions: { forceFreshSearch?: boolean; cacheOnlyIfAvailable?: boolean } = {};
+      if (isPaidPlan) {
+        searchOptions = { forceFreshSearch: true };
+        this.logger.log(`SEARCH_NOW premium: forzando busqueda fresca para ${userId}`);
+      } else {
+        const freeStrategy = await this.decideFreeSearchStrategy(userId, maxResults, profile?.role || null, profile?.location || null);
+        searchOptions = freeStrategy.strategy === 'reuse_cache'
+          ? { cacheOnlyIfAvailable: true }
+          : { forceFreshSearch: true };
+        this.logger.log(
+          `SEARCH_NOW free: estrategia IA=${freeStrategy.strategy} confidence=${freeStrategy.confidence.toFixed(2)} para ${userId}`,
+        );
+      }
+
+      // Ejecutar busqueda
+      const baseResult = await this.jobSearchService.searchJobsForUser(userId, maxResults, searchOptions);
       const result = isPaidPlan
         ? await this.refinePremiumSearchResultWithAi(userId, baseResult, maxResults)
         : await this.refineFreeSearchResultWithAi(userId, baseResult, maxResults);
+      const cityPrioritizedJobs = this.applyDeterministicCityPriority(result.jobs, profile?.location || null);
 
       // Si no hay ofertas, sugerir roles alternativos con IA
-      if (result.jobs.length === 0) {
+      if (cityPrioritizedJobs.length === 0) {
         if (result.offersExhausted) {
           return {
             outcome: 'no_results',
@@ -4057,10 +4669,10 @@ Actualmente tienes el Plan Free: 5 búsquedas por una semana.
         };
       }
 
-      const formattedJobs = this.jobSearchService.formatJobsForWhatsApp(result.jobs);
+      const formattedJobs = this.jobSearchService.formatJobsForWhatsApp(cityPrioritizedJobs);
       const primarySearchMessage = formattedJobs;
 
-      await this.jobSearchService.markJobsAsSent(userId, result.jobs);
+      await this.jobSearchService.markJobsAsSent(userId, cityPrioritizedJobs);
 
       let exhaustedMessage = '';
       if (result.offersExhausted && result.jobs.length === 0) {
@@ -4145,13 +4757,18 @@ Puedes ir a *Editar perfil* y ajustar tu rol, ciudad o preferencias.
         diagnosisText = diagnosis?.userMessage || null;
       }
 
-      const editMenu = await this.showProfileForEditing(userId);
+      await this.updateSessionState(userId, ConversationState.READY);
+
+      const diagnosisForUser = diagnosisText
+        || 'No pude buscar ofertas en este momento por un problema temporal.';
+      const menuReply = await this.returnToMainMenu(
+        userId,
+        `${diagnosisForUser}\n\nIntenta de nuevo ahora o en unos minutos.`,
+      );
+
       return {
         outcome: 'error',
-        reply: {
-          ...editMenu,
-          text: `${diagnosisText || 'No pude buscar ofertas en este momento. Ajusta tu perfil y vuelve a intentar.'}\n\n${editMenu.text || ''}`,
-        },
+        reply: menuReply,
       };
     }
   }

@@ -53,6 +53,12 @@ export interface PremiumSearchExpansionDecision {
   rationale: string;
 }
 
+export interface FreeSearchStrategyDecision {
+  strategy: 'reuse_cache' | 'force_fresh';
+  confidence: number;
+  rationale: string;
+}
+
 export interface PremiumJobRerankResult {
   orderedIndexes: number[];
   rationale: string;
@@ -513,6 +519,55 @@ export class LlmService {
       shouldFetchMore: parsed.shouldFetchMore === true,
       confidence,
       rationale: parsed.rationale || fallbackDecision.rationale,
+    };
+  }
+
+  /**
+   * Decide la estrategia de busqueda para plan free: reutilizar cache o forzar fresh.
+   * Si IA no esta disponible, usa un fallback local conservador.
+   */
+  async decideFreeSearchStrategy(input: {
+    cacheCount: number;
+    hasNextPageToken: boolean;
+    cacheAgeMinutes: number | null;
+    cityMatchRatio: number;
+    role?: string | null;
+    location?: string | null;
+    targetResults: number;
+  }): Promise<FreeSearchStrategyDecision> {
+    const hasCoverage = input.cacheCount >= input.targetResults;
+    const fallback: FreeSearchStrategyDecision = {
+      strategy: hasCoverage ? 'reuse_cache' : 'force_fresh',
+      confidence: 0.6,
+      rationale: hasCoverage
+        ? 'Fallback local: cache con cobertura suficiente.'
+        : 'Fallback local: cache insuficiente, se fuerza busqueda nueva.',
+    };
+
+    const systemPrompt = [
+      'Eres un decisor de estrategia de busqueda para plan free en un bot de empleo.',
+      'Responde SOLO JSON valido con: {"strategy":"reuse_cache|force_fresh","confidence":number,"rationale":string}.',
+      'Criterio principal: si cacheCount >= targetResults, prefiere reuse_cache.',
+      'Si cacheCount < targetResults, prefiere force_fresh.',
+      'Usa hasNextPageToken, cacheAgeMinutes y cityMatchRatio como factores secundarios.',
+      'confidence debe estar entre 0 y 1.',
+    ].join('\n');
+
+    const raw = await this.callOpenAI(systemPrompt, JSON.stringify(input));
+    if (!raw) return fallback;
+
+    const parsed = this.parseJSON<FreeSearchStrategyDecision>(raw, fallback);
+    const strategy = parsed.strategy === 'reuse_cache' || parsed.strategy === 'force_fresh'
+      ? parsed.strategy
+      : fallback.strategy;
+    const confidence = Number.isFinite(parsed.confidence)
+      ? Math.min(1, Math.max(0, parsed.confidence))
+      : fallback.confidence;
+
+    return {
+      strategy,
+      confidence,
+      rationale: parsed.rationale || fallback.rationale,
     };
   }
 
