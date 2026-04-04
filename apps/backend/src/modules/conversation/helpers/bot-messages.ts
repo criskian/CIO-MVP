@@ -158,6 +158,14 @@ Durante esta semana te enviaremos ofertas seg\u00FAn tu b\u00FAsqueda.
 
 No tienes que entrar a los portales, nosotros las buscamos por ti.`,
 
+  FAQ_PRICING_BRIEF: `Al terminar la prueba gratuita, puedes elegir:
+\u2B50 CIO Premium: $20.000 COP por 30 dias
+\u{1F3C6} CIO Pro: $54.000 COP por 90 dias
+
+Puedes ver los planes y pagar aqui:
+Premium: ${WOMPI_CHECKOUT_LINK}
+Pro: ${WOMPI_CHECKOUT_LINK_PRO}`,
+
   ASK_ROLE: `\u00A1Genial! \u{1F3AF}
 
 *\u00BFCu\u00E1l es el cargo o profesi\u00F3n PRINCIPAL en el que est\u00E1s buscando empleo?*

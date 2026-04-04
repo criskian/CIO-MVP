@@ -404,6 +404,109 @@ export function detectIntent(text: string): UserIntent {
   return UserIntent.UNKNOWN;
 }
 
+function normalizeSemanticText(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function isPricingOrPlanQuestion(text: string): boolean {
+  const normalized = normalizeSemanticText(text);
+  if (!normalized) return false;
+
+  const pricingKeywords = [
+    'precio',
+    'valor',
+    'cuanto',
+    'costo',
+    'costar',
+    'cuesta',
+    'plan',
+    'planes',
+    'premium',
+    'pro',
+    'prueba',
+    'mensual',
+    'mes',
+    'meses',
+    'dias',
+    'beneficios',
+    'pago',
+    'pagar',
+    'como funciona',
+  ];
+
+  return pricingKeywords.some((keyword) => normalized.includes(keyword));
+}
+
+export function isLikelyHumanNameInput(text: string): boolean {
+  const raw = text.trim().replace(/\s+/g, ' ');
+  if (raw.length < 2 || raw.length > 50) return false;
+
+  if (/[?¿]/.test(raw)) return false;
+  if (/@|https?:\/\/|www\.|\.com|\.co|[0-9]/i.test(raw)) return false;
+  if (isPricingOrPlanQuestion(raw)) return false;
+  if (
+    isSearchIntent(raw)
+    || isEditIntent(raw)
+    || isRestartIntent(raw)
+    || isCancelServiceIntent(raw)
+    || isUploadCVIntent(raw)
+    || isHelpIntent(raw)
+  ) {
+    return false;
+  }
+
+  const normalized = normalizeSemanticText(raw).replace(/[.,;:!]/g, ' ');
+  const tokens = normalized.split(' ').map((token) => token.trim()).filter(Boolean);
+  if (tokens.length === 0 || tokens.length > 5) return false;
+
+  const connectors = new Set(['de', 'del', 'la', 'las', 'los', 'da', 'do', 'dos', 'y']);
+  const blockedWords = new Set([
+    'precio', 'valor', 'plan', 'premium', 'pro', 'prueba', 'correo', 'email',
+    'buscar', 'editar', 'reiniciar', 'cancelar', 'ofertas', 'trabajo', 'empleo',
+    'hola', 'buenas', 'gracias', 'ayuda', 'quiero', 'necesito', 'como', 'cuanto',
+  ]);
+
+  let meaningfulTokenCount = 0;
+  for (const token of tokens) {
+    if (!/^[a-z][a-z'’-]*$/i.test(token)) return false;
+    if (connectors.has(token)) continue;
+    if (token.length < 2) return false;
+    if (blockedWords.has(token)) return false;
+    meaningfulTokenCount += 1;
+  }
+
+  return meaningfulTokenCount >= 1;
+}
+
+export function extractLikelyHumanName(text: string): string | null {
+  const raw = text.trim().replace(/\s+/g, ' ');
+  if (!raw) return null;
+
+  const byIntroPatterns = [
+    /(?:soy|me llamo|mi nombre es)\s+([A-Za-zÀ-ÿ'’-]+(?:\s+[A-Za-zÀ-ÿ'’-]+){0,4})/i,
+  ];
+
+  for (const pattern of byIntroPatterns) {
+    const match = raw.match(pattern);
+    const candidate = match?.[1]?.trim().replace(/[.,;:!?]+$/g, '');
+    if (candidate && isLikelyHumanNameInput(candidate)) {
+      return candidate;
+    }
+  }
+
+  const firstSegment = raw.split(',')[0]?.trim().replace(/[.;:!?]+$/g, '');
+  if (firstSegment && isLikelyHumanNameInput(firstSegment)) {
+    return firstSegment;
+  }
+
+  return isLikelyHumanNameInput(raw) ? raw : null;
+}
+
 // Normaliza texto de tipo de trabajo
 export function normalizeJobType(text: string): JobType | null {
   const normalizedText = text.toLowerCase().trim();

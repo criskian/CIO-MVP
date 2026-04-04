@@ -38,6 +38,9 @@ import {
   alertFrequencyToText,
   generateTimeOptions,
   getFirstName,
+  isLikelyHumanNameInput,
+  extractLikelyHumanName,
+  isPricingOrPlanQuestion,
 } from './helpers/input-validators';
 import {
   FREEMIUM_POLICY_V2,
@@ -489,28 +492,115 @@ export class ConversationService {
 
     if (!interactiveStates.has(currentState)) return null;
     if (this.isCriticalCommandBeforeAi(text, intent)) return null;
-    if (this.isLikelyValidAnswerForState(currentState, text, intent)) return null;
+    if (this.isLikelyValidAnswerForState(currentState, text, intent)) {
+      this.logger.debug(`STATE_GUARD valid_answer=true state=${currentState}`);
+      return null;
+    }
+    this.logger.log(`STATE_GUARD valid_answer=false state=${currentState}`);
 
     if (currentState === ConversationState.READY && this.shouldRedirectToEditFlow(text, intent)) {
       return await this.redirectReadyUserToEditFlow(userId);
     }
 
     const outOfFlow = await this.llmService.handleOutOfFlowMessage(text, currentState);
+    const normalizedResponseFromExtraction = this.normalizeConversationalMessage(outOfFlow?.response || null);
+
     if (outOfFlow?.isValidAnswer && outOfFlow.extractedAnswer) {
       const extracted = outOfFlow.extractedAnswer.trim();
       if (extracted.length > 0) {
         const extractedIntent = detectIntent(extracted);
-        this.logger.log(`IA extrajo respuesta valida en ${currentState}: "${extracted}"`);
-        return await this.handleStateTransition(userId, currentState, extracted, extractedIntent);
+        this.logger.log(`STATE_GUARD action=continue_with_extracted state=${currentState} extracted=${JSON.stringify(extracted)}`);
+        const transitionReply = await this.handleStateTransition(userId, currentState, extracted, extractedIntent);
+
+        if (normalizedResponseFromExtraction) {
+          return this.attachPreMessageToReply(
+            transitionReply,
+            this.clampToMaxLines(normalizedResponseFromExtraction, 5),
+          );
+        }
+
+        return transitionReply;
       }
+    }
+
+    const fallbackExtracted = this.extractFallbackAnswerForState(currentState, text);
+    if (fallbackExtracted) {
+      const extractedIntent = detectIntent(fallbackExtracted);
+      if (this.isLikelyValidAnswerForState(currentState, fallbackExtracted, extractedIntent)) {
+        this.logger.log(`STATE_GUARD action=continue_with_extracted state=${currentState} extracted=${JSON.stringify(fallbackExtracted)}`);
+        let transitionReply = await this.handleStateTransition(userId, currentState, fallbackExtracted, extractedIntent);
+
+        if (normalizedResponseFromExtraction) {
+          transitionReply = this.attachPreMessageToReply(
+            transitionReply,
+            this.clampToMaxLines(normalizedResponseFromExtraction, 5),
+          );
+        } else if (isPricingOrPlanQuestion(text)) {
+          this.logger.log(`STATE_GUARD faq_detected=true state=${currentState}`);
+          transitionReply = this.attachPreMessageToReply(
+            transitionReply,
+            this.clampToMaxLines(BotMessages.FAQ_PRICING_BRIEF, 5),
+          );
+        }
+
+        return transitionReply;
+      }
+    }
+
+    const faqDetected = isPricingOrPlanQuestion(text);
+    if (faqDetected) {
+      this.logger.log(`STATE_GUARD faq_detected=true state=${currentState}`);
     }
 
     const aiResponse = outOfFlow?.response
       || await this.llmService.generateConversationalResponse(text, currentState);
     const fallback = this.getOutOfFlowFallbackMessage(currentState);
-    const message = this.normalizeConversationalMessage(aiResponse) || fallback;
+    const message = faqDetected
+      ? BotMessages.FAQ_PRICING_BRIEF
+      : (this.normalizeConversationalMessage(aiResponse) || fallback);
     const conciseMessage = this.clampToMaxLines(message, 5);
+    this.logger.log(`STATE_GUARD action=reply_and_stay state=${currentState}`);
     return await this.buildOutOfFlowReinforcementReply(userId, currentState, conciseMessage);
+  }
+
+  private attachPreMessageToReply(reply: BotReply, preMessageText: string): BotReply {
+    const preText = preMessageText.trim();
+    if (!preText) return reply;
+
+    if (reply.preMessage?.text?.trim()) {
+      return {
+        ...reply,
+        preMessage: {
+          text: `${preText}\n\n${reply.preMessage.text.trim()}`,
+        },
+      };
+    }
+
+    return {
+      ...reply,
+      preMessage: { text: preText },
+    };
+  }
+
+  private extractFallbackAnswerForState(currentState: string, text: string): string | null {
+    if (
+      currentState === ConversationState.LEAD_REGISTER_NAME
+      || currentState === ConversationState.WA_ASK_NAME
+    ) {
+      return extractLikelyHumanName(text);
+    }
+
+    if (
+      currentState === ConversationState.LEAD_REGISTER_EMAIL
+      || currentState === ConversationState.WA_ASK_EMAIL
+      || currentState === ConversationState.ASK_EMAIL
+      || currentState === ConversationState.WAITING_PAYMENT
+    ) {
+      const emailMatch = text.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
+      return emailMatch?.[0]?.trim().toLowerCase() || null;
+    }
+
+    return null;
   }
 
   private normalizeConversationalMessage(message: string | null): string | null {
@@ -610,7 +700,7 @@ export class ConversationService {
     const normalized = this.normalizeLeadSignalToken(text);
     const trimmed = text.trim();
     const hasEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed.toLowerCase());
-    const hasName = trimmed.length >= 2 && trimmed.length <= 50 && /[a-zA-Z\u00C0-\u017F]/.test(trimmed);
+    const hasName = isLikelyHumanNameInput(trimmed);
 
     if (currentState === ConversationState.EDITING_PROFILE) {
       return Boolean(detectEditField(text)) || normalized === 'cancelar';
@@ -708,11 +798,6 @@ export class ConversationService {
       || currentState === ConversationState.ASK_EMAIL
       || currentState === ConversationState.WAITING_PAYMENT) {
       return hasEmail;
-    }
-
-    // En estado EDITING_PROFILE, toda respuesta es valida (seleccion de campo a editar)
-    if (currentState === ConversationState.EDITING_PROFILE) {
-      return true;
     }
 
     if (currentState === ConversationState.LEAD_REGISTER_NAME
@@ -885,6 +970,26 @@ export class ConversationService {
     if (currentState === ConversationState.LEAD_TERMS_CONSENT) {
       const termsReply = this.buildLeadTermsConsentReply();
       return { ...termsReply, text: message };
+    }
+
+    if (
+      currentState === ConversationState.LEAD_REGISTER_NAME
+      || currentState === ConversationState.WA_ASK_NAME
+    ) {
+      return {
+        text: `${message}\n\nPara continuar con el registro, escribeme tu nombre completo.`,
+      };
+    }
+
+    if (
+      currentState === ConversationState.LEAD_REGISTER_EMAIL
+      || currentState === ConversationState.WA_ASK_EMAIL
+      || currentState === ConversationState.ASK_EMAIL
+      || currentState === ConversationState.WAITING_PAYMENT
+    ) {
+      return {
+        text: `${message}\n\nPara continuar, escribeme tu correo electronico.`,
+      };
     }
 
     if (currentState === ConversationState.OFFER_ALERTS) {
@@ -2564,9 +2669,10 @@ export class ConversationService {
   }
 
   private async handleLeadRegisterNameState(userId: string, text: string): Promise<BotReply> {
-    const name = text.trim();
+    const extractedName = extractLikelyHumanName(text) || text.trim();
+    const name = extractedName.trim().replace(/\s+/g, ' ');
 
-    if (name.length < 2 || name.length > 50 || !/[a-zA-Z]/.test(name)) {
+    if (!isLikelyHumanNameInput(name)) {
       return {
         text: `Por favor escribe tu nombre completo (entre 2 y 50 caracteres).`,
       };
@@ -2723,19 +2829,13 @@ export class ConversationService {
    * Estado WA_ASK_NAME: Usuario no registrado, pidiendo nombre
    */
   private async handleWaAskNameState(userId: string, text: string): Promise<BotReply> {
-    const name = text.trim();
+    const extractedName = extractLikelyHumanName(text) || text.trim();
+    const name = extractedName.trim().replace(/\s+/g, ' ');
 
     // Validar nombre: mínimo 2 caracteres, máximo 50, solo letras y espacios
-    if (name.length < 2 || name.length > 50) {
+    if (!isLikelyHumanNameInput(name)) {
       return {
         text: 'Por favor, escribe tu *nombre completo* (entre 2 y 50 caracteres).\n\n✏️ Ejemplo: Juan Pérez',
-      };
-    }
-
-    // Validar que contenga al menos letras
-    if (!/[a-zA-ZÀ-ÿ\s]/i.test(name)) {
-      return {
-        text: 'Hmm, eso no parece un nombre válido. Por favor, escribe tu *nombre completo*:',
       };
     }
 
